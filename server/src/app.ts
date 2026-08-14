@@ -28,6 +28,10 @@ export function createApp(store: IncidentStore, dispatcher: PushDispatcher): exp
   app.use("/api/push", createPushRouter(dispatcher));
   app.use("/api/sources", sourcesRouter);
 
+  return app;
+}
+
+export function applyTerminalHandlers(app: express.Express): void {
   app.use((_req, res) => {
     res.status(404).json({ error: "Not found" });
   });
@@ -38,6 +42,4 @@ export function createApp(store: IncidentStore, dispatcher: PushDispatcher): exp
     const status = message.includes("requires") ? 400 : 500;
     res.status(status).json({ error: message });
   });
-
-  return app;
 }
