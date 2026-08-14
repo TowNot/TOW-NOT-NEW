@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
 import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
 import helmet from "helmet";
@@ -29,6 +31,53 @@ export function createApp(store: IncidentStore, dispatcher: PushDispatcher): exp
   app.use("/api/sources", sourcesRouter);
 
   return app;
+}
+
+function resolveClientDist(): string | undefined {
+  const candidates = [
+    path.join(__dirname, "../../client/dist"),
+    path.join(process.cwd(), "client/dist"),
+  ];
+  return candidates.find((dir) => existsSync(path.join(dir, "index.html")));
+}
+
+export function applyClientAssets(app: express.Express): void {
+  const clientDist = resolveClientDist();
+  if (!clientDist) {
+    logger.warn("Client build not found; serving API only", {
+      cwd: process.cwd(),
+      dirname: __dirname,
+    });
+    return;
+  }
+
+  logger.info("Serving client assets", { clientDist });
+
+  app.use(
+    express.static(clientDist, {
+      index: false,
+      setHeaders(res, filePath) {
+        if (filePath.endsWith("progressier.js")) {
+          res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+          res.setHeader("Service-Worker-Allowed", "/");
+          res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+          res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+        }
+      },
+    }),
+  );
+
+  app.use((req, res, next) => {
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      next();
+      return;
+    }
+    if (req.path.startsWith("/api") || req.path === "/progressier.js" || path.extname(req.path)) {
+      next();
+      return;
+    }
+    res.sendFile(path.join(clientDist, "index.html"));
+  });
 }
 
 export function applyTerminalHandlers(app: express.Express): void {

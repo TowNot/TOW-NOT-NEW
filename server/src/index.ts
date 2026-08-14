@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
 import "dotenv/config";
-import { applyTerminalHandlers, createApp } from "./app";
+import { applyClientAssets, applyTerminalHandlers, createApp } from "./app";
 import { config } from "./config";
 import { PushDispatcher } from "./dispatch/pushDispatcher";
 import { DataAggregatorEngine } from "./engine/aggregator";
@@ -66,6 +66,7 @@ app.get("/progressier.js", (_req, res) => {
   });
 });
 
+applyClientAssets(app);
 applyTerminalHandlers(app);
 
 const server = createServer(app);
