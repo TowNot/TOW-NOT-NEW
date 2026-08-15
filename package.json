@@ -11,7 +11,7 @@
     "dev": "concurrently -n server,client -c cyan,magenta \"npm run dev -w @tow-not/server\" \"npm run dev -w @tow-not/client\"",
     "dev:server": "npm run dev -w @tow-not/server",
     "dev:client": "npm run dev -w @tow-not/client",
-    "build": "npm run build -w @tow-not/server && npm run build -w @tow-not/client",
+    "build": "npm run build -w @tow-not/server",
     "build:server": "npm run build -w @tow-not/server",
     "start": "npm run start -w @tow-not/server",
     "typecheck": "npm run typecheck -w @tow-not/server && npm run typecheck -w @tow-not/client"

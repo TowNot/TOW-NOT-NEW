@@ -35,8 +35,13 @@ export function createApp(store: IncidentStore, dispatcher: PushDispatcher): exp
 
 function resolveClientDist(): string | undefined {
   const candidates = [
+    path.join(__dirname, "public"),
+    path.join(__dirname, "../public"),
     path.join(__dirname, "../../client/dist"),
+    path.join(process.cwd(), "dist/public"),
+    path.join(process.cwd(), "server/dist/public"),
     path.join(process.cwd(), "client/dist"),
+    path.join(process.cwd(), "../client/dist"),
   ];
   return candidates.find((dir) => existsSync(path.join(dir, "index.html")));
 }
@@ -44,7 +49,7 @@ function resolveClientDist(): string | undefined {
 export function applyClientAssets(app: express.Express): void {
   const clientDist = resolveClientDist();
   if (!clientDist) {
-    logger.warn("Client build not found; serving API only", {
+    logger.error("Client build not found; GET / will 404 until client/dist is built", {
       cwd: process.cwd(),
       dirname: __dirname,
     });
@@ -52,6 +57,13 @@ export function applyClientAssets(app: express.Express): void {
   }
 
   logger.info("Serving client assets", { clientDist });
+
+  const indexFile = path.join(clientDist, "index.html");
+  const sendIndex = (_req: Request, res: Response, next: NextFunction): void => {
+    res.sendFile(indexFile, (error) => {
+      if (error) next(error);
+    });
+  };
 
   app.use(
     express.static(clientDist, {
@@ -67,16 +79,17 @@ export function applyClientAssets(app: express.Express): void {
     }),
   );
 
-  app.use((req, res, next) => {
+  app.get("/", sendIndex);
+  app.get(/^\/(?!api(?:\/|$)|progressier\.js$).*/, (req, res, next) => {
     if (req.method !== "GET" && req.method !== "HEAD") {
       next();
       return;
     }
-    if (req.path.startsWith("/api") || req.path === "/progressier.js" || path.extname(req.path)) {
+    if (path.extname(req.path)) {
       next();
       return;
     }
-    res.sendFile(path.join(clientDist, "index.html"));
+    sendIndex(req, res, next);
   });
 }
 
