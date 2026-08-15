@@ -13,7 +13,7 @@ import { logger } from "./logger";
 import { IncidentStore } from "./store/incidentStore";
 
 const PROGRESSIER_SW_SOURCE =
-  'importScripts("https://progressier.app/Bv9Rb1Vm5PkAtyh6w0WG/sw.js");\n';
+  'importScripts("https://progressier.app/Bv9Rb1Vm5PkATyh6w0WG/sw.js");\n';
 
 function resolveProgressierFile(): string | undefined {
   const candidates = [
