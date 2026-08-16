@@ -2,7 +2,6 @@ import { config } from "./config";
 import { logger } from "./logger";
 import type { Incident, PushPayload } from "./types/incident";
 
-const PROGRESSIER_PUSH_URL = "https://progressier.app/api/v1/push";
 const TITLE_MAX = 50;
 const BODY_MAX = 100;
 
@@ -50,9 +49,10 @@ export async function sendProgressierPush(payload: PushPayload): Promise<void> {
   logger.info("Sending Progressier push", {
     title: body.title,
     incidentId: payload.incidentId,
+    endpoint: config.progressierPushUrl,
   });
 
-  const response = await fetch(PROGRESSIER_PUSH_URL, {
+  const response = await fetch(config.progressierPushUrl, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -63,7 +63,9 @@ export async function sendProgressierPush(payload: PushPayload): Promise<void> {
 
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
-    throw new Error(`Progressier push failed (${response.status}): ${detail || response.statusText}`);
+    throw new Error(
+      `Progressier push failed (${response.status}) at ${config.progressierPushUrl}: ${detail || response.statusText}`,
+    );
   }
 }
 

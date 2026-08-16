@@ -8,6 +8,19 @@ function resolveClientOrigin(): string {
   return "http://localhost:5173";
 }
 
+const progressierAppId = process.env.PROGRESSIER_APP_ID ?? "Bv9Rb1Vm5PkATyh6w0wG";
+
+/**
+ * Progressier issues a per-app push endpoint (dashboard → API Docs → Send
+ * notifications programmatically). Any other route answers 403 "Method not
+ * allowed", so PROGRESSIER_PUSH_URL takes precedence over the derived default.
+ */
+function resolveProgressierPushUrl(): string {
+  const configured = process.env.PROGRESSIER_PUSH_URL?.trim();
+  if (configured) return configured;
+  return `https://progressier.app/${progressierAppId}/send`;
+}
+
 export const config = {
   port: Number(process.env.PORT ?? 8080),
   clientOrigin: resolveClientOrigin(),
@@ -15,6 +28,8 @@ export const config = {
   incidentTtlMs: Number(process.env.INCIDENT_TTL_MS ?? 3 * 60 * 60 * 1000),
   radioHlsUrl: process.env.RADIO_HLS_URL ?? "",
   progressierApiKey: process.env.PROGRESSIER_API_KEY ?? "",
+  progressierAppId,
+  progressierPushUrl: resolveProgressierPushUrl(),
   pushIconUrl: process.env.PUSH_ICON_URL ?? "",
   rapidApiKey: process.env.RAPIDAPI_KEY ?? "",
   apifyApiToken: process.env.APIFY_API_TOKEN ?? "",

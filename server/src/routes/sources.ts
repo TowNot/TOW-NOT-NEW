@@ -56,6 +56,11 @@ export function createSourcesRouter(store: IncidentStore): Router {
         openai: Boolean(config.openaiApiKey),
         progressier: Boolean(config.progressierApiKey),
       },
+      push: {
+        endpoint: config.progressierPushUrl,
+        appId: config.progressierAppId,
+        recipientTag: "tow-not",
+      },
       fireDispatch: {
         listening: isFireListenerRunning(),
         streamOverride: Boolean(config.radioHlsUrl),
