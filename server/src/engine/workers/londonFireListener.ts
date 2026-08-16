@@ -1122,7 +1122,10 @@ async function pollOnce(state: StreamState): Promise<void> {
     processingBusy = true;
     void processBuffer(chunk)
       .catch((err) =>
-        logger.error({ err }, "[fire-dispatch] buffer processing failed"),
+        logger.error(
+          { err, segments: chunk.length },
+          "[fire-dispatch] buffer processing failed — audio discarded",
+        ),
       )
       .finally(() => {
         processingBusy = false;
