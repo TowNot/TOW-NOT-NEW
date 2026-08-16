@@ -161,8 +161,8 @@ export const INGEST_TYPE_ALLOWLIST = new Set([
 ]);
 
 /**
- * Hard blocklist — STRICT equality only. These exact roadwork subtypes and
- * municipal publishers are the only things dropped at ingestion.
+ * Hard blocklist — STRICT equality only. These exact roadwork subtypes are
+ * dropped before anything else looks at the row.
  */
 const HARD_BLOCK_SUBTYPES = new Set([
   "HAZARD_ON_ROAD_CONSTRUCTION",
@@ -170,7 +170,55 @@ const HARD_BLOCK_SUBTYPES = new Set([
   "HAZARD_ON_ROAD_UTILITY",
   "HAZARD_ON_ROAD_WATERMAIN",
 ]);
+
+/**
+ * Municipal traffic-management publishers. Their feeds are almost entirely
+ * planned roadwork ("Sections of roadway for surface treatment", lane
+ * closures, resurfacing), so nothing they post is ingested unless it carries
+ * explicit crash or stopped-vehicle language.
+ */
 const BLOCKED_PUBLISHERS = new Set(["LDNONTTMC", "TRANSNOMIS"]);
+
+/**
+ * Municipal-notice language. Any row whose text matches is planned road work
+ * rather than an active incident, whatever type the provider gave it. Matched
+ * against underscore-normalized text so "Sections of roadway for surface
+ * treatment" and "Road construction" are both caught.
+ */
+const MUNICIPAL_NOTICE_PATTERNS: RegExp[] = [
+  /(^|_)CONSTRUCTION(_|$)/,
+  /(^|_)ROADWORK(_|$)/,
+  /(^|_)ROAD_WORK(_|$)/,
+  /(^|_)SURFACE_TREATMENT(_|$)/,
+  /(^|_)SURFACE_TREATMENTS(_|$)/,
+  /(^|_)RESURFACING(_|$)/,
+  /(^|_)REPAVING(_|$)/,
+  /(^|_)PAVING(_|$)/,
+  /(^|_)MILLING(_|$)/,
+  /(^|_)GRADING(_|$)/,
+  /(^|_)SEALING(_|$)/,
+  /(^|_)LINE_PAINTING(_|$)/,
+  /(^|_)STREET_SWEEPING(_|$)/,
+  /(^|_)SWEEPING(_|$)/,
+  /(^|_)SNOW_REMOVAL(_|$)/,
+  /(^|_)TREE_(TRIMMING|REMOVAL|WORK)(_|$)/,
+  /(^|_)SIDEWALK(_|$)/,
+  /(^|_)SEWER(_|$)/,
+  /(^|_)WATERMAIN(_|$)/,
+  /(^|_)HYDRO(_|$)/,
+  /(^|_)UTILITY(_|$)/,
+  /(^|_)MAINTENANCE(_|$)/,
+  /(^|_)REPAIRS?(_|$)/,
+  /(^|_)DETOUR(_|$)/,
+  /(^|_)LANE_CLOSED(_|$)/,
+  /(^|_)LANE_CLOSURE(_|$)/,
+  /(^|_)ROAD_CLOSED(_|$)/,
+  /(^|_)ROAD_CLOSURE(_|$)/,
+  /(^|_)CLOSURE(_|$)/,
+  /(^|_)SPECIAL_EVENT(_|$)/,
+  /(^|_)PARADE(_|$)/,
+  /(^|_)FILMING(_|$)/,
+];
 
 /**
  * Crash-language keywords crawled across description/title/street text.
@@ -264,44 +312,59 @@ function normalizeToken(value: string): string {
 }
 
 /**
- * Minor municipal notices: roadwork, weather, animals, signage, and closure
- * paperwork. These are the ONLY hazards dropped at ingestion.
+ * The ONLY hazard subtypes allowed into the feed: a vehicle stopped in a live
+ * traffic lane or on the shoulder, and Waze's "car on the other side" crash
+ * report. This is an allowlist, not a blocklist — a hazard the list does not
+ * recognize is dropped, so new municipal subtypes can never leak in.
  *
- * Every pattern is anchored on token boundaries ((^|_)…(_|$)) rather than a
- * bare substring. Unanchored "ICE" would match POLICE, and unanchored "SIGN"
- * would match rows describing a collision "at the signal" — anchoring keeps
- * these exclusions inside the hazard branch where they belong.
+ * Patterns are anchored on token boundaries ((^|_)…(_|$)) rather than bare
+ * substrings, so an exclusion like the weather rule `_ICE` below can never
+ * mask POLICE, and these hazard rules never touch collision rows.
+ */
+const MAJOR_HAZARD_ALLOWLIST: RegExp[] = [
+  /(^|_)CAR_STOPPED(_|$)/,
+  /(^|_)STOPPED_VEHICLE(_|$)/,
+  /(^|_)VEHICLE_STOPPED(_|$)/,
+  /(^|_)DISABLED_VEHICLE(_|$)/,
+  /(^|_)VEHICLE_BREAKDOWN(_|$)/,
+  /(^|_)BREAKDOWN(_|$)/,
+  /(^|_)HAZARD_ON_ROAD_FEATURE(_|$)/, // Waze "car on other side" = a crash
+];
+
+/**
+ * Weather, wildlife, signage, and surface-defect hazards. Kept separate from
+ * the municipal-notice list purely for logging clarity; both drop the row.
  */
 const MINOR_HAZARD_PATTERNS: RegExp[] = [
-  /(^|_)CONSTRUCTION(_|$)/,
-  /(^|_)ROADWORK(_|$)/,
-  /(^|_)REPAIRS?(_|$)/,
-  /(^|_)MAINTENANCE(_|$)/,
-  /(^|_)UTILITY(_|$)/,
-  /(^|_)WATERMAIN(_|$)/,
-  /(^|_)POT_?HOLES?(_|$)/,
-  /(^|_)ROAD_CLOSED(_|$)/,
-  /(^|_)LANE_CLOSED(_|$)/,
-  /(^|_)CLOSURE(_|$)/,
   /(^|_)WEATHER(_|$)/,
   /(^|_)ICE(_|$)/,
   /(^|_)SNOW(_|$)/,
   /(^|_)FOG(_|$)/,
   /(^|_)HAIL(_|$)/,
   /(^|_)FLOOD(_|$)/,
+  /(^|_)POT_?HOLES?(_|$)/,
   /(^|_)ANIMALS?(_|$)/,
   /(^|_)ROAD_KILL(_|$)/,
   /(^|_)MISSING_SIGN(_|$)/,
   /(^|_)TRAFFIC_LIGHT_FAULT(_|$)/,
   /(^|_)BROKEN_TRAFFIC_LIGHT(_|$)/,
+  /(^|_)OBJECT_ON_ROAD(_|$)/,
+  /(^|_)EMERGENCY_VEHICLE(_|$)/,
 ];
 
+/** True when the row reads as planned municipal road work rather than an incident. */
+export function isMunicipalNotice(...values: Array<string | null | undefined>): boolean {
+  const haystacks = values
+    .filter((value): value is string => Boolean(value))
+    .map(normalizeToken);
+  return MUNICIPAL_NOTICE_PATTERNS.some((re) => haystacks.some((value) => re.test(value)));
+}
+
 /**
- * Hazard retention: a HAZARD-typed row stays in the feed unless it is one of
- * the minor municipal notices above. Emergency-vehicle, shoulder, and
- * single-vehicle hazards are real roadway events an operator can tow, so they
- * are stored and displayed — silently, since only crashes and breakdowns pass
- * `isNotifiableCrash` and reach push.
+ * Hazard retention, deliberately ruthless: the feed carries collisions,
+ * vehicles stopped in traffic, and live fire dispatches — nothing else. A
+ * HAZARD row is kept only when its subtype is on the allowlist above and it
+ * carries no municipal-notice or minor-hazard language.
  */
 export function isMajorHazard(
   type: string,
@@ -316,7 +379,11 @@ export function isMajorHazard(
   if (MINOR_HAZARD_PATTERNS.some((re) => haystacks.some((value) => re.test(value)))) {
     return false;
   }
-  return true;
+  if (isMunicipalNotice(type, subtype, text)) return false;
+
+  // Allowlist is checked against type/subtype only: a description mentioning a
+  // stopped car must not promote a roadwork row.
+  return MAJOR_HAZARD_ALLOWLIST.some((re) => re.test(t) || re.test(s));
 }
 
 export function isTrueCrash(type: string, subtype: string | null): boolean {
@@ -411,23 +478,46 @@ export function parseRawAlerts(
     const isBlockedPublisher = [...BLOCKED_PUBLISHERS].some(
       (p) => publisherUp === p || publisherUp.startsWith(`${p} `),
     );
-    // Blocked municipal publishers (LDNONTTMC / Transnomis) only cause a
-    // drop when the row is explicit roadwork (a hard-blocked subtype or a
-    // ROAD_CLOSED type). Their generic HAZARD rows — lane closures, debris,
-    // stopped vehicles — are ACTIVE roadway disruptions and must NOT be
-    // silently dropped just because a municipal feed reported them.
-    const publisherRoadwork =
-      isBlockedPublisher && (HARD_BLOCK_SUBTYPES.has(sUp) || tUp === "ROAD_CLOSED");
-    // Breakdown / disabled-vehicle rows are exempt from every blocklist —
+    // Breakdown / disabled-vehicle rows are exempt from the subtype blocklist —
     // stalled cars needing a tow always pass the crash filter.
     const breakdownHit = isBreakdown(tUp, sUp);
     const streetLabel = asString(raw["street"]) ?? "-";
-    if (!keywordHit && !breakdownHit && (HARD_BLOCK_SUBTYPES.has(sUp) || publisherRoadwork)) {
+    if (!keywordHit && !breakdownHit && HARD_BLOCK_SUBTYPES.has(sUp)) {
       earlyDropped++;
-      const key = `blocklist${isBlockedPublisher ? "-publisher" : ""}:${tUp || "<no-type>"}/${sUp || "<no-subtype>"}`;
+      const key = `blocklist:${tUp || "<no-type>"}/${sUp || "<no-subtype>"}`;
       droppedCombos.set(key, (droppedCombos.get(key) ?? 0) + 1);
       console.log(
-        `[Aggregator] DROPPED non-crash (reason: ${sUp || tUp}${isBlockedPublisher ? " / blocked municipal publisher" : ""}) at ${streetLabel} [${provider}]`,
+        `[Aggregator] DROPPED non-crash (reason: ${sUp || tUp}) at ${streetLabel} [${provider}]`,
+      );
+      continue;
+    }
+
+    // MUNICIPAL PUBLISHER HARD DROP: LDNONTTMC / Transnomis publish planned
+    // road work, not incidents. Nothing they post survives without explicit
+    // crash or stopped-vehicle language.
+    if (!keywordHit && !breakdownHit && isBlockedPublisher) {
+      earlyDropped++;
+      const key = `municipal-publisher:${tUp || "<no-type>"}/${sUp || "<no-subtype>"}`;
+      droppedCombos.set(key, (droppedCombos.get(key) ?? 0) + 1);
+      console.log(
+        `[Aggregator] DROPPED municipal notice (publisher: ${publisherUp}) at ${streetLabel} [${provider}]`,
+      );
+      continue;
+    }
+
+    // MUNICIPAL NOTICE TEXT DROP: catches roadwork posted by unbranded
+    // publishers or with a bare subtype — "Sections of roadway for surface
+    // treatment", "Road construction", resurfacing, lane closures.
+    if (
+      !keywordHit &&
+      !breakdownHit &&
+      isMunicipalNotice(type, subtype, rawDescription, asString(raw["title"]))
+    ) {
+      earlyDropped++;
+      const key = `municipal-notice:${tUp || "<no-type>"}/${sUp || "<no-subtype>"}`;
+      droppedCombos.set(key, (droppedCombos.get(key) ?? 0) + 1);
+      console.log(
+        `[Aggregator] DROPPED municipal notice (text: ${(rawDescription ?? sUp ?? tUp ?? "").slice(0, 80)}) at ${streetLabel} [${provider}]`,
       );
       continue;
     }

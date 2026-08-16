@@ -5,7 +5,7 @@ interface HeaderProps {
   health: HealthStatus | null;
   alertsEnabled: boolean;
   onToggleAlerts: () => void;
-  onEnablePush: () => Promise<void>;
+  onTogglePush: () => Promise<void>;
   pushEnabled: boolean;
   pushEnableBusy: boolean;
   onTestPush: () => Promise<void>;
@@ -19,7 +19,7 @@ export function Header({
   health,
   alertsEnabled,
   onToggleAlerts,
-  onEnablePush,
+  onTogglePush,
   pushEnabled,
   pushEnableBusy,
   onTestPush,
@@ -60,15 +60,22 @@ export function Header({
           </button>
           <button
             type="button"
-            onClick={() => void onEnablePush()}
-            disabled={pushEnableBusy || pushEnabled}
-            className={`rounded-md border px-3 py-2 text-xs font-semibold tracking-wide ${
+            onClick={() => void onTogglePush()}
+            disabled={pushEnableBusy}
+            aria-pressed={pushEnabled}
+            className={`rounded-md border px-3 py-2 text-xs font-semibold tracking-wide disabled:opacity-60 ${
               pushEnabled
-                ? "border-maps/50 bg-maps/10 text-maps"
-                : "border-fire/50 bg-fire/10 text-fire hover:bg-fire/20 disabled:opacity-60"
+                ? "border-maps/50 bg-maps/10 text-maps hover:bg-maps/20"
+                : "border-fire/50 bg-fire/10 text-fire hover:bg-fire/20"
             }`}
           >
-            {pushEnabled ? "Push notifications on" : pushEnableBusy ? "Enabling…" : "Enable Push Notifications"}
+            {pushEnableBusy
+              ? pushEnabled
+                ? "Turning off…"
+                : "Enabling…"
+              : pushEnabled
+                ? "Push notifications on"
+                : "Enable Push Notifications"}
           </button>
           <button
             type="button"

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   isBreakdown,
   isMajorHazard,
+  isMunicipalNotice,
   isNotifiableCrash,
   isTrueCrash,
   parseRawAlerts,
@@ -11,9 +12,29 @@ const checks: Array<[string, () => void]> = [
   [
     "POLICE is never masked by the anchored _ICE weather exclusion",
     () => {
-      assert.equal(isMajorHazard("HAZARD", "HAZARD_ON_ROAD_POLICE"), true);
+      // The weather rule drops real ice hazards...
       assert.equal(isMajorHazard("HAZARD", "HAZARD_WEATHER_ICE"), false);
       assert.equal(isMajorHazard("HAZARD", "HAZARD_ON_ROAD_ICE"), false);
+      // ...but the substring "ice" inside POLICE must never trigger it, so a
+      // stopped vehicle with police on scene is still retained.
+      assert.equal(
+        isMajorHazard("HAZARD", "HAZARD_ON_ROAD_CAR_STOPPED", "Police on scene"),
+        true,
+      );
+      // And a collision mentioning police still ingests as a crash.
+      const parsed = parseRawAlerts(
+        [
+          {
+            type: "HAZARD",
+            street: "Highbury Ave",
+            description: "Police on scene of a collision",
+            location: { x: -81.21, y: 42.99 },
+          },
+        ] as Record<string, unknown>[],
+        "openwebninja",
+      );
+      assert.equal(parsed.length, 1);
+      assert.equal(parsed[0]?.type, "ACCIDENT");
     },
   ],
   [
@@ -25,10 +46,29 @@ const checks: Array<[string, () => void]> = [
     },
   ],
   [
-    "major hazards are retained but silent",
+    "only stopped/disabled vehicles and other-side crashes survive the hazard branch",
     () => {
-      assert.equal(isMajorHazard("HAZARD", "HAZARD_ON_ROAD_EMERGENCY_VEHICLE"), true);
-      assert.equal(isNotifiableCrash("HAZARD", "HAZARD_ON_ROAD_EMERGENCY_VEHICLE"), false);
+      assert.equal(isMajorHazard("HAZARD", "HAZARD_ON_ROAD_CAR_STOPPED"), true);
+      assert.equal(isMajorHazard("HAZARD", "HAZARD_ON_SHOULDER_CAR_STOPPED"), true);
+      assert.equal(isMajorHazard("HAZARD", "HAZARD_ON_ROAD_FEATURE"), true);
+      // Everything else in the hazard branch is now dropped outright.
+      assert.equal(isMajorHazard("HAZARD", "HAZARD_ON_ROAD_EMERGENCY_VEHICLE"), false);
+      assert.equal(isMajorHazard("HAZARD", "HAZARD_ON_ROAD_OBJECT"), false);
+      assert.equal(isMajorHazard("HAZARD", null), false);
+      assert.equal(isMajorHazard("HAZARD", "HAZARD_ON_ROAD"), false);
+    },
+  ],
+  [
+    "reported municipal notices are recognized as road work",
+    () => {
+      assert.equal(isMunicipalNotice("Sections of roadway for surface treatment"), true);
+      assert.equal(isMunicipalNotice("Road construction"), true);
+      assert.equal(isMunicipalNotice("Road resurfacing on Parson Road"), true);
+      assert.equal(isMunicipalNotice("Lane closure on Second Line"), true);
+      assert.equal(isMunicipalNotice("Watermain maintenance"), true);
+      // Real incidents must never read as municipal work.
+      assert.equal(isMunicipalNotice("Two-vehicle collision"), false);
+      assert.equal(isMunicipalNotice("Disabled vehicle blocking the right lane"), false);
     },
   ],
   [
@@ -62,12 +102,13 @@ const checks: Array<[string, () => void]> = [
     },
   ],
   [
-    "ingestion keeps crashes and major hazards, drops jams and roadwork",
+    "ingestion keeps only collisions and stopped vehicles",
     () => {
       const rows = [
         { type: "ACCIDENT", subType: "ACCIDENT_MAJOR", street: "Oxford St E", location: { x: -81.22, y: 42.98 } },
-        { type: "HAZARD", subType: "HAZARD_ON_ROAD_EMERGENCY_VEHICLE", street: "Highbury Ave", location: { x: -81.21, y: 42.99 } },
+        { type: "HAZARD", subType: "HAZARD_ON_ROAD_CAR_STOPPED", street: "Highbury Ave", location: { x: -81.21, y: 42.99 } },
         { type: "HAZARD", subType: "HAZARD_ON_ROAD_CONSTRUCTION", street: "Dundas St", location: { x: -81.24, y: 42.98 } },
+        { type: "HAZARD", subType: "HAZARD_ON_ROAD_EMERGENCY_VEHICLE", street: "Adelaide St", location: { x: -81.23, y: 42.97 } },
         { type: "JAM", subType: "JAM_HEAVY_TRAFFIC", street: "Wonderland Rd", location: { x: -81.28, y: 42.94 } },
       ] as Record<string, unknown>[];
 
@@ -75,12 +116,64 @@ const checks: Array<[string, () => void]> = [
       const kept = parsed.map((alert) => `${alert.type}/${alert.subtype}`).sort();
       assert.deepEqual(kept, [
         "ACCIDENT/ACCIDENT_MAJOR",
-        "HAZARD/HAZARD_ON_ROAD_EMERGENCY_VEHICLE",
+        "HAZARD/HAZARD_ON_ROAD_CAR_STOPPED",
       ]);
 
-      const hazard = parsed.find((alert) => alert.type === "HAZARD");
-      assert.ok(hazard);
-      assert.equal(isNotifiableCrash(hazard.type, hazard.subtype), false);
+      const stopped = parsed.find((alert) => alert.type === "HAZARD");
+      assert.ok(stopped);
+      assert.equal(isNotifiableCrash(stopped.type, stopped.subtype), true);
+    },
+  ],
+  [
+    "the roadwork the operator reported never reaches the feed",
+    () => {
+      const rows = [
+        {
+          type: "HAZARD",
+          street: "Parson Road",
+          description: "Sections of roadway for surface treatment",
+          reported_by: "Transnomis Solutions",
+          location: { x: -81.19, y: 42.95 },
+        },
+        {
+          type: "HAZARD",
+          street: "Second Line",
+          description: "Road construction",
+          location: { x: -81.31, y: 43.02 },
+        },
+        {
+          type: "OTHER",
+          street: "Parson Road",
+          description: "Sections of roadway for surface treatment",
+          location: { x: -81.19, y: 42.95 },
+        },
+        {
+          type: "ROAD_CLOSED",
+          street: "Linkway Blvd",
+          description: "Road closed for resurfacing",
+          location: { x: -81.33, y: 42.96 },
+        },
+      ] as Record<string, unknown>[];
+
+      assert.deepEqual(parseRawAlerts(rows, "openwebninja"), []);
+    },
+  ],
+  [
+    "a real crash from a municipal publisher still gets through",
+    () => {
+      const rows = [
+        {
+          type: "HAZARD",
+          street: "Wharncliffe Rd",
+          description: "Collision blocking the curb lane",
+          reported_by: "Transnomis Solutions",
+          location: { x: -81.25, y: 42.97 },
+        },
+      ] as Record<string, unknown>[];
+
+      const parsed = parseRawAlerts(rows, "openwebninja");
+      assert.equal(parsed.length, 1);
+      assert.equal(parsed[0]?.type, "ACCIDENT");
     },
   ],
 ];

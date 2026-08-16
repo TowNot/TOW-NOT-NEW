@@ -1,8 +1,9 @@
 importScripts("https://progressier.app/Bv9Rb1Vm5PkATyh6w0wG/sw.js");
 
-// Progressier's handler above renders the notification. This listener only
-// forwards the payload to open windows so the app can play the TOW-NOT
-// dispatch tone instead of the platform's generic notification sound.
+// Progressier's handler above renders the notification and the device plays
+// its notification sound. This listener only tells open windows which incident
+// was announced, so the app can suppress its own dispatch tone and the
+// operator never hears two sounds for one incident.
 self.addEventListener("push", (event) => {
   event.waitUntil(
     (async () => {
@@ -21,6 +22,7 @@ self.addEventListener("push", (event) => {
           type: "tow-not-alert",
           title: payload.title || "",
           body: payload.body || "",
+          url: payload.url || "",
         });
       }
     })(),

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { scheduleIncidentAlert } from "../lib/dispatchAlerts";
 import type { Incident } from "../types";
 
 export function useAlertOnNewIncidents(
@@ -18,14 +19,17 @@ export function useAlertOnNewIncidents(
 
     const newcomers = incidents.filter((incident) => !seen.current.has(incident.id));
     newcomers.forEach((incident) => seen.current.add(incident.id));
+    if (!enabled) return;
 
-    const shouldAlert = newcomers.some(
-      (incident) =>
+    for (const incident of newcomers) {
+      const worthAlerting =
         incident.source === "fire_dispatch" ||
         incident.severity === "high" ||
-        incident.severity === "critical",
-    );
-
-    if (enabled && shouldAlert) play();
+        incident.severity === "critical";
+      // Scheduled rather than played: a push for the same incident cancels it,
+      // so the operator hears the device notification or the in-app tone, but
+      // never both.
+      if (worthAlerting) scheduleIncidentAlert(incident.id, play);
+    }
   }, [incidents, play, enabled]);
 }

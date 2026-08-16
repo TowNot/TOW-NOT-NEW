@@ -26,7 +26,7 @@ const PROGRESSIER_SW_SOURCE = [
   "      }",
   '      const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });',
   "      for (const client of windows) {",
-  '        client.postMessage({ type: "tow-not-alert", title: payload.title || "", body: payload.body || "" });',
+  '        client.postMessage({ type: "tow-not-alert", title: payload.title || "", body: payload.body || "", url: payload.url || "" });',
   "      }",
   "    })(),",
   "  );",

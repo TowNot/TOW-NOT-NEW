@@ -15,14 +15,14 @@ export default function App() {
     busy: pushEnableBusy,
     enabled: pushEnabled,
     error: progressierError,
-    enablePush,
+    togglePush,
   } = useProgressier();
   const [pushBusy, setPushBusy] = useState(false);
   const [lastPush, setLastPush] = useState<PushReceipt | null>(null);
   const [pushError, setPushError] = useState<string | null>(null);
 
   useAlertOnNewIncidents(incidents, play, enabled);
-  usePushAlertBridge(play, enabled);
+  usePushAlertBridge();
 
   const onToggleAlerts = useCallback(() => {
     if (enabled) disable();
@@ -39,13 +39,13 @@ export default function App() {
         throw new Error(body.error ?? "Test push failed");
       }
       setLastPush(body.receipt);
-      play();
+      // No local tone here: the delivered notification is the sound.
     } catch (error) {
       setPushError(error instanceof Error ? error.message : "Test push failed");
     } finally {
       setPushBusy(false);
     }
-  }, [play]);
+  }, []);
 
   return (
     <div className="radar-grid min-h-screen">
@@ -54,7 +54,7 @@ export default function App() {
         health={health}
         alertsEnabled={enabled}
         onToggleAlerts={onToggleAlerts}
-        onEnablePush={enablePush}
+        onTogglePush={togglePush}
         pushEnabled={pushEnabled}
         pushEnableBusy={pushEnableBusy}
         onTestPush={onTestPush}
