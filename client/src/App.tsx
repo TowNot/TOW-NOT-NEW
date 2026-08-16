@@ -5,6 +5,7 @@ import { useAlertOnNewIncidents } from "./hooks/useAlertOnNewIncidents";
 import { useAudioAlert } from "./hooks/useAudioAlert";
 import { useIncidents } from "./hooks/useIncidents";
 import { useProgressier } from "./hooks/useProgressier";
+import { usePushAlertBridge } from "./hooks/usePushAlertBridge";
 import type { PushReceipt } from "./types";
 
 export default function App() {
@@ -21,6 +22,7 @@ export default function App() {
   const [pushError, setPushError] = useState<string | null>(null);
 
   useAlertOnNewIncidents(incidents, play, enabled);
+  usePushAlertBridge(play, enabled);
 
   const onToggleAlerts = useCallback(() => {
     if (enabled) disable();

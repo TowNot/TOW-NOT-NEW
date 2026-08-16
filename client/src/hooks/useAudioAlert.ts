@@ -50,23 +50,27 @@ export function useAudioAlert(src = "/sounds/dispatch_alert.mp3") {
     const ctx = contextRef.current;
     if (!ctx) return;
     const now = ctx.currentTime;
-    const sequence: Array<[number, number, number]> = [
-      [880, now, 0.16],
-      [1320, now + 0.14, 0.1],
-      [660, now + 0.22, 0.22],
-    ];
-    for (const [freq, start, duration] of sequence) {
+
+    const tone = (frequency: number, start: number, duration: number) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.type = "triangle";
-      osc.frequency.value = freq;
+      osc.type = "sawtooth";
+      osc.frequency.value = frequency;
       osc.connect(gain);
       gain.connect(ctx.destination);
       gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(0.18, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.2, start + 0.015);
       gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
       osc.start(start);
       osc.stop(start + duration + 0.02);
+    };
+
+    // TOW-NOT dispatch signature: three two-tone pulses, deliberately unlike
+    // a generic notification ping so an emergency tow alert is recognizable
+    // without looking at the screen.
+    for (const offset of [0, 0.36, 0.72]) {
+      tone(740, now + offset, 0.16);
+      tone(988, now + offset + 0.17, 0.17);
     }
   }, []);
 

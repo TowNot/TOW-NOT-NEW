@@ -18,6 +18,11 @@ export interface Incident {
   severity: IncidentSeverity;
   timestamp: string;
   expiresAt: string;
+  subtype?: string | null;
+  provider?: string;
+  unverifiedAddress?: boolean;
+  /** False for major hazards, which are mapped and listed but never pushed. */
+  notified?: boolean;
 }
 
 export interface PushPayload {

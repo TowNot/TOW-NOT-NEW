@@ -11,22 +11,29 @@ export interface ProgressierPushRequest {
   title: string;
   body: string;
   url: string;
+  icon?: string;
 }
+
+const SOURCE_LABELS: Record<Incident["source"], string> = {
+  waze: "Waze",
+  google_maps: "Google Maps",
+  fire_dispatch: "Fire dispatch",
+};
 
 export function buildProgressierPayload(payload: PushPayload): ProgressierPushRequest {
   return {
-    recipients: { users: "all" },
+    recipients: { tags: "tow-not" },
     title: truncate(payload.title, TITLE_MAX),
     body: truncate(payload.body, BODY_MAX),
     url: payload.url ?? config.clientOrigin,
+    ...(config.pushIconUrl ? { icon: config.pushIconUrl } : {}),
   };
 }
 
 export function incidentToPushPayload(incident: Incident): PushPayload {
-  const sourceLabel = incident.source.replaceAll("_", " ");
   return {
-    title: `${sourceLabel} · ${incident.title}`,
-    body: `${incident.locationLabel} — ${incident.description}`,
+    title: `TOW-NOT · ${incident.title}`,
+    body: `${incident.locationLabel} — ${SOURCE_LABELS[incident.source]}`,
     severity: incident.severity,
     incidentId: incident.id,
     url: `${config.clientOrigin}/?incident=${encodeURIComponent(incident.id)}`,

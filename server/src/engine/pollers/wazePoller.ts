@@ -1,76 +1,80 @@
 import { config } from "../../config";
 import { logger } from "../../logger";
 import { IncidentStore } from "../../store/incidentStore";
-import type { Incident, IncidentSeverity } from "../../types/incident";
-import { jitter, LONDON_ON_LOCATIONS } from "../londonLocations";
-import { stableId } from "../../util/ids";
+import type { Incident, IncidentSeverity, IncidentSource } from "../../types/incident";
+import { distanceKm } from "../geo";
+import {
+  fetchWazeAlerts,
+  GOOGLE_MAPS_DEDUP_RADIUS_KM,
+  isBreakdown,
+  isNotifiableCrash,
+  type ProviderSource,
+  type WazeAlert,
+} from "../wazeAggregator";
 
-export interface WazeAlert {
-  uuid: string;
-  type: "ACCIDENT" | "HAZARD" | "ROAD_CLOSED";
-  subtype: string;
-  street: string;
-  city: "London, ON";
-  location: { x: number; y: number };
-  reliability: number;
-  pubMillis: number;
+export type { WazeAlert };
+
+function toSource(provider: ProviderSource): IncidentSource {
+  return provider === "google_maps" ? "google_maps" : "waze";
 }
 
-const ACCIDENT_POOL: Array<{ type: WazeAlert["type"]; subtype: string; title: string; severity: IncidentSeverity }> = [
-  { type: "ACCIDENT", subtype: "ACCIDENT_MAJOR", title: "Major collision", severity: "critical" },
-  { type: "ACCIDENT", subtype: "ACCIDENT_MINOR", title: "Minor collision", severity: "high" },
-  { type: "HAZARD", subtype: "HAZARD_ON_ROAD_CAR_STOPPED", title: "Stopped vehicle", severity: "medium" },
-  { type: "ROAD_CLOSED", subtype: "ROAD_CLOSED_EVENT", title: "Road closure", severity: "high" },
-  { type: "ACCIDENT", subtype: "ACCIDENT_MAJOR", title: "Multi-vehicle accident", severity: "critical" },
-];
+function toSeverity(alert: WazeAlert): IncidentSeverity {
+  if (isBreakdown(alert.type, alert.subtype)) return "high";
+  const subtype = (alert.subtype ?? "").toUpperCase();
+  if (subtype.includes("MAJOR") || subtype.includes("SEVERE") || subtype.includes("PILE")) {
+    return "critical";
+  }
+  if (alert.type.toUpperCase().startsWith("ACCIDENT") || alert.type.toUpperCase().includes("CRASH")) {
+    return "high";
+  }
+  return "medium";
+}
 
-const MAX_ACTIVE = 8;
-
-export function scrapeWazeAccidents(): WazeAlert[] {
-  const count = 2 + Math.floor(Math.random() * 4);
-  const now = Date.now();
-  return Array.from({ length: count }, (_, i) => {
-    const location = LONDON_ON_LOCATIONS[(now + i) % LONDON_ON_LOCATIONS.length];
-    const template = ACCIDENT_POOL[i % ACCIDENT_POOL.length];
-    const key = `${template.subtype}:${location.label}`;
-    return {
-      uuid: stableId("waze-raw", key),
-      type: template.type,
-      subtype: template.subtype,
-      street: location.label,
-      city: "London, ON",
-      location: { x: jitter(location.longitude), y: jitter(location.latitude) },
-      reliability: 6 + Math.floor(Math.random() * 4),
-      pubMillis: now - i * 90_000,
-    };
-  });
+function toTitle(alert: WazeAlert): string {
+  if (isBreakdown(alert.type, alert.subtype)) return "Disabled vehicle";
+  const subtype = (alert.subtype ?? "").toUpperCase();
+  if (subtype.includes("MAJOR") || subtype.includes("PILE")) return "Major collision";
+  if (alert.type.toUpperCase().startsWith("ACCIDENT")) return "Traffic accident";
+  return alert.street ? `${alert.type} on ${alert.street}` : alert.type;
 }
 
 export function mapWazeAlert(alert: WazeAlert): Incident {
-  const template = ACCIDENT_POOL.find((item) => item.subtype === alert.subtype) ?? ACCIDENT_POOL[0];
-  const timestamp = new Date(alert.pubMillis).toISOString();
+  const reported = alert.reportedAt.getTime();
+  const street = alert.street?.trim() || "Unknown street";
+  const city = alert.city?.trim() || "London, ON";
   return {
-    id: stableId("waze", alert.uuid),
-    source: "waze",
-    type: alert.type.toLowerCase(),
-    title: template.title,
-    description: `${template.title} reported on ${alert.street}. Reliability ${alert.reliability}/10.`,
-    coordinates: { latitude: alert.location.y, longitude: alert.location.x },
-    locationLabel: `${alert.street}, ${alert.city}`,
-    severity: template.severity,
-    timestamp,
-    expiresAt: new Date(alert.pubMillis + config.incidentTtlMs).toISOString(),
+    id: `${alert.provider}:${alert.alertId}`,
+    source: toSource(alert.provider),
+    type: alert.type,
+    subtype: alert.subtype,
+    title: toTitle(alert),
+    description:
+      alert.description?.trim() ||
+      `${toTitle(alert)} reported on ${street}.`,
+    coordinates: { latitude: alert.lat, longitude: alert.lng },
+    locationLabel: `${street}, ${city}`,
+    severity: toSeverity(alert),
+    timestamp: alert.reportedAt.toISOString(),
+    expiresAt: new Date(reported + config.incidentTtlMs).toISOString(),
+    provider: alert.provider,
   };
 }
 
 export class WazeTrafficPoller {
   private timer: NodeJS.Timeout | null = null;
+  private inFlight = false;
 
   constructor(private readonly store: IncidentStore) {}
 
   start(): void {
     if (this.timer) return;
-    logger.info("Waze traffic poller started", { intervalMs: config.pollIntervalMs });
+    logger.info("Live traffic aggregator started", {
+      intervalMs: config.pollIntervalMs,
+      lat: config.londonLat,
+      lng: config.londonLng,
+      radiusKm: config.pollRadiusKm,
+      rapidApiConfigured: Boolean(config.rapidApiKey),
+    });
     void this.poll();
     this.timer = setInterval(() => void this.poll(), config.pollIntervalMs);
     this.timer.unref();
@@ -84,12 +88,52 @@ export class WazeTrafficPoller {
   }
 
   async poll(): Promise<Incident[]> {
-    const alerts = scrapeWazeAccidents();
-    const incidents = alerts.slice(0, MAX_ACTIVE).map(mapWazeAlert);
-    for (const incident of incidents) {
-      this.store.upsert(incident);
+    if (!config.rapidApiKey) {
+      logger.warn("Skipping live traffic poll; RAPIDAPI_KEY is not configured");
+      return [];
     }
-    logger.debug("Waze poll complete", { ingested: incidents.length });
-    return incidents;
+    if (this.inFlight) {
+      logger.info("Live traffic poll skipped: previous pass still running");
+      return [];
+    }
+    this.inFlight = true;
+    try {
+      const alerts = await fetchWazeAlerts(config.londonLat, config.londonLng, config.pollRadiusKm);
+      const ingested: Incident[] = [];
+      for (const alert of alerts) {
+        if (alert.provider === "google_maps" && this.hasNearbyCrash(alert)) {
+          logger.info("Skipped drifting Google Maps pin near an active crash", {
+            street: alert.street,
+            provider: alert.provider,
+          });
+          continue;
+        }
+        const incident = mapWazeAlert(alert);
+        this.store.upsert(incident);
+        ingested.push(incident);
+      }
+      logger.info("Live traffic poll complete", { fetched: alerts.length, ingested: ingested.length });
+      return ingested;
+    } catch (error) {
+      logger.error("Live traffic poll failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return [];
+    } finally {
+      this.inFlight = false;
+    }
+  }
+
+  private hasNearbyCrash(alert: WazeAlert): boolean {
+    return this.store.getActive().some(
+      (incident) =>
+        isNotifiableCrash(incident.type, incident.subtype ?? null) &&
+        distanceKm(
+          incident.coordinates.latitude,
+          incident.coordinates.longitude,
+          alert.lat,
+          alert.lng,
+        ) <= GOOGLE_MAPS_DEDUP_RADIUS_KM,
+    );
   }
 }

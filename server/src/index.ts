@@ -6,14 +6,33 @@ import { applyClientAssets, applyTerminalHandlers, createApp } from "./app";
 import { config } from "./config";
 import { PushDispatcher } from "./dispatch/pushDispatcher";
 import { DataAggregatorEngine } from "./engine/aggregator";
+import { shouldNotifyIncident } from "./engine/notifyGate";
 import { GoogleMapsTrafficPoller } from "./engine/pollers/googleMapsPoller";
 import { WazeTrafficPoller } from "./engine/pollers/wazePoller";
 import { RadioIngestionWorker } from "./engine/workers/radioIngestionWorker";
 import { logger } from "./logger";
 import { IncidentStore } from "./store/incidentStore";
 
-const PROGRESSIER_SW_SOURCE =
-  'importScripts("https://progressier.app/Bv9Rb1Vm5PkATyh6w0wG/sw.js");\n';
+const PROGRESSIER_SW_SOURCE = [
+  'importScripts("https://progressier.app/Bv9Rb1Vm5PkATyh6w0wG/sw.js");',
+  'self.addEventListener("push", (event) => {',
+  "  event.waitUntil(",
+  "    (async () => {",
+  "      let payload = {};",
+  "      try {",
+  "        payload = event.data ? event.data.json() : {};",
+  "      } catch {",
+  "        payload = {};",
+  "      }",
+  '      const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });',
+  "      for (const client of windows) {",
+  '        client.postMessage({ type: "tow-not-alert", title: payload.title || "", body: payload.body || "" });',
+  "      }",
+  "    })(),",
+  "  );",
+  "});",
+  "",
+].join("\n");
 
 function resolveProgressierFile(): string | undefined {
   const candidates = [
@@ -32,11 +51,23 @@ const radio = new RadioIngestionWorker(store);
 const engine = new DataAggregatorEngine(waze, googleMaps, radio);
 
 store.on("created", (incident) => {
-  void dispatcher.notifyIncident(incident).catch((error: unknown) => {
-    logger.error("Automatic push failed", {
-      error: error instanceof Error ? error.message : String(error),
+  if (!shouldNotifyIncident(incident, store)) {
+    logger.info("Stored without push", {
+      incidentId: incident.id,
+      type: incident.type,
+      subtype: incident.subtype,
+      source: incident.source,
     });
-  });
+    return;
+  }
+  void dispatcher
+    .notifyIncident(incident)
+    .then(() => store.markNotified(incident.id))
+    .catch((error: unknown) => {
+      logger.error("Automatic push failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
 });
 
 const app = createApp(store, dispatcher);

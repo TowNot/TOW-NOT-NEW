@@ -17,6 +17,10 @@ export interface Incident {
   severity: IncidentSeverity;
   timestamp: string;
   expiresAt: string;
+  subtype?: string | null;
+  provider?: string;
+  unverifiedAddress?: boolean;
+  notified?: boolean;
 }
 
 export interface PushReceipt {

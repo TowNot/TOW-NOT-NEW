@@ -9,7 +9,7 @@ import { logger } from "./logger";
 import { createIncidentRouter } from "./routes/incidents";
 import { healthRouter } from "./routes/health";
 import { createPushRouter } from "./routes/push";
-import { sourcesRouter } from "./routes/sources";
+import { createSourcesRouter } from "./routes/sources";
 import type { IncidentStore } from "./store/incidentStore";
 
 export function createApp(store: IncidentStore, dispatcher: PushDispatcher): express.Express {
@@ -28,7 +28,7 @@ export function createApp(store: IncidentStore, dispatcher: PushDispatcher): exp
   app.use("/api", healthRouter);
   app.use("/api/incidents", createIncidentRouter(store));
   app.use("/api/push", createPushRouter(dispatcher));
-  app.use("/api/sources", sourcesRouter);
+  app.use("/api/sources", createSourcesRouter(store));
 
   return app;
 }

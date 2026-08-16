@@ -5,7 +5,12 @@ export function IncidentCard({ incident }: { incident: Incident }) {
     <article className="grid gap-3 rounded-lg border border-line bg-panel/80 p-4 md:grid-cols-[9rem_1fr_auto]">
       <div className="flex items-start justify-between gap-3 md:block">
         <SourceBadge source={incident.source} />
-        <SeverityMark severity={incident.severity} />
+        <div className="md:mt-2">
+          <SeverityMark severity={incident.severity} />
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-slate-500">
+            {incident.notified ? "alerted" : "silent"}
+          </p>
+        </div>
       </div>
       <div>
         <h3 className="text-base font-semibold">{incident.title}</h3>

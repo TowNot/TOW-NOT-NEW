@@ -1,7 +1,18 @@
 import { EventEmitter } from "node:events";
 import { config } from "../config";
 import { logger } from "../logger";
-import type { Incident } from "../types/incident";
+import type { Incident, IncidentSeverity } from "../types/incident";
+
+const SEVERITY_RANK: Record<IncidentSeverity, number> = {
+  low: 0,
+  medium: 1,
+  high: 2,
+  critical: 3,
+};
+
+function higherSeverity(current: IncidentSeverity, incoming: IncidentSeverity): IncidentSeverity {
+  return SEVERITY_RANK[incoming] > SEVERITY_RANK[current] ? incoming : current;
+}
 
 export class IncidentStore extends EventEmitter {
   private readonly incidents = new Map<string, Incident>();
@@ -21,15 +32,25 @@ export class IncidentStore extends EventEmitter {
   }
 
   upsert(incident: Incident): Incident {
-    const isNew = !this.incidents.has(incident.id);
+    const existing = this.incidents.get(incident.id);
+    const isNew = !existing;
     const withExpiry: Incident = {
       ...incident,
       expiresAt: incident.expiresAt || new Date(Date.now() + config.incidentTtlMs).toISOString(),
+      severity: existing ? higherSeverity(existing.severity, incident.severity) : incident.severity,
     };
     this.incidents.set(withExpiry.id, withExpiry);
     this.emit("upsert", withExpiry);
     if (isNew) this.emit("created", withExpiry);
     return withExpiry;
+  }
+
+  markNotified(id: string): void {
+    const incident = this.incidents.get(id);
+    if (!incident || incident.notified) return;
+    const updated: Incident = { ...incident, notified: true };
+    this.incidents.set(id, updated);
+    this.emit("upsert", updated);
   }
 
   getActive(): Incident[] {
