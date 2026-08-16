@@ -10,7 +10,7 @@ import type { PushReceipt } from "./types";
 
 export default function App() {
   const { incidents, connected, health } = useIncidents();
-  const { enabled, enable, disable, play } = useAudioAlert("/sounds/dispatch_alert.mp3");
+  const { enabled, enable, disable, play } = useAudioAlert();
   const {
     busy: pushEnableBusy,
     enabled: pushEnabled,
@@ -22,7 +22,7 @@ export default function App() {
   const [pushError, setPushError] = useState<string | null>(null);
 
   useAlertOnNewIncidents(incidents, play, enabled);
-  usePushAlertBridge();
+  usePushAlertBridge(play);
 
   const onToggleAlerts = useCallback(() => {
     if (enabled) disable();

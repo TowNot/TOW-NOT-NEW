@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { setTimeout as delay } from "node:timers/promises";
 import {
+  claimIncidentAlert,
   markPushAlerted,
   resetDispatchAlerts,
   scheduleIncidentAlert,
@@ -33,13 +34,36 @@ results.push(
 );
 
 results.push(
-  await run("a push for the same incident cancels the in-app tone", async () => {
+  await run("a backgrounded push cancels the in-app tone", async () => {
     let plays = 0;
     scheduleIncidentAlert("waze:abc", () => plays++);
     await delay(200); // push lands while the tone is still queued
     markPushAlerted("waze:abc");
     await delay(AFTER_RACE_WINDOW_MS);
     assert.equal(plays, 0, "device notification already announced this incident");
+  }),
+);
+
+results.push(
+  await run("a foreground push sounds the siren exactly once", async () => {
+    let plays = 0;
+    scheduleIncidentAlert("waze:abc", () => plays++);
+    await delay(200);
+    // App is visible, so the push claims the incident and plays the siren
+    // itself instead of letting the queued feed tone fire too.
+    if (claimIncidentAlert("waze:abc")) plays++;
+    await delay(AFTER_RACE_WINDOW_MS);
+    assert.equal(plays, 1);
+  }),
+);
+
+results.push(
+  await run("a claim after the tone already played does not repeat it", async () => {
+    let plays = 0;
+    scheduleIncidentAlert("waze:late", () => plays++);
+    await delay(AFTER_RACE_WINDOW_MS); // tone fires first
+    if (claimIncidentAlert("waze:late")) plays++;
+    assert.equal(plays, 1);
   }),
 );
 

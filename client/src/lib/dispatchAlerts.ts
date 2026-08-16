@@ -33,6 +33,18 @@ export function markPushAlerted(incidentId: string): void {
   }
 }
 
+/**
+ * Claims the right to sound the siren for an incident right now, cancelling any
+ * queued in-app tone. Returns false when something already announced it, so a
+ * push and a feed update for the same incident produce exactly one siren.
+ */
+export function claimIncidentAlert(incidentId: string): boolean {
+  prune();
+  const alreadyAlerted = alerted.has(incidentId);
+  markPushAlerted(incidentId);
+  return !alreadyAlerted;
+}
+
 /** Queues the in-app tone unless the incident has already been announced. */
 export function scheduleIncidentAlert(incidentId: string, play: () => void): void {
   prune();

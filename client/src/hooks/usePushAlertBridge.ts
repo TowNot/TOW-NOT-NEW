@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { markPushAlerted } from "../lib/dispatchAlerts";
+import { claimIncidentAlert, markPushAlerted } from "../lib/dispatchAlerts";
 
 interface TowNotAlertMessage {
   type?: string;
@@ -18,14 +18,15 @@ function incidentIdFromUrl(url: string | undefined): string | null {
 }
 
 /**
- * Suppresses the in-app tone for incidents the device has already announced.
+ * Sounds the dispatch siren for pushes that arrive while the app is open.
  *
- * The push notification itself makes the platform's sound, and on iOS that
- * banner sounds even with the app in the foreground. Playing the dispatch tone
- * as well is the double-sound operators were hearing, so a push claims the
- * incident and the live feed stays quiet for it.
+ * With the app in the foreground the operator should hear the TOW-NOT siren,
+ * not just the platform chime, so the push claims the incident and plays it —
+ * which also cancels the queued feed tone, keeping it to one siren per
+ * incident. When the app is backgrounded the incident is only recorded: audio
+ * cannot play there, and the system notification is the alert.
  */
-export function usePushAlertBridge(): void {
+export function usePushAlertBridge(play: () => void): void {
   useEffect(() => {
     if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
 
@@ -34,10 +35,21 @@ export function usePushAlertBridge(): void {
       if (data?.type !== "tow-not-alert") return;
 
       const incidentId = incidentIdFromUrl(data.url);
-      if (incidentId) markPushAlerted(incidentId);
+      const visible = typeof document !== "undefined" && document.visibilityState === "visible";
+
+      if (!incidentId) {
+        if (visible) play();
+        return;
+      }
+
+      if (!visible) {
+        markPushAlerted(incidentId);
+        return;
+      }
+      if (claimIncidentAlert(incidentId)) play();
     };
 
     navigator.serviceWorker.addEventListener("message", onMessage);
     return () => navigator.serviceWorker.removeEventListener("message", onMessage);
-  }, []);
+  }, [play]);
 }
