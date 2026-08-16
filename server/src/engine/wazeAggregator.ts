@@ -486,8 +486,9 @@ export function parseRawAlerts(
       earlyDropped++;
       const key = `blocklist:${tUp || "<no-type>"}/${sUp || "<no-subtype>"}`;
       droppedCombos.set(key, (droppedCombos.get(key) ?? 0) + 1);
-      console.log(
-        `[Aggregator] DROPPED non-crash (reason: ${sUp || tUp}) at ${streetLabel} [${provider}]`,
+      logger.debug(
+        { provider, street: streetLabel, subtype: sUp || tUp },
+        "[Aggregator] dropped roadwork subtype",
       );
       continue;
     }
@@ -497,10 +498,11 @@ export function parseRawAlerts(
     // crash or stopped-vehicle language.
     if (!keywordHit && !breakdownHit && isBlockedPublisher) {
       earlyDropped++;
-      const key = `municipal-publisher:${tUp || "<no-type>"}/${sUp || "<no-subtype>"}`;
+      const key = `municipal-publisher:${publisherUp}`;
       droppedCombos.set(key, (droppedCombos.get(key) ?? 0) + 1);
-      console.log(
-        `[Aggregator] DROPPED municipal notice (publisher: ${publisherUp}) at ${streetLabel} [${provider}]`,
+      logger.debug(
+        { provider, street: streetLabel, publisher: publisherUp },
+        "[Aggregator] dropped municipal publisher row",
       );
       continue;
     }
@@ -516,8 +518,9 @@ export function parseRawAlerts(
       earlyDropped++;
       const key = `municipal-notice:${tUp || "<no-type>"}/${sUp || "<no-subtype>"}`;
       droppedCombos.set(key, (droppedCombos.get(key) ?? 0) + 1);
-      console.log(
-        `[Aggregator] DROPPED municipal notice (text: ${(rawDescription ?? sUp ?? tUp ?? "").slice(0, 80)}) at ${streetLabel} [${provider}]`,
+      logger.debug(
+        { provider, street: streetLabel, text: (rawDescription ?? sUp ?? tUp ?? "").slice(0, 80) },
+        "[Aggregator] dropped municipal notice",
       );
       continue;
     }
@@ -532,8 +535,9 @@ export function parseRawAlerts(
       earlyDropped++;
       const key = `road-closed:${tUp}/${sUp || "<no-subtype>"}`;
       droppedCombos.set(key, (droppedCombos.get(key) ?? 0) + 1);
-      console.log(
-        `[Aggregator] DROPPED non-crash (reason: ROAD_CLOSED${sUp ? `/${sUp}` : ""}) at ${streetLabel} [${provider}]`,
+      logger.debug(
+        { provider, street: streetLabel, subtype: sUp },
+        "[Aggregator] dropped road closure",
       );
       continue;
     }
@@ -559,30 +563,31 @@ export function parseRawAlerts(
       earlyDropped++;
       const key = `non-crash:${tUp || "<no-type>"}/${sUp || "<no-subtype>"}`;
       droppedCombos.set(key, (droppedCombos.get(key) ?? 0) + 1);
-      console.log(
-        `[Aggregator] DROPPED non-crash (reason: ${sUp || tUp || rawDescription?.slice(0, 80) || "no crash language"}) at ${streetLabel} [${provider}]`,
+      logger.debug(
+        { provider, street: streetLabel, reason: sUp || tUp || "no crash language" },
+        "[Aggregator] dropped non-crash row",
       );
       continue;
     }
 
-    // Detailed live ingestion tracing: raw JSON + normalized key fields for
-    // every incoming item, so test posts pushed to Waze can be spotted.
-    console.log(`[${provider}] RAW EVENT: ${JSON.stringify(raw)}`);
-    console.log(
-      `[${provider}] ITEM type=${raw["type"] ?? "-"} subtype=${raw["subType"] ?? raw["subtype"] ?? "-"} category=${raw["category"] ?? "-"} street=${raw["street"] ?? "-"} gps=${JSON.stringify({ locationX: raw["locationX"], locationY: raw["locationY"], location: raw["location"], lat: raw["latitude"] ?? raw["lat"], lng: raw["longitude"] ?? raw["lng"] })}`,
-    );
-    if (keywordHit) {
-      console.log(
-        `[${provider}] KEYWORD-CRASH RETAINED: matched "${keywordHit}" in text — type=${tUp || "-"} subtype=${sUp || "-"} street=${asString(raw["street"]) ?? "-"} text=${crashText.slice(0, 200)}`,
-      );
-    }
+    // Full payload tracing stays at debug: a busy London poll carries hundreds
+    // of rows, and dumping each one buries the incidents that matter.
+    logger.debug({ provider, raw }, "[Aggregator] raw event retained");
+
     const acceptedAs = keywordHit || crashTyped
       ? "crash"
       : breakdownHit
         ? "breakdown"
         : "major hazard (silent)";
-    console.log(
-      `[Aggregator] ACCEPTED ${acceptedAs} at ${streetLabel} [${provider}] (${keywordHit ? `keyword "${keywordHit}"` : crashTyped ? `crash type ${tUp}${sUp ? `/${sUp}` : ""}` : breakdownHit ? "breakdown/disabled vehicle" : `hazard ${sUp || tUp}`})`,
+    logger.info(
+      {
+        provider,
+        street: streetLabel,
+        type: tUp || null,
+        subtype: sUp || null,
+        matchedKeyword: keywordHit ?? null,
+      },
+      `[Aggregator] ACCEPTED ${acceptedAs}`,
     );
     const location = (raw["location"] ?? {}) as Record<string, unknown>;
     const latVal =
@@ -600,9 +605,11 @@ export function parseRawAlerts(
       asNumber(raw["longitude"]) ??
       asNumber(raw["lng"]);
     if (latVal === null || lngVal === null) {
-      console.log(
-        `DROPPED [${provider}] (missing coords):`,
-        JSON.stringify({ type: raw["type"], location: raw["location"], street: raw["street"] }),
+      const key = "missing-coords";
+      droppedCombos.set(key, (droppedCombos.get(key) ?? 0) + 1);
+      logger.warn(
+        { provider, street: streetLabel, type: raw["type"] },
+        "[Aggregator] dropped row without coordinates",
       );
       continue;
     }
@@ -661,17 +668,19 @@ export function parseRawAlerts(
       })(),
     });
   }
-  if (earlyDropped > 0) {
-    const combos = [...droppedCombos.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .map(([k, n]) => `${k} x${n}`)
-      .join(", ");
-    console.log(
-      `[${provider}] early crash-only filter dropped ${earlyDropped}/${rawAlerts.length} raw rows — dropped combos: ${combos}`,
-    );
-  }
-  console.log(
-    `[${provider}] Incoming: ${rawAlerts.length} total items, ${alerts.length} accidents retained`,
+  // One line per provider per poll. The per-row detail above is debug-only, so
+  // this summary is where dropped volume stays visible without flooding logs.
+  logger.info(
+    {
+      provider,
+      received: rawAlerts.length,
+      retained: alerts.length,
+      dropped: earlyDropped,
+      droppedBy: Object.fromEntries(
+        [...droppedCombos.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8),
+      ),
+    },
+    "[Aggregator] ingestion summary",
   );
   return alerts;
 }
@@ -812,16 +821,13 @@ async function fetchRapidApiAlerts(
     );
     throw new Error(`${provider} responded with status ${res.status}`);
   }
-  console.log(`[${provider}] HTTP ${res.status} in ${Date.now() - started}ms`);
+  logger.debug({ provider, status: res.status, latencyMs: Date.now() - started }, "Provider responded");
   const rawBody = await res.text();
   let parsed: unknown;
   try {
     parsed = JSON.parse(rawBody) as unknown;
   } catch (err) {
-    console.error(
-      `[${provider}] malformed JSON, body sample:`,
-      rawBody.slice(0, 300),
-    );
+    logger.error({ provider, sample: rawBody.slice(0, 300) }, "Provider returned malformed JSON");
     throw err;
   }
   const json = (parsed ?? {}) as Record<string, unknown>;
@@ -831,9 +837,7 @@ async function fetchRapidApiAlerts(
     : Array.isArray(data["alerts"])
       ? (data["alerts"] as Record<string, unknown>[])
       : [];
-  console.log(
-    `[${provider}] raw payload: ${rawAlerts.length} item(s) (${rawBody.length} bytes)`,
-  );
+  logger.debug({ provider, items: rawAlerts.length, bytes: rawBody.length }, "Provider payload");
   return parseRawAlerts(rawAlerts, provider);
 }
 
@@ -886,14 +890,15 @@ async function fetchWazeDirect(
     );
     throw new Error(`waze_direct responded with status ${res.status}`);
   }
-  console.log(`[waze_direct] HTTP ${res.status} in ${Date.now() - started}ms`);
+  logger.debug({ provider: "waze_direct", status: res.status, latencyMs: Date.now() - started }, "Provider responded");
   const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   const rawAlerts = Array.isArray(json["alerts"])
     ? (json["alerts"] as Record<string, unknown>[])
     : [];
   const alerts = parseRawAlerts(rawAlerts, "waze_direct");
-  console.log(
-    `[Direct Waze Ingestion] Polling via ${proxyUrl ? "Residential Proxy" : "direct connection (RESIDENTIAL_PROXY_URL not set)"}... Received ${rawAlerts.length} alerts, ${alerts.length} accidents retained.`,
+  logger.debug(
+    { proxied: Boolean(proxyUrl), received: rawAlerts.length, retained: alerts.length },
+    "Direct Waze ingestion complete",
   );
   return alerts;
 }
@@ -1036,13 +1041,13 @@ async function fetchGoogleMaps(
     );
     throw new Error(`google_maps responded with status ${res.status}`);
   }
-  console.log(`[google_maps] HTTP ${res.status} in ${Date.now() - started}ms`);
+  logger.debug({ provider: "google_maps", status: res.status, latencyMs: Date.now() - started }, "Provider responded");
   const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   const data = (json["data"] ?? {}) as Record<string, unknown>;
   const rawAlerts = Array.isArray(data["alerts"])
     ? (data["alerts"] as Record<string, unknown>[])
     : [];
-  console.log(`[google_maps] raw payload: ${rawAlerts.length} item(s)`);
+  logger.debug({ provider: "google_maps", items: rawAlerts.length }, "Provider payload");
   // Normalize the provider's lowercase types into our Waze-style taxonomy
   // before the shared parser so the standard allowlist/blocklist/keyword
   // pipeline and 50m dedup apply unchanged.
@@ -1102,12 +1107,13 @@ async function fetchApifyPhantom(
     throw new Error(`apify_phantom responded with status ${res.status}`);
   }
 
-  console.log(`[apify_phantom] HTTP ${res.status}`);
+  logger.debug({ provider: "apify_phantom", status: res.status }, "Provider responded");
   const parsed = (await res.json()) as unknown;
   const rawItems = flattenApifyItems(parsed, "apify_phantom");
   const alerts = parseRawAlerts(rawItems, "apify_phantom");
-  console.log(
-    `[Apify Test: phantom_coder] Received ${rawItems.length} total alerts, ${alerts.length} accidents retained.`,
+  logger.debug(
+    { provider: "apify_phantom", received: rawItems.length, retained: alerts.length },
+    "Apify actor complete",
   );
   return alerts;
 }
@@ -1140,7 +1146,7 @@ function flattenApifyItems(
       rawAlerts.push(...(item["alerts"] as Record<string, unknown>[]));
       const sources = item["dataSources"] as Record<string, unknown> | undefined;
       if (sources && typeof sources["alerts"] === "string" && sources["alerts"] !== "ok") {
-        console.log(`[${provider}] alerts dataSource status: ${sources["alerts"]}`);
+        logger.debug({ provider, status: sources["alerts"] }, "Apify alerts dataSource status");
       }
     } else if (typeof item["type"] === "string") {
       rawAlerts.push(item);
@@ -1178,7 +1184,7 @@ async function runApifyActor(
     );
     throw new Error(`${provider} responded with status ${res.status}`);
   }
-  console.log(`[${provider}] HTTP ${res.status}`);
+  logger.debug({ provider, status: res.status }, "Provider responded");
   return (await res.json()) as unknown;
 }
 
@@ -1208,8 +1214,9 @@ async function fetchApifyBurbn(
   );
   const rawItems = flattenApifyItems(parsed, "apify_burbn");
   const alerts = parseRawAlerts(rawItems, "apify_burbn");
-  console.log(
-    `[Apify Test: burbn] Received ${rawItems.length} total alerts, ${alerts.length} accidents retained.`,
+  logger.debug(
+    { provider: "apify_burbn", received: rawItems.length, retained: alerts.length },
+    "Apify actor complete",
   );
   return alerts;
 }
@@ -1247,8 +1254,9 @@ async function fetchApifyMaiAmm(
   );
   const rawItems = flattenApifyItems(parsed, "apify_mai_amm");
   const alerts = parseRawAlerts(rawItems, "apify_mai_amm");
-  console.log(
-    `[Apify Test: mai_amm] Polling London ON... Received ${rawItems.length} total alerts, ${alerts.length} accidents retained.`,
+  logger.debug(
+    { provider: "apify_mai_amm", received: rawItems.length, retained: alerts.length },
+    "Apify actor complete",
   );
   return alerts;
 }
@@ -1293,15 +1301,16 @@ async function fetchApifySian(
     throw new Error(`apify_sian responded with status ${res.status}`);
   }
 
-  console.log(`[apify_sian] HTTP ${res.status}`);
+  logger.debug({ provider: "apify_sian", status: res.status }, "Provider responded");
   const parsed = (await res.json()) as unknown;
   const items = Array.isArray(parsed) ? (parsed as Record<string, unknown>[]) : [];
   const rawAlerts = items.filter(
     (item) => item["recordType"] !== "jam" && typeof item["type"] === "string",
   );
   const alerts = parseRawAlerts(rawAlerts, "apify_sian");
-  console.log(
-    `[Apify Test: sian] Received ${items.length} total alerts, ${alerts.length} accidents retained.`,
+  logger.debug(
+    { provider: "apify_sian", received: items.length, retained: alerts.length },
+    "Apify actor complete",
   );
   return alerts;
 }
@@ -1319,8 +1328,9 @@ function noteProviderFailure(provider: ProviderSource, err: unknown): void {
   const msg = err instanceof Error ? err.message : String(err);
   const ms = msg.includes("429") ? COOLDOWN_429_MS : COOLDOWN_ERROR_MS;
   cooldownUntil.set(provider, Date.now() + ms);
-  console.error(
-    `[${provider}] fetch failed: ${msg} — cooling down ${Math.round(ms / 1000)}s`,
+  logger.warn(
+    { provider, error: msg, cooldownSeconds: Math.round(ms / 1000) },
+    "Provider fetch failed — cooling down",
   );
 }
 
@@ -1369,7 +1379,7 @@ function makeNonBlocking(
         const hit = cache.get(key);
         const fresh = hit && Date.now() - hit.at <= APIFY_CACHE_TTL_MS;
         if (fresh)
-          console.log(`[${provider}] run still in flight — using cached result`);
+          logger.debug({ provider }, "Apify run still in flight — using cached result");
         resolve(fresh ? hit.alerts : []);
       }, APIFY_SOFT_DEADLINE_MS).unref?.(),
     );
@@ -1424,15 +1434,17 @@ export async function fetchWazeAlerts(
     if (DISABLED_PROVIDERS.has(p)) return false;
     const until = cooldownUntil.get(p) ?? 0;
     if (until > now) {
-      console.log(
-        `[${p}] skipped — cooling down another ${Math.ceil((until - now) / 1000)}s`,
+      logger.debug(
+        { provider: p, remainingSeconds: Math.ceil((until - now) / 1000) },
+        "Provider skipped — cooling down",
       );
       return false;
     }
     return true;
   });
-  console.log(
-    `Aggregating ${active.length}/${PROVIDER_PRIORITY.length} providers @${lat.toFixed(4)},${lng.toFixed(4)} r=${radiusKm}km`,
+  logger.debug(
+    { active: active.length, total: PROVIDER_PRIORITY.length, lat, lng, radiusKm },
+    "Aggregating providers",
   );
   // Stagger launches so the providers never fire on the exact same
   // millisecond (rate-limiter friendliness + spreads local socket/DNS work);
@@ -1448,7 +1460,7 @@ export async function fetchWazeAlerts(
   settled.forEach((result, i) => {
     const provider = active[i]!;
     if (result.status === "fulfilled") {
-      console.log(`[${provider}] returned ${result.value.length} alerts`);
+      logger.debug({ provider, alerts: result.value.length }, "Provider returned alerts");
       byProvider.set(provider, result.value);
     } else {
       noteProviderFailure(provider, result.reason);
@@ -1481,16 +1493,23 @@ export async function fetchWazeAlerts(
           alert.provider === "google_maps" || dup.provider === "google_maps"
             ? GOOGLE_MAPS_DEDUP_RADIUS_KM * 1000
             : DEDUP_RADIUS_KM * 1000;
-        console.log(
-          `DEDUPED [${alert.provider}] accident at ${alert.street ?? "?"} — matches [${dup.provider}] within ${radiusM}m`,
+        logger.info(
+          {
+            provider: alert.provider,
+            street: alert.street ?? "?",
+            matchedProvider: dup.provider,
+            withinMeters: radiusM,
+          },
+          "Deduped cross-provider accident",
         );
         continue;
       }
       kept.push(alert);
     }
   }
-  console.log(
-    `Aggregator: ${kept.length} alerts kept from ${byProvider.size}/${PROVIDER_PRIORITY.length} responding providers`,
+  logger.info(
+    { kept: kept.length, responded: byProvider.size, total: PROVIDER_PRIORITY.length },
+    "Aggregator pass complete",
   );
   return kept;
 }

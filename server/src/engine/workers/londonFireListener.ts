@@ -113,7 +113,7 @@ const LONDON_CENTER = { lat: 42.9849, lng: -81.2453 };
 const LONDON_FALLBACK_COORDS = { lat: 42.9837, lng: -81.2497 };
 const MAX_GEOCODE_DISTANCE_KM = 25;
 
-const log = (msg: string) => console.log(`[fire-dispatch] ${msg}`);
+const log = (msg: string) => logger.info(`[fire-dispatch] ${msg}`);
 
 export interface AudioBufferState {
   pending: Buffer[]; // raw MPEG-TS segments awaiting transcription
