@@ -35,7 +35,7 @@ export function incidentToPushPayload(incident: Incident): PushPayload {
     body: `${incident.locationLabel} — ${SOURCE_LABELS[incident.source]}`,
     severity: incident.severity,
     incidentId: incident.id,
-    url: `${config.clientOrigin}/?incident=${encodeURIComponent(incident.id)}`,
+    url: `${config.clientOrigin}/desk?incident=${encodeURIComponent(incident.id)}`,
   };
 }
 

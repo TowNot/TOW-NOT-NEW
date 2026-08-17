@@ -31,11 +31,10 @@ export function Header({
     <header className="border-b border-line bg-panel">
       <div className="mx-auto flex max-w-6xl flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-md border border-line bg-white font-mono text-sm font-semibold tracking-widest text-fire">
-            AN
-          </div>
+          <a href="/" className="font-display text-2xl leading-none text-gray-900 no-underline">
+            AlertNav
+          </a>
           <div>
-            <h1 className="text-lg font-semibold tracking-tight text-gray-900">AlertNav</h1>
             <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-gray-500">
               London, ON · live incident desk
             </p>
