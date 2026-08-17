@@ -969,8 +969,7 @@ async function fetchRapidApiAlerts(
   if (rawAlerts.length === 0 && rawBody.length > 20) {
     const keys = isPlainRecord(parsed) ? Object.keys(parsed) : [];
     logger.warn(
-      { provider, bytes: rawBody.length, keys },
-      "Provider JSON had no alerts array",
+      `Provider JSON had no alerts array provider=${provider} bytes=${rawBody.length} keys=${JSON.stringify(keys)}`,
     );
   } else {
     logger.info(
@@ -1657,8 +1656,7 @@ export async function fetchWazeAlerts(
     }
   }
   logger.info(
-    { kept: kept.length, responded: byProvider.size, total: PROVIDER_PRIORITY.length },
-    "Aggregator pass complete",
+    `Aggregator pass complete kept=${kept.length} responded=${byProvider.size} total=${PROVIDER_PRIORITY.length}`,
   );
   return kept;
 }

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { config } from "../config";
+import { boundingBox } from "../engine/geo";
 import { getProviderRuntimeStats } from "../engine/wazeAggregator";
 import { getFireDispatchRuntime } from "../engine/workers/londonFireListener";
 import type { IncidentStore } from "../store/incidentStore";
@@ -42,6 +43,13 @@ export function createSourcesRouter(store: IncidentStore): Router {
   // upstream feeds answered last, and how many incidents each has produced.
   router.get("/status", (_req, res) => {
     const active = store.getActive();
+    const providers = getProviderRuntimeStats();
+    const cavsn = providers.cavsn;
+    const box = boundingBox(
+      config.londonLat,
+      config.londonLng,
+      Math.min(config.pollRadiusKm, 15),
+    );
     res.json({
       checkedAt: new Date().toISOString(),
       pollCenter: {
@@ -50,6 +58,17 @@ export function createSourcesRouter(store: IncidentStore): Router {
         radiusKm: config.pollRadiusKm,
         intervalMs: config.pollIntervalMs,
       },
+      cavsnQuery: {
+        alert_types: "ACCIDENT",
+        max_jams: "0",
+        max_alerts: "300",
+        bottom_left: `${box.bottomLeft.lat},${box.bottomLeft.lng}`,
+        top_right: `${box.topRight.lat},${box.topRight.lng}`,
+      },
+      lastTypeCounts: cavsn.lastTypeCounts,
+      lastDroppedBy: cavsn.lastDroppedBy,
+      lastReceived: cavsn.lastReceived,
+      lastRetained: cavsn.lastRetained,
       credentials: {
         rapidApi: Boolean(config.rapidApiKey),
         apify: Boolean(config.apifyApiToken),
@@ -65,7 +84,7 @@ export function createSourcesRouter(store: IncidentStore): Router {
         ...getFireDispatchRuntime(),
         streamOverride: Boolean(config.radioHlsUrl),
       },
-      providers: getProviderRuntimeStats(),
+      providers,
       incidents: {
         total: active.length,
         notified: active.filter((incident) => incident.notified).length,

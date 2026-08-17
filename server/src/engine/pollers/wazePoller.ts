@@ -117,7 +117,9 @@ export class WazeTrafficPoller {
         this.store.upsert(incident);
         ingested.push(incident);
       }
-      logger.info("Live traffic poll complete", { fetched: alerts.length, ingested: ingested.length });
+      logger.info(
+        `Live traffic poll complete fetched=${alerts.length} ingested=${ingested.length}`,
+      );
       return ingested;
     } catch (error) {
       logger.error("Live traffic poll failed", {
