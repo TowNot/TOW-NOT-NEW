@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  cavsnHazardHasCrashLanguage,
   isBreakdown,
   isMajorHazard,
   isMunicipalNotice,
@@ -256,6 +257,52 @@ const checks: Array<[string, () => void]> = [
         ),
         [],
       );
+    },
+  ],
+  [
+    "CAVSN keeps accidents and crash-language hazards, drops construction/debris",
+    () => {
+      assert.equal(cavsnHazardHasCrashLanguage("HAZARD_ON_ROAD", "vehicle collision"), true);
+      assert.equal(cavsnHazardHasCrashLanguage("HAZARD_ON_ROAD_OBJECT", "debris in lane"), false);
+      assert.equal(cavsnHazardHasCrashLanguage("HAZARD_ON_ROAD_FEATURE", "car on other side"), true);
+
+      const parsed = parseRawAlerts(
+        [
+          {
+            type: "ACCIDENT",
+            latitude: 42.9849,
+            longitude: -81.2453,
+            street: "Oxford St",
+          },
+          {
+            type: "HAZARD",
+            subType: "HAZARD_ON_ROAD",
+            description: "he hit the pole",
+            latitude: 42.98,
+            longitude: -81.24,
+            street: "Highbury",
+          },
+          {
+            type: "HAZARD",
+            subType: "HAZARD_ON_ROAD_CONSTRUCTION",
+            description: "Road construction",
+            latitude: 42.98,
+            longitude: -81.24,
+            street: "Dundas",
+          },
+          {
+            type: "HAZARD",
+            subType: "HAZARD_ON_ROAD_OBJECT",
+            description: "debris",
+            latitude: 42.97,
+            longitude: -81.25,
+            street: "Wonderland",
+          },
+        ] as Record<string, unknown>[],
+        "cavsn",
+      );
+      const kept = parsed.map((alert) => alert.type).sort();
+      assert.deepEqual(kept, ["ACCIDENT", "ACCIDENT"]);
     },
   ],
 ];

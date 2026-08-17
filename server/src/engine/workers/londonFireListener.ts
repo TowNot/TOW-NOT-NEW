@@ -548,7 +548,7 @@ async function nominatimSearch(
     "https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" +
     encodeURIComponent(query);
   const res = await fetch(url, {
-    headers: { "User-Agent": "TowNot 2/1.0 (fire dispatch geocoder)" },
+    headers: { "User-Agent": "AlertNav/1.0 (fire dispatch geocoder)" },
     signal: AbortSignal.timeout(12_000),
   });
   if (!res.ok) throw new Error(`Nominatim ${res.status}`);

@@ -48,7 +48,7 @@ export default function App() {
   }, []);
 
   return (
-    <div className="radar-grid min-h-screen">
+    <div className="min-h-screen bg-white">
       <Header
         connected={connected}
         health={health}

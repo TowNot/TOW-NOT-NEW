@@ -29,7 +29,7 @@ export class PushDispatcher extends EventEmitter {
   async sendTest(): Promise<PushReceipt> {
     return this.send(
       {
-        title: "TowNot 2 test alert",
+        title: "AlertNav test alert",
         body: "Push dispatcher is online for London, ON.",
         severity: "medium",
       },

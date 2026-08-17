@@ -12,9 +12,9 @@ export class DataAggregatorEngine {
 
   start(): void {
     this.waze.start();
-    this.googleMaps.start();
+    // Google Maps RapidAPI scraper is paused for the live test — Fire + CAVSN only.
     this.radio.start();
-    logger.info("Data aggregator engine running");
+    logger.info("Data aggregator engine running (fire dispatch + CAVSN)");
   }
 
   stop(): void {

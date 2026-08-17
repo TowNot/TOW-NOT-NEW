@@ -22,14 +22,8 @@ export function useAlertOnNewIncidents(
     if (!enabled) return;
 
     for (const incident of newcomers) {
-      const worthAlerting =
-        incident.source === "fire_dispatch" ||
-        incident.severity === "high" ||
-        incident.severity === "critical";
-      // Scheduled rather than played: a push for the same incident cancels it,
-      // so the operator hears the device notification or the in-app tone, but
-      // never both.
-      if (worthAlerting) scheduleIncidentAlert(incident.id, play);
+      if (incident.source !== "fire_dispatch" && incident.source !== "waze") continue;
+      scheduleIncidentAlert(incident.id, play);
     }
   }, [incidents, play, enabled]);
 }

@@ -393,6 +393,16 @@ export function isTrueCrash(type: string, subtype: string | null): boolean {
   return CRASH_KEYWORDS.some((k) => t.includes(k) || s.includes(k));
 }
 
+/** CAVSN HAZARD rows keep only with explicit crash language in subtype/text. */
+const CAVSN_HAZARD_CRASH_RE =
+  /\b(crash|collision|hit|mvc|mva|pile[\s_-]?up|opposite[\s_-]?side|other[\s_-]?side|accident|rollover|t-?bone|struck)\b/i;
+
+export function cavsnHazardHasCrashLanguage(subtype: string | null, text: string): boolean {
+  const s = (subtype ?? "").toUpperCase();
+  if (s.includes("OTHER_SIDE") || s.includes("ON_ROAD_FEATURE")) return true;
+  return CAVSN_HAZARD_CRASH_RE.test(`${subtype ?? ""} ${text}`);
+}
+
 export function isNotifiableCrash(
   type: string,
   subtype: string | null,
@@ -462,6 +472,34 @@ export function parseRawAlerts(
         "i",
       ).test(crashText),
     );
+
+    // CAVSN live-test gate: ACCIDENT always keeps; HAZARD keeps only with
+    // crash language in description/subtype. Construction, debris, jams drop.
+    if (provider === "cavsn") {
+      const accident = tUp.startsWith("ACCIDENT");
+      const hazard = tUp.includes("HAZARD");
+      if (!accident && !hazard && !keywordHit) {
+        earlyDropped++;
+        const key = `cavsn-skip:${tUp || "<no-type>"}/${sUp || "<no-subtype>"}`;
+        droppedCombos.set(key, (droppedCombos.get(key) ?? 0) + 1);
+        continue;
+      }
+      if (
+        hazard &&
+        !accident &&
+        !keywordHit &&
+        !cavsnHazardHasCrashLanguage(subtype, crashText)
+      ) {
+        earlyDropped++;
+        const key = `cavsn-hazard:${tUp || "<no-type>"}/${sUp || "<no-subtype>"}`;
+        droppedCombos.set(key, (droppedCombos.get(key) ?? 0) + 1);
+        logger.debug(
+          { provider, street: asString(raw["street"]) ?? "-", subtype: sUp || tUp },
+          "[Aggregator] dropped CAVSN hazard without crash language",
+        );
+        continue;
+      }
+    }
 
     // HARD BLOCKLIST (strict match only, keyword hits exempt): drop ONLY
     // rows whose subtype exactly equals a known roadwork subtype, or whose
@@ -976,9 +1014,7 @@ async function fetchBlocksInside(
   );
 }
 
-/** Cavsn — waze-api-waze-scraper.p.rapidapi.com /waze/alerts-and-jams. No
- * server-side type filter (this host ignores or empties on alert_types);
- * bbox + center/radius, then parseRawAlerts keeps crashes locally. */
+/** Cavsn — waze-api-waze-scraper.p.rapidapi.com /waze/alerts-and-jams. */
 async function fetchCavsn(
   lat: number,
   lng: number,
@@ -994,6 +1030,7 @@ async function fetchCavsn(
       center: `${lat},${lng}`,
       radius: String(Math.min(Math.max(radiusKm, 1), 15)),
       radius_units: "KM",
+      alert_types: "ACCIDENT,HAZARD",
       max_alerts: "200",
       max_jams: "0",
     }),
@@ -1447,10 +1484,12 @@ const PROVIDER_FETCHERS: Record<
  * loop. Remove entries here to re-enable.
  */
 const DISABLED_PROVIDERS = new Set<ProviderSource>([
-  // Active race: blocksinside + openwebninja + cavsn (RapidAPI-only) run in
-  // parallel each pass. Remove entries to re-enable other providers.
+  // Live-test isolation: only CAVSN Waze + London Fire STT run.
   "waze_direct",
-  "apify_sian", // temporarily disabled — remove this line to rejoin the race
+  "openwebninja",
+  "blocksinside",
+  "google_maps",
+  "apify_sian",
   "apify_phantom",
   "apify_burbn",
   "apify_mai_amm",

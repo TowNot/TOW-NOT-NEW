@@ -3,7 +3,7 @@
 @theme {
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
-  --color-ink: #f4f5f7;
+  --color-ink: #ffffff;
   --color-panel: #ffffff;
   --color-line: #e5e7eb;
   --color-waze: #0369a1;
@@ -11,23 +11,20 @@
   --color-fire: #c2410c;
 }
 
+html {
+  color-scheme: light;
+}
+
 html,
 body,
 #root {
   min-height: 100%;
+  background: #ffffff;
 }
 
 body {
   margin: 0;
-  background: var(--color-ink);
+  background: #ffffff;
   color: #111827;
   font-family: var(--font-sans);
-}
-
-.radar-grid {
-  background-color: var(--color-ink);
-  background-image:
-    linear-gradient(rgba(17, 24, 39, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(17, 24, 39, 0.04) 1px, transparent 1px);
-  background-size: 48px 48px, 48px 48px;
 }

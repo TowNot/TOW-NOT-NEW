@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { claimIncidentAlert, markPushAlerted } from "../lib/dispatchAlerts";
 
-interface TowNotAlertMessage {
+interface AlertNavAlertMessage {
   type?: string;
   title?: string;
   body?: string;
@@ -20,7 +20,7 @@ function incidentIdFromUrl(url: string | undefined): string | null {
 /**
  * Sounds the dispatch siren for pushes that arrive while the app is open.
  *
- * With the app in the foreground the operator should hear the TowNot 2 siren,
+ * With the app in the foreground the operator should hear the AlertNav siren,
  * not just the platform chime, so the push claims the incident and plays it —
  * which also cancels the queued feed tone, keeping it to one siren per
  * incident. When the app is backgrounded the incident is only recorded: audio
@@ -31,7 +31,7 @@ export function usePushAlertBridge(play: () => void): void {
     if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
 
     const onMessage = (event: MessageEvent) => {
-      const data = event.data as TowNotAlertMessage | null;
+      const data = event.data as AlertNavAlertMessage | null;
       if (data?.type !== "tow-not-alert") return;
 
       const incidentId = incidentIdFromUrl(data.url);

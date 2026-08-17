@@ -1,5 +1,5 @@
 /**
- * The TowNot 2 dispatch siren — the single sound the app makes for an incident.
+ * The AlertNav dispatch siren — the single sound the app makes for an incident.
  *
  * Two playback paths, never both at once:
  *  1. the generated siren asset (client/scripts/generate-dispatch-siren.cjs),

@@ -5,7 +5,7 @@ export const healthRouter = Router();
 healthRouter.get("/health", (_req, res) => {
   res.json({
     status: "ok",
-    service: "townot-2-server",
+    service: "alertnav-server",
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
   });
