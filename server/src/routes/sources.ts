@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { config } from "../config";
 import { getProviderRuntimeStats } from "../engine/wazeAggregator";
-import { isFireListenerRunning } from "../engine/workers/londonFireListener";
+import { getFireDispatchRuntime, isFireListenerRunning } from "../engine/workers/londonFireListener";
 import type { IncidentStore } from "../store/incidentStore";
 import type { IncidentSource } from "../types/incident";
 
@@ -64,6 +64,7 @@ export function createSourcesRouter(store: IncidentStore): Router {
       fireDispatch: {
         listening: isFireListenerRunning(),
         streamOverride: Boolean(config.radioHlsUrl),
+        ...getFireDispatchRuntime(),
       },
       providers: getProviderRuntimeStats(),
       incidents: {

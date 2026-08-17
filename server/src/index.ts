@@ -106,7 +106,7 @@ store.start();
 engine.start();
 
 server.listen(config.port, () => {
-  logger.info("TOW-NOT server listening", { port: config.port });
+  logger.info("TowNot 2 server listening", { port: config.port });
 });
 
 function shutdown(signal: string): void {

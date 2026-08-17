@@ -61,6 +61,16 @@ export function findCrashKeywords(transcript: string): string[] {
   for (const { label, re } of CRASH_PATTERNS) {
     if (re.test(transcript) && !hits.includes(label)) hits.push(label);
   }
+  // Code 4 + a vehicle word: London Fire often dispatches "Engine 7, …
+  // code 4" and only later says MVC. Treat that as a crash so the first
+  // transmission still posts.
+  if (
+    CODE4_RE.test(transcript) &&
+    /\b(?:cars?|trucks?|vehicles?|trailers?|semis?|transports?)\b/i.test(transcript) &&
+    !hits.includes("code 4 vehicle")
+  ) {
+    hits.push("code 4 vehicle");
+  }
   // The multi-vehicle count pattern alone ("two vehicles on scene") is too
   // weak to declare a crash — require at least one substantive crash term.
   if (hits.length === 1 && hits[0] === "multi-vehicle") return [];

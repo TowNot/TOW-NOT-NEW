@@ -52,6 +52,19 @@ const checks: Array<[string, () => void]> = [
       assert.ok(hits.includes("MVC"), String(hits));
     },
   ],
+  [
+    "code 4 plus a vehicle word posts without MVC",
+    () => {
+      const hits = findCrashKeywords(
+        "Engine 7, Highbury and Oxford, two vehicles, code 4",
+      );
+      assert.ok(hits.includes("code 4 vehicle") || hits.includes("multi-vehicle"), String(hits));
+      assert.equal(
+        classifyPriority("Engine 7, Highbury and Oxford, two vehicles, code 4"),
+        "critical",
+      );
+    },
+  ],
 ];
 
 let failures = 0;

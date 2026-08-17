@@ -69,6 +69,55 @@ const MAX_GEOCODE_DISTANCE_KM = 25;
 
 const log = (msg: string) => logger.info(`[fire-dispatch] ${msg}`);
 
+export type FireDispatchRuntimeStats = {
+  listening: boolean;
+  lastAudioAt: string | null;
+  lastTranscriptAt: string | null;
+  lastTranscript: string | null;
+  lastKeywords: string[] | null;
+  lastSkipReason: string | null;
+  lastError: string | null;
+  lastPostedAt: string | null;
+  counts: {
+    audioSegments: number;
+    sttOk: number;
+    deadAir: number;
+    emptyTranscript: number;
+    noKeyword: number;
+    discarded: number;
+    posted: number;
+  };
+};
+
+const fireRuntime: FireDispatchRuntimeStats = {
+  listening: false,
+  lastAudioAt: null,
+  lastTranscriptAt: null,
+  lastTranscript: null,
+  lastKeywords: null,
+  lastSkipReason: null,
+  lastError: null,
+  lastPostedAt: null,
+  counts: {
+    audioSegments: 0,
+    sttOk: 0,
+    deadAir: 0,
+    emptyTranscript: 0,
+    noKeyword: 0,
+    discarded: 0,
+    posted: 0,
+  },
+};
+
+export function getFireDispatchRuntime(): FireDispatchRuntimeStats {
+  return {
+    ...fireRuntime,
+    listening: started,
+    counts: { ...fireRuntime.counts },
+    lastKeywords: fireRuntime.lastKeywords ? [...fireRuntime.lastKeywords] : null,
+  };
+}
+
 export interface AudioBufferState {
   pending: Buffer[]; // raw MPEG-TS segments awaiting transcription
   pendingSegSeconds: number[]; // per-segment durations, parallel to `pending`
@@ -499,7 +548,7 @@ async function nominatimSearch(
     "https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" +
     encodeURIComponent(query);
   const res = await fetch(url, {
-    headers: { "User-Agent": "TowNot/1.0 (fire dispatch geocoder)" },
+    headers: { "User-Agent": "TowNot 2/1.0 (fire dispatch geocoder)" },
     signal: AbortSignal.timeout(12_000),
   });
   if (!res.ok) throw new Error(`Nominatim ${res.status}`);
@@ -668,6 +717,10 @@ async function saveAndNotify(
     unverifiedAddress,
   };
   incidentStore.upsert(incident);
+  fireRuntime.counts.posted += 1;
+  fireRuntime.lastPostedAt = now.toISOString();
+  fireRuntime.lastSkipReason = null;
+  fireRuntime.lastError = null;
   if (existing) {
     log(
       `DEDUPED: dispatch at "${location}" refreshed existing fire-dispatch row ${id} — no re-notify`,
@@ -691,20 +744,35 @@ async function processBuffer(tsChunks: Buffer[]): Promise<void> {
 async function processWav(wav: Buffer): Promise<void> {
   const level = wavRmsDbfs(wav);
   if (level < SILENCE_RMS_DBFS) {
+    fireRuntime.counts.deadAir += 1;
+    fireRuntime.lastSkipReason = `dead_air:${level.toFixed(1)}dBFS`;
     log(`STT skipped: dead air (${level.toFixed(1)} dBFS)`);
     return;
   }
 
-  const started = Date.now();
+  const startedAt = Date.now();
   const transcript = (await speechToText(wav)).trim();
+  fireRuntime.counts.sttOk += 1;
+  fireRuntime.lastTranscriptAt = new Date().toISOString();
+  fireRuntime.lastTranscript = transcript.slice(0, 240);
   log(
-    `STT complete in ${Date.now() - started}ms: ${Math.round((wav.length - 44) / 32000)}s audio -> ${transcript.length} chars`,
+    `STT complete in ${Date.now() - startedAt}ms: ${Math.round((wav.length - 44) / 32000)}s audio -> ${transcript.length} chars`,
   );
-  if (transcript.length < 5) return;
+  if (transcript.length < 5) {
+    fireRuntime.counts.emptyTranscript += 1;
+    fireRuntime.lastSkipReason = "empty_transcript";
+    return;
+  }
   log(`Transcript: ${transcript.slice(0, 200)}`);
 
   const keywords = findCrashKeywords(transcript);
-  if (keywords.length === 0) return;
+  fireRuntime.lastKeywords = keywords;
+  if (keywords.length === 0) {
+    fireRuntime.counts.noKeyword += 1;
+    fireRuntime.lastSkipReason = "no_keyword";
+    log(`no crash/hazard keywords — not posting`);
+    return;
+  }
   if (seenRecently(transcriptSignature(transcript), recentTranscriptSignatures)) {
     log("DEDUPED: overlapping buffer re-transcribed an already-processed dispatch");
     return;
@@ -952,6 +1020,8 @@ async function pollOnce(state: StreamState): Promise<void> {
       pushSegment(state, data, seg.seconds);
       state.lastSequence = seg.sequence;
       state.lastAudioAt = Date.now();
+      fireRuntime.lastAudioAt = new Date().toISOString();
+      fireRuntime.counts.audioSegments += 1;
     } catch (err) {
       logger.warn({ err, url: seg.url }, "[fire-dispatch] segment fetch failed");
       state.lastSequence = seg.sequence; // don't refetch a dead segment forever
@@ -965,12 +1035,15 @@ async function pollOnce(state: StreamState): Promise<void> {
     // lastAudioAt and tripping the silence watchdog on a healthy stream).
     processingBusy = true;
     void processBuffer(chunk)
-      .catch((err) =>
+      .catch((err) => {
+        fireRuntime.counts.discarded += 1;
+        fireRuntime.lastError = err instanceof Error ? err.message : String(err);
+        fireRuntime.lastSkipReason = "stt_discarded";
         logger.error(
           { err, segments: chunk.length },
           "[fire-dispatch] buffer processing failed — audio discarded",
-        ),
-      )
+        );
+      })
       .finally(() => {
         processingBusy = false;
       });

@@ -20,7 +20,7 @@ function incidentIdFromUrl(url: string | undefined): string | null {
 /**
  * Sounds the dispatch siren for pushes that arrive while the app is open.
  *
- * With the app in the foreground the operator should hear the TOW-NOT siren,
+ * With the app in the foreground the operator should hear the TowNot 2 siren,
  * not just the platform chime, so the push claims the incident and plays it —
  * which also cancels the queued feed tone, keeping it to one siren per
  * incident. When the app is backgrounded the incident is only recorded: audio

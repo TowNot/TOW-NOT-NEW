@@ -31,7 +31,7 @@ export function buildProgressierPayload(payload: PushPayload): ProgressierPushRe
 
 export function incidentToPushPayload(incident: Incident): PushPayload {
   return {
-    title: `TOW-NOT · ${incident.title}`,
+    title: `TowNot 2 · ${incident.title}`,
     body: `${incident.locationLabel} — ${SOURCE_LABELS[incident.source]}`,
     severity: incident.severity,
     incidentId: incident.id,

@@ -3,12 +3,12 @@
 @theme {
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
-  --color-ink: #07090d;
-  --color-panel: #10151c;
-  --color-line: #243040;
-  --color-waze: #33ccff;
-  --color-maps: #7dffb3;
-  --color-fire: #ff6b3d;
+  --color-ink: #f4f5f7;
+  --color-panel: #ffffff;
+  --color-line: #e5e7eb;
+  --color-waze: #0369a1;
+  --color-maps: #047857;
+  --color-fire: #c2410c;
 }
 
 html,
@@ -20,14 +20,14 @@ body,
 body {
   margin: 0;
   background: var(--color-ink);
-  color: #e8eef6;
+  color: #111827;
   font-family: var(--font-sans);
 }
 
 .radar-grid {
+  background-color: var(--color-ink);
   background-image:
-    linear-gradient(rgba(36, 48, 64, 0.45) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(36, 48, 64, 0.45) 1px, transparent 1px),
-    radial-gradient(circle at top, rgba(255, 107, 61, 0.08), transparent 42%);
-  background-size: 48px 48px, 48px 48px, 100% 100%;
+    linear-gradient(rgba(17, 24, 39, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(17, 24, 39, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px, 48px 48px;
 }

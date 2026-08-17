@@ -2,7 +2,7 @@
   "name": "tow-not",
   "private": true,
   "version": "1.0.0",
-  "description": "TOW-NOT — live traffic and dispatch incident aggregator for London, ON",
+  "description": "TowNot 2 — live traffic and dispatch incident aggregator for London, ON",
   "workspaces": [
     "client",
     "server"
