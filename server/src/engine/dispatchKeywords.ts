@@ -6,9 +6,38 @@
  * to vehicle-into-infrastructure scenes that never say "MVC" — tractor
  * trailer, hit the pole, light pole, pole down, wires across the street.
  * Those must still post-and-notify.
+ *
+ * negativeKeywords is a hard blacklist: if any of these appear, the buffer
+ * is dropped even when a crash term (extricated, accident, MVC, …) also
+ * matched. London Fire uses the same extrication language for elevator
+ * rescues and similar non-road calls.
  */
 
 export type DispatchPriority = "critical" | "high" | "normal";
+
+/** Blacklist: any hit drops the transcript before it can post to the desk. */
+export const negativeKeywords = [
+  "elevator",
+  "escalator",
+  "medical assist",
+  "medical assistance",
+  "alarm",
+];
+
+function keywordBoundaryRe(keyword: string): RegExp {
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+  return new RegExp(`\\b${escaped}s?\\b`, "i");
+}
+
+export function findNegativeKeywords(transcript: string): string[] {
+  const hits: string[] = [];
+  for (const keyword of negativeKeywords) {
+    if (keywordBoundaryRe(keyword).test(transcript) && !hits.includes(keyword)) {
+      hits.push(keyword);
+    }
+  }
+  return hits;
+}
 
 const CRASH_PATTERNS: { label: string; re: RegExp }[] = [
   // Acronyms incl. punctuated/spaced forms and STT misreads over static:
@@ -58,6 +87,7 @@ const CODE4_RE = /\bcode\s*(?:4|four)\b/i;
 const CODE3_RE = /\bcode\s*(?:3|three)\b/i;
 
 export function findCrashKeywords(transcript: string): string[] {
+  if (findNegativeKeywords(transcript).length > 0) return [];
   const hits: string[] = [];
   for (const { label, re } of CRASH_PATTERNS) {
     if (re.test(transcript) && !hits.includes(label)) hits.push(label);

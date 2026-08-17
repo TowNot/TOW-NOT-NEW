@@ -28,6 +28,7 @@ import {
 import {
   classifyPriority,
   findCrashKeywords,
+  findNegativeKeywords,
   type DispatchPriority,
 } from "../dispatchKeywords";
 import { speechToText } from "../deepgramClient";
@@ -773,8 +774,14 @@ async function processWav(wav: Buffer): Promise<void> {
   fireRuntime.lastKeywords = keywords;
   if (keywords.length === 0) {
     fireRuntime.counts.noKeyword += 1;
-    fireRuntime.lastSkipReason = "no_keyword";
-    log(`no crash/hazard keywords — not posting`);
+    const blocked = findNegativeKeywords(transcript);
+    if (blocked.length > 0) {
+      fireRuntime.lastSkipReason = `negative_keyword:${blocked.join(",")}`;
+      log(`DROPPED: blacklist hit [${blocked.join(", ")}] — not posting`);
+    } else {
+      fireRuntime.lastSkipReason = "no_keyword";
+      log(`no crash/hazard keywords — not posting`);
+    }
     return;
   }
   if (seenRecently(transcriptSignature(transcript), recentTranscriptSignatures)) {

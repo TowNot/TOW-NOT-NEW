@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
-import { classifyPriority, findCrashKeywords } from "../src/engine/dispatchKeywords";
+import {
+  classifyPriority,
+  findCrashKeywords,
+  findNegativeKeywords,
+} from "../src/engine/dispatchKeywords";
 
 const checks: Array<[string, () => void]> = [
   [
@@ -67,6 +71,33 @@ const checks: Array<[string, () => void]> = [
         classifyPriority("Engine 7, Highbury and Oxford, two vehicles, code 4"),
         "critical",
       );
+    },
+  ],
+  [
+    "elevator / escalator / medical assist / alarm drop even with extricated or accident",
+    () => {
+      assert.deepEqual(
+        findCrashKeywords("Engine 5, person extricated from the elevator, Main and Dundas"),
+        [],
+      );
+      assert.deepEqual(
+        findCrashKeywords("Engine 3, trapped in the escalator at Galleria"),
+        [],
+      );
+      assert.deepEqual(
+        findCrashKeywords("Engine 7, medical assist, accident reported, Oxford Street"),
+        [],
+      );
+      assert.deepEqual(
+        findCrashKeywords("Engine 2, alarm ringing, accident, Wellington and Horton"),
+        [],
+      );
+      assert.ok(findNegativeKeywords("elevators, person extricated").includes("elevator"));
+      assert.equal(
+        classifyPriority("Engine 5, person extricated from the elevator"),
+        "normal",
+      );
+      assert.ok(findCrashKeywords("MVC Oxford and Highbury, person extricated").includes("MVC"));
     },
   ],
 ];
