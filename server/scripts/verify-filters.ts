@@ -176,6 +176,88 @@ const checks: Array<[string, () => void]> = [
       assert.equal(parsed[0]?.type, "ACCIDENT");
     },
   ],
+  [
+    "OpenWebNinja/Cavsn crashes map alert_id and latitude/longitude",
+    () => {
+      const own = parseRawAlerts(
+        [
+          {
+            alert_id: "own-1",
+            type: "ACCIDENT",
+            latitude: 42.9849,
+            longitude: -81.2453,
+            street: "Richmond St",
+          },
+        ] as Record<string, unknown>[],
+        "openwebninja",
+      );
+      assert.equal(own.length, 1);
+      assert.equal(own[0]?.alertId, "own-1");
+      assert.equal(own[0]?.lat, 42.9849);
+      assert.equal(own[0]?.lng, -81.2453);
+      assert.equal(own[0]?.type, "ACCIDENT");
+
+      const accidents = parseRawAlerts(
+        [
+          {
+            uuid: "cavsn-1",
+            type: "ACCIDENTS",
+            location: { lat: 43.0092, lng: -81.2738 },
+          },
+        ] as Record<string, unknown>[],
+        "cavsn",
+      );
+      assert.equal(accidents.length, 1);
+      assert.equal(accidents[0]?.alertId, "cavsn-1");
+      assert.equal(accidents[0]?.lat, 43.0092);
+      assert.equal(accidents[0]?.lng, -81.2738);
+      assert.equal(accidents[0]?.type, "ACCIDENT");
+
+      const xy = parseRawAlerts(
+        [
+          {
+            id: 99,
+            type: "ACCIDENT",
+            location: { x: -81.2453, y: 42.9849 },
+          },
+        ] as Record<string, unknown>[],
+        "cavsn",
+      );
+      assert.equal(xy.length, 1);
+      assert.equal(xy[0]?.alertId, "99");
+      assert.equal(xy[0]?.lat, 42.9849);
+      assert.equal(xy[0]?.lng, -81.2453);
+
+      assert.deepEqual(
+        parseRawAlerts(
+          [
+            {
+              alert_id: "drop-hazard",
+              type: "HAZARD",
+              subType: "HAZARD_ON_ROAD",
+              latitude: 42.98,
+              longitude: -81.24,
+            },
+            {
+              alert_id: "drop-police",
+              type: "POLICE",
+              latitude: 42.98,
+              longitude: -81.24,
+            },
+            {
+              alert_id: "drop-construction",
+              type: "HAZARD",
+              subType: "HAZARD_ON_ROAD_CONSTRUCTION",
+              latitude: 42.98,
+              longitude: -81.24,
+            },
+          ] as Record<string, unknown>[],
+          "openwebninja",
+        ),
+        [],
+      );
+    },
+  ],
 ];
 
 let failures = 0;

@@ -5,12 +5,12 @@ import { STT_RETRY_POLICY, withTransientRetry } from "./retryPolicy";
 let client: DeepgramClient | null = null;
 
 /**
- * Bound the live socket so a hung Deepgram session cannot stall the fire
- * listener's single-flight audio processor. SDK reconnect is off: our
- * STT_RETRY_POLICY is the only retry layer.
+ * Prerecorded Listen is the right API for a closed WAV chunk: a 10s dispatch
+ * buffer transcribes in ~1-2s. The live WebSocket path was hanging until our
+ * 20s timer, then retrying three times (~61s) and discarding the audio.
  */
-const LIVE_TIMEOUT_MS = 20_000;
-const SDK_MAX_RETRIES = 1;
+const REQUEST_TIMEOUT_MS = 8_000;
+const SDK_MAX_RETRIES = 0;
 
 const DISPATCH_KEYTERMS = [
   "MVC",
@@ -27,7 +27,7 @@ export function getDeepgram(): DeepgramClient {
   if (!client) {
     client = new DeepgramClient({
       apiKey: config.deepgramApiKey,
-      timeoutInSeconds: Math.ceil(LIVE_TIMEOUT_MS / 1000),
+      timeoutInSeconds: Math.ceil(REQUEST_TIMEOUT_MS / 1000),
       maxRetries: SDK_MAX_RETRIES,
       reconnect: false,
     });
@@ -37,79 +37,34 @@ export function getDeepgram(): DeepgramClient {
 
 export type Transcriber = (wav: Buffer) => Promise<string>;
 
-function toMediaBytes(wav: Buffer): Uint8Array {
-  return new Uint8Array(wav.buffer, wav.byteOffset, wav.byteLength);
+function transcriptFromResponse(response: unknown): string {
+  const results = (response as {
+    results?: { channels?: Array<{ alternatives?: Array<{ transcript?: string }> }> };
+  })?.results;
+  return results?.channels?.[0]?.alternatives?.[0]?.transcript?.trim() ?? "";
 }
 
 /**
- * Stream one WAV buffer over Deepgram Listen v1 (Nova-3) and collect finals.
- * A new socket is opened per attempt so a retry never reuses a half-closed
- * connection or a body the failed request already consumed.
+ * Send one WAV buffer to Deepgram Nova-3 prerecorded Listen. Rebuilt per
+ * attempt so a retry never reuses a consumed body.
  */
 async function transcribeOnce(wav: Buffer): Promise<string> {
-  const connection = await getDeepgram().listen.v1.connect({
-    model: "nova-3",
-    language: "en-US",
-    smart_format: "true",
-    punctuate: "true",
-    numerals: "true",
-    interim_results: "false",
-    keyterm: DISPATCH_KEYTERMS,
-    reconnectAttempts: 0,
-    connectionTimeoutInSeconds: Math.ceil(LIVE_TIMEOUT_MS / 1000),
-  });
-
-  const finals: string[] = [];
-
-  return new Promise<string>((resolve, reject) => {
-    let settled = false;
-    const settle = (fn: () => void) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      try {
-        connection.close();
-      } catch {
-        // Socket may already be closed by Deepgram after CloseStream.
-      }
-      fn();
-    };
-
-    const timer = setTimeout(() => {
-      settle(() =>
-        reject(
-          Object.assign(new Error("Deepgram live transcription timed out"), {
-            code: "ETIMEDOUT",
-          }),
-        ),
-      );
-    }, LIVE_TIMEOUT_MS);
-
-    connection.on("message", (data) => {
-      if (data.type !== "Results") return;
-      const text = data.channel?.alternatives?.[0]?.transcript?.trim() ?? "";
-      if (text && data.is_final !== false) finals.push(text);
-    });
-
-    connection.on("error", (err) => {
-      settle(() => reject(err));
-    });
-
-    connection.on("close", () => {
-      settle(() => resolve(finals.join(" ").replace(/\s+/g, " ").trim()));
-    });
-
-    void (async () => {
-      try {
-        connection.connect();
-        await connection.waitForOpen();
-        connection.sendMedia(toMediaBytes(wav));
-        connection.sendCloseStream({ type: "CloseStream" });
-      } catch (err) {
-        settle(() => reject(err));
-      }
-    })();
-  });
+  const response = await getDeepgram().listen.v1.media.transcribeFile(
+    new Uint8Array(wav),
+    {
+      model: "nova-3",
+      language: "en-US",
+      smart_format: true,
+      punctuate: true,
+      numerals: true,
+      keyterm: DISPATCH_KEYTERMS,
+    },
+    {
+      timeoutInSeconds: Math.ceil(REQUEST_TIMEOUT_MS / 1000),
+      maxRetries: SDK_MAX_RETRIES,
+    },
+  );
+  return transcriptFromResponse(response);
 }
 
 export async function speechToText(

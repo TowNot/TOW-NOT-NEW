@@ -797,7 +797,36 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms).unref?.());
 }
 
-/** Shared RapidAPI GET + tolerant body parsing ({data:{alerts}}, {alerts}, or bare array). */
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+/**
+ * Pull the alerts array out of every RapidAPI Waze payload shape observed
+ * live: a bare array, `{alerts}`, `{data:{alerts}}` (OpenWeb Ninja),
+ * `{data:[...]}`, `{result:{alerts}}`, and `{items}`.
+ */
+export function extractAlertRows(parsed: unknown): Record<string, unknown>[] {
+  if (Array.isArray(parsed)) {
+    return parsed.filter(isPlainRecord);
+  }
+  if (!isPlainRecord(parsed)) return [];
+
+  const data = isPlainRecord(parsed["data"]) ? parsed["data"] : parsed;
+  const nested: unknown[] = [
+    parsed["alerts"],
+    data["alerts"],
+    parsed["items"],
+    data["items"],
+    isPlainRecord(parsed["result"]) ? parsed["result"]["alerts"] : undefined,
+    Array.isArray(parsed["data"]) ? parsed["data"] : undefined,
+  ];
+  for (const candidate of nested) {
+    if (Array.isArray(candidate)) return candidate.filter(isPlainRecord);
+  }
+  return [];
+}
+
 async function fetchRapidApiAlerts(
   host: string,
   path: string,
@@ -806,9 +835,6 @@ async function fetchRapidApiAlerts(
 ): Promise<WazeAlert[]> {
   const url = `https://${host}${path}?${params.toString()}`;
   const started = Date.now();
-  // 25s provider timeout: generous enough that slow-but-healthy RapidAPI
-  // responses aren't aborted early (providers run concurrently, so a slow
-  // one doesn't stall the others anyway).
   const res = await timedProviderFetch(provider, url, {
     headers: { "x-rapidapi-host": host, "x-rapidapi-key": getRapidApiKey() },
     signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
@@ -830,14 +856,16 @@ async function fetchRapidApiAlerts(
     logger.error({ provider, sample: rawBody.slice(0, 300) }, "Provider returned malformed JSON");
     throw err;
   }
-  const json = (parsed ?? {}) as Record<string, unknown>;
-  const data = (json["data"] ?? json) as Record<string, unknown>;
-  const rawAlerts = Array.isArray(parsed)
-    ? (parsed as Record<string, unknown>[])
-    : Array.isArray(data["alerts"])
-      ? (data["alerts"] as Record<string, unknown>[])
-      : [];
-  logger.debug({ provider, items: rawAlerts.length, bytes: rawBody.length }, "Provider payload");
+  const rawAlerts = extractAlertRows(parsed);
+  if (rawAlerts.length === 0 && rawBody.length > 20) {
+    const keys = isPlainRecord(parsed) ? Object.keys(parsed) : [];
+    logger.warn(
+      { provider, bytes: rawBody.length, keys },
+      "Provider JSON had no alerts array",
+    );
+  } else {
+    logger.debug({ provider, items: rawAlerts.length, bytes: rawBody.length }, "Provider payload");
+  }
   return parseRawAlerts(rawAlerts, provider);
 }
 
@@ -903,22 +931,23 @@ async function fetchWazeDirect(
   return alerts;
 }
 
-/** OpenWeb Ninja — waze.p.rapidapi.com /alerts-and-jams, snake_case box params. */
+/** OpenWeb Ninja — waze.p.rapidapi.com /alerts-and-jams. No server-side type
+ * filter: the feed is mixed (accidents, hazards, construction) and
+ * parseRawAlerts keeps crashes locally. Center+radius (capped 15 km) stays
+ * inside their ~200-alert cap so a 20 km bbox cannot crowd out ACCIDENT rows. */
 async function fetchOpenWebNinja(
   lat: number,
   lng: number,
   radiusKm: number,
 ): Promise<WazeAlert[]> {
-  const box = boundingBox(lat, lng, radiusKm);
   return fetchRapidApiAlerts(
     "waze.p.rapidapi.com",
     "/alerts-and-jams",
     new URLSearchParams({
-      bottom_left: `${box.bottomLeft.lat},${box.bottomLeft.lng}`,
-      top_right: `${box.topRight.lat},${box.topRight.lng}`,
-      // No alert_types filter: the widened ingestion allowlist accepts
-      // accidents, hazards, closures, jams, and other — filter client-side.
-      max_alerts: "300",
+      center: `${lat},${lng}`,
+      radius: String(Math.min(Math.max(radiusKm, 1), 15)),
+      radius_units: "KM",
+      max_alerts: "200",
       max_jams: "0",
     }),
     "openwebninja",
@@ -938,31 +967,34 @@ async function fetchBlocksInside(
     new URLSearchParams({
       "bottom-left": `${box.bottomLeft.lat},${box.bottomLeft.lng}`,
       "top-right": `${box.topRight.lat},${box.topRight.lng}`,
-      // Widened API filter: request every alert class the ingestion
-      // allowlist accepts; the parser's hard blocklist drops the roadwork.
-      filter: '["ACCIDENTS","HAZARDS","ROAD_CLOSED","JAMS","OTHER"]',
-      limit: "300",
+      // Server-side filter: accidents only. HTTP 429 still trips the existing
+      // 15-minute cooldown and never crashes the aggregator.
+      filter: '["ACCIDENTS"]',
+      limit: "100",
     }),
     "blocksinside",
   );
 }
 
-/** Cavsn — waze-api-waze-scraper.p.rapidapi.com /waze/alerts-and-jams. */
+/** Cavsn — waze-api-waze-scraper.p.rapidapi.com /waze/alerts-and-jams. No
+ * server-side type filter (this host ignores or empties on alert_types);
+ * bbox + center/radius, then parseRawAlerts keeps crashes locally. */
 async function fetchCavsn(
   lat: number,
   lng: number,
   radiusKm: number,
 ): Promise<WazeAlert[]> {
-  const box = boundingBox(lat, lng, radiusKm);
+  const box = boundingBox(lat, lng, Math.min(radiusKm, 15));
   return fetchRapidApiAlerts(
     "waze-api-waze-scraper.p.rapidapi.com",
     "/waze/alerts-and-jams",
     new URLSearchParams({
       bottom_left: `${box.bottomLeft.lat},${box.bottomLeft.lng}`,
       top_right: `${box.topRight.lat},${box.topRight.lng}`,
-      // No alert_types filter: widened ingestion accepts all alert classes
-      // (this feed has returned zero items historically anyway).
-      max_alerts: "300",
+      center: `${lat},${lng}`,
+      radius: String(Math.min(Math.max(radiusKm, 1), 15)),
+      radius_units: "KM",
+      max_alerts: "200",
       max_jams: "0",
     }),
     "cavsn",

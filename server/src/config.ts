@@ -35,8 +35,11 @@ export const config = {
   apifyApiToken: process.env.APIFY_API_TOKEN ?? "",
   deepgramApiKey: process.env.DEEPGRAM_API_KEY ?? "",
   residentialProxyUrl: process.env.RESIDENTIAL_PROXY_URL ?? "",
-  londonLat: Number(process.env.LONDON_LAT ?? 42.9837),
-  londonLng: Number(process.env.LONDON_LNG ?? -81.2497),
-  pollRadiusKm: Number(process.env.POLL_RADIUS_KM ?? 20),
+  // Downtown London, ON (same pin the fire-dispatch geocoder uses). A 15 km
+  // radius covers Western campus, the 401, and Hyde Park without overflowing
+  // RapidAPI's ~200-alert cap the way a 20 km box did.
+  londonLat: Number(process.env.LONDON_LAT ?? 42.9849),
+  londonLng: Number(process.env.LONDON_LNG ?? -81.2453),
+  pollRadiusKm: Number(process.env.POLL_RADIUS_KM ?? 15),
   logLevel: (process.env.LOG_LEVEL ?? "info") as "debug" | "info" | "warn" | "error",
 } as const;

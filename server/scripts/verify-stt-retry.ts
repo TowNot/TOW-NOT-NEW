@@ -97,15 +97,15 @@ const checks: Array<[string, () => Promise<void>]> = [
           STT_RETRY_POLICY,
           async () => {
             attempts++;
-            clock += 40_000; // one attempt burning the SDK timeout plus its built-in retry
+            clock += 10_000; // one attempt burning the 8s timeout plus slack
             throw connectionReset();
           },
           { now: () => clock, sleep: async (ms) => void (clock += ms) },
         ),
       );
-      assert.equal(attempts, 2, "the budget must stop a third slow attempt");
-      assert.ok(clock <= 90_000, `worst case ran ${clock}ms`);
-      assert.ok(STT_RETRY_POLICY.budgetMs <= 60_000);
+      assert.equal(attempts, 2, "the 20s budget must stop a third slow attempt");
+      assert.ok(clock <= 25_000, `worst case ran ${clock}ms`);
+      assert.ok(STT_RETRY_POLICY.budgetMs <= 20_000);
     },
   ],
   [

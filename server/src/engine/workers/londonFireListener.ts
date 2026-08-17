@@ -2,8 +2,8 @@
  * London Fire cloud audio listener.
  *
  * Pipes the Broadcastify Feed 34296 ("London Fire and Public Works") public
- * HLS stream into 15-second in-memory audio buffers, transcribes each buffer
- * with Deepgram Nova-3 live streaming, scans transcripts for crash keywords,
+ * HLS stream into 10-second in-memory audio buffers, transcribes each buffer
+ * with Deepgram Nova-3, scans transcripts for crash keywords,
  * extracts streets with a local regex parser, geocodes them, then stores
  * crash dispatches as incidents with
  * provider `london_fire_dispatch` — gated by the standard 350m dedup filter —
@@ -13,8 +13,8 @@
  *  - The legacy Icecast URL (audio.broadcastify.com/34296.mp3) is 401 Basic
  *    auth — premium only. The web player's HLS origin is public, no auth:
  *    https://hls-o1.broadcastify.com/s0/feed/34296/playlist.m3u8
- *  - Segments are ~4.023s MPEG-TS wrapping mono 22.05kHz MP3. Four segments
- *    ≈ 16s ≈ one transcription buffer.
+ *  - Segments are ~4.023s MPEG-TS wrapping mono 22.05kHz MP3. Three segments
+ *    ≈ 12s ≈ one transcription buffer.
  *  - If the HLS path token rotates, we re-scrape the popout player page for
  *    the fresh hlsUrl.
  */
@@ -40,13 +40,13 @@ const UA =
 const STREAM_REFERER = "https://www.broadcastify.com/";
 
 const POLL_INTERVAL_MS = 5_000; // playlist re-poll cadence
-const BUFFER_TARGET_SECONDS = 15; // flush transcription buffer at ≥15s of NEW audio
+const BUFFER_TARGET_SECONDS = 10; // flush transcription buffer at ≥10s of NEW audio
 const MAX_BUFFERED_SEGMENTS = 12; // hard cap so a stall can't grow memory
 // Rolling overlap: the tail of each flushed buffer is re-queued at the head of
 // the next one so a dispatch spoken across a chunk boundary ("single vehicle
 // MVC, Wharncliffe and…" | "…Oxford") is transcribed whole at least once.
 // Overlap audio is excluded from the flush thresholds, so a 15s buffer still
-// carries 15s of new audio plus the 4s replay.
+// carries 10s of new audio plus the 4s replay.
 const OVERLAP_TARGET_SECONDS = 4;
 
 // Silence gate: dispatch channels are dead air most of the day. Buffers whose

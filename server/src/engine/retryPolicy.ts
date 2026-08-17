@@ -75,18 +75,16 @@ export interface RetryPolicy {
 }
 
 /**
- * Worst case ≈ 2 attempts × ~40s of SDK time + backoff ≈ 85s: the budget stops
- * a third attempt from starting once two have already burned their timeouts,
- * while a fast-failing reset still gets all three attempts within a few
- * seconds. Anything longer would stall the audio buffer behind the
- * single-flight guard and start shedding live dispatch traffic.
+ * Each Deepgram prerecorded attempt is capped at 8s. Three attempts plus
+ * jittered backoff stay under ~20s — short enough that the fire listener's
+ * single-flight guard does not shed the next live dispatch buffer.
  */
 export const STT_RETRY_POLICY: RetryPolicy = {
   label: "speech-to-text",
   maxAttempts: 3,
-  budgetMs: 60_000,
-  baseDelayMs: 500,
-  maxDelayMs: 4_000,
+  budgetMs: 20_000,
+  baseDelayMs: 400,
+  maxDelayMs: 1_500,
 };
 
 export interface RetryHooks {
