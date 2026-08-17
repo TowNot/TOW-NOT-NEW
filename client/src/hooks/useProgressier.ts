@@ -54,7 +54,11 @@ export function useProgressier() {
       return;
     }
     try {
-      setEnabled(Boolean(await getSubscription()));
+      const subscription = await getSubscription();
+      setEnabled(Boolean(subscription));
+      if (subscription && window.progressier) {
+        window.progressier.add?.({ tags: "tow-not" });
+      }
     } catch {
       setEnabled(false);
     }
@@ -85,11 +89,11 @@ export function useProgressier() {
 
       const progressier = await waitForProgressier();
       await progressier.subscribe();
-      progressier.add?.({ tags: "tow-not" });
 
       // subscribe() resolves before the subscription is registered, so settle
       // briefly and then confirm against the PushManager rather than assuming.
       await new Promise((resolve) => setTimeout(resolve, SUBSCRIBE_SETTLE_MS));
+      progressier.add?.({ tags: "tow-not" });
       const subscription = await getSubscription();
       if (!subscription) {
         throw new Error("Push subscription was not created — check notification permissions");

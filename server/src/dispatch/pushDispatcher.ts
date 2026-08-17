@@ -32,6 +32,7 @@ export class PushDispatcher extends EventEmitter {
         title: "AlertNav test alert",
         body: "Push dispatcher is online for London, ON.",
         severity: "medium",
+        url: "/desk",
       },
       "test",
     );

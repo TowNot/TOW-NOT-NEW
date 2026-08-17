@@ -30,7 +30,10 @@ export const config = {
   progressierApiKey: process.env.PROGRESSIER_API_KEY ?? "",
   progressierAppId,
   progressierPushUrl: resolveProgressierPushUrl(),
-  pushIconUrl: process.env.PUSH_ICON_URL ?? "",
+  // AlertNav 512×512 from the Progressier manifest; override with PUSH_ICON_URL.
+  pushIconUrl:
+    process.env.PUSH_ICON_URL?.trim() ||
+    "https://oouxkyuexvzylckxeeks.supabase.co/storage/v1/object/public/pgsstoragebucket/Box8ybh6oF1k8MfNQjxX/YUEjbFcDfJDaWOI.png",
   rapidApiKey: process.env.RAPIDAPI_KEY ?? "",
   apifyApiToken: process.env.APIFY_API_TOKEN ?? "",
   deepgramApiKey: process.env.DEEPGRAM_API_KEY ?? "",

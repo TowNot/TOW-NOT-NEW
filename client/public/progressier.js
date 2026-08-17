@@ -10,13 +10,17 @@ self.addEventListener("push", (event) => {
       } catch {
         payload = {};
       }
-      const title = payload.title || "AlertNav";
-      const body = payload.body || "";
-      const url = payload.url || "";
+      const nested = payload.notification || {};
+      const data = payload.data || nested.data || {};
+      const title = payload.title || nested.title || "AlertNav";
+      const body = payload.body || payload.message || nested.body || nested.message || "";
+      const url = payload.url || data.url || nested.url || "";
+      const icon = payload.icon || nested.icon || "";
       // Always banner, including when a /desk tab is focused. Progressier's
       // imported handler may skip showNotification for visible clients.
       await self.registration.showNotification(title, {
         body,
+        icon: icon || undefined,
         tag: url || title,
         renotify: true,
         data: { url },

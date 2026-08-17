@@ -78,7 +78,7 @@ export function createSourcesRouter(store: IncidentStore): Router {
       push: {
         endpoint: config.progressierPushUrl,
         appId: config.progressierAppId,
-        recipientTag: "tow-not",
+        recipients: { users: "all" },
       },
       fireDispatch: {
         ...getFireDispatchRuntime(),
