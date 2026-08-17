@@ -125,6 +125,38 @@ function normalizeEpoch(v: unknown): number | null {
   return null;
 }
 
+function readAlertType(raw: Record<string, unknown>): string | null {
+  for (const key of ["type", "alert_type", "alertType"]) {
+    const value = raw[key];
+    if (typeof value === "string" && value.length > 0) return value;
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+  return null;
+}
+
+function unwrapAlertRow(raw: Record<string, unknown>): Record<string, unknown> {
+  for (const key of ["alert", "item"]) {
+    const nested = raw[key];
+    if (
+      isPlainRecord(nested) &&
+      (readAlertType(nested) || nested["location"] || nested["latitude"] || nested["lat"])
+    ) {
+      return { ...raw, ...nested };
+    }
+  }
+  return raw;
+}
+
+function typeHistogram(rows: Record<string, unknown>[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const raw of rows) {
+    const row = unwrapAlertRow(raw);
+    const t = (readAlertType(row) ?? "<none>").toUpperCase();
+    counts[t] = (counts[t] ?? 0) + 1;
+  }
+  return counts;
+}
+
 function asString(v: unknown): string | null {
   return typeof v === "string" && v.length > 0 ? v : null;
 }
@@ -393,17 +425,7 @@ export function isTrueCrash(type: string, subtype: string | null): boolean {
   return CRASH_KEYWORDS.some((k) => t.includes(k) || s.includes(k));
 }
 
-/** CAVSN HAZARD rows keep only with explicit crash language in subtype/text. */
-const CAVSN_HAZARD_CRASH_RE =
-  /\b(crash|collision|hit|mvc|mva|pile[\s_-]?up|opposite[\s_-]?side|other[\s_-]?side|accident|rollover|t-?bone|struck)\b/i;
-
-export function cavsnHazardHasCrashLanguage(subtype: string | null, text: string): boolean {
-  const s = (subtype ?? "").toUpperCase();
-  if (s.includes("OTHER_SIDE") || s.includes("ON_ROAD_FEATURE")) return true;
-  return CAVSN_HAZARD_CRASH_RE.test(`${subtype ?? ""} ${text}`);
-}
-
-/** Waze/CAVSN accident types always ingest. Keyword filters apply to HAZARD only. */
+/** Waze/CAVSN accident types always ingest. */
 export function isAccidentType(type: string): boolean {
   const t = type.toUpperCase();
   return t.startsWith("ACCIDENT") || t === "CRASH" || t === "COLLISION" || t === "MVC" || t === "MVA";
@@ -445,11 +467,10 @@ export function parseRawAlerts(
   // counts — logged once per parse so unexpected provider formats are
   // traceable without per-row log spam.
   const droppedCombos = new Map<string, number>();
-  for (const raw of rawAlerts) {
-    const type =
-      asString(raw["type"]) ??
-      asString(raw["alert_type"]) ??
-      asString(raw["alertType"]);
+  const typeCounts = typeHistogram(rawAlerts);
+  for (const original of rawAlerts) {
+    const raw = unwrapAlertRow(original);
+    const type = readAlertType(raw);
     // Providers vary: subtype may arrive as subType/subtype, or under a
     // "category" style field on some RapidAPI feeds.
     const subtype =
@@ -483,28 +504,19 @@ export function parseRawAlerts(
       ).test(crashText),
     );
 
-    // CAVSN live-test gate: ACCIDENT always keeps; HAZARD keeps only with
-    // crash language in description/subtype. Construction, debris, jams drop.
-    // Keepers skip the generic municipal/ingestion gates so an ACCIDENT row
-    // cannot be dropped later as "road construction" text or a non-crash hazard.
+    // CAVSN is queried as ACCIDENT-only. Keep accident types; drop HAZARD and
+    // everything else so leftover construction rows cannot fill the store.
     let bypassGenericGates = false;
     if (provider === "cavsn") {
-      const accident = isAccidentType(tUp);
-      const hazard = tUp.includes("HAZARD") || sUp.includes("HAZARD");
-      if (accident) {
-        bypassGenericGates = true;
-      } else if (
-        hazard &&
-        (Boolean(keywordHit) || cavsnHazardHasCrashLanguage(subtype, crashText))
-      ) {
+      if (isAccidentType(tUp)) {
         bypassGenericGates = true;
       } else {
         earlyDropped++;
-        const key = `${hazard ? "cavsn-hazard" : "cavsn-skip"}:${tUp || "<no-type>"}/${sUp || "<no-subtype>"}`;
+        const key = `cavsn-skip:${tUp || "<no-type>"}/${sUp || "<no-subtype>"}`;
         droppedCombos.set(key, (droppedCombos.get(key) ?? 0) + 1);
         logger.debug(
           { provider, street: streetLabel, subtype: sUp || tUp },
-          "[Aggregator] dropped CAVSN row without accident type or crash language",
+          "[Aggregator] dropped CAVSN non-accident row",
         );
         continue;
       }
@@ -729,17 +741,14 @@ export function parseRawAlerts(
   }
   // One line per provider per poll. The per-row detail above is debug-only, so
   // this summary is where dropped volume stays visible without flooding logs.
+  const droppedBy = Object.fromEntries(
+    [...droppedCombos.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8),
+  );
+  const stats = statFor(provider);
+  stats.lastDroppedBy = droppedBy;
+  stats.lastTypeCounts = typeCounts;
   logger.info(
-    {
-      provider,
-      received: rawAlerts.length,
-      retained: alerts.length,
-      dropped: earlyDropped,
-      droppedBy: Object.fromEntries(
-        [...droppedCombos.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8),
-      ),
-    },
-    "[Aggregator] ingestion summary",
+    `[Aggregator] ingestion summary provider=${provider} received=${rawAlerts.length} retained=${alerts.length} dropped=${earlyDropped} types=${JSON.stringify(typeCounts)} droppedBy=${JSON.stringify(droppedBy)}`,
   );
   return alerts;
 }
@@ -753,6 +762,9 @@ export interface ProviderFetchStat {
   lastError: string | null;
   lastReceived: number | null;
   lastRetained: number | null;
+  lastTypeCounts: Record<string, number> | null;
+  lastDroppedBy: Record<string, number> | null;
+  lastSampleKeys: string[] | null;
 }
 
 const fetchStats = new Map<ProviderSource, ProviderFetchStat>();
@@ -771,6 +783,9 @@ function statFor(provider: ProviderSource): ProviderFetchStat {
       lastError: null,
       lastReceived: null,
       lastRetained: null,
+      lastTypeCounts: null,
+      lastDroppedBy: null,
+      lastSampleKeys: null,
     };
     fetchStats.set(provider, s);
   }
@@ -945,8 +960,11 @@ async function fetchRapidApiAlerts(
     throw err;
   }
   const rawAlerts = extractAlertRows(parsed);
+  const typeCounts = typeHistogram(rawAlerts);
   if (provider === "cavsn") {
-    console.log(`[WAZE API] Fetched ${rawAlerts.length} incidents from CAVSN`);
+    console.log(
+      `[WAZE API] Fetched ${rawAlerts.length} incidents from CAVSN types=${JSON.stringify(typeCounts)} sampleKeys=${JSON.stringify(rawAlerts[0] ? Object.keys(rawAlerts[0]) : [])}`,
+    );
   }
   if (rawAlerts.length === 0 && rawBody.length > 20) {
     const keys = isPlainRecord(parsed) ? Object.keys(parsed) : [];
@@ -955,12 +973,16 @@ async function fetchRapidApiAlerts(
       "Provider JSON had no alerts array",
     );
   } else {
-    logger.info({ provider, items: rawAlerts.length, bytes: rawBody.length }, "Provider payload");
+    logger.info(
+      `Provider payload provider=${provider} items=${rawAlerts.length} types=${JSON.stringify(typeCounts)}`,
+    );
   }
   const alerts = parseRawAlerts(rawAlerts, provider);
   const stats = statFor(provider);
   stats.lastReceived = rawAlerts.length;
   stats.lastRetained = alerts.length;
+  stats.lastTypeCounts = typeCounts;
+  stats.lastSampleKeys = rawAlerts[0] ? Object.keys(rawAlerts[0]) : [];
   return alerts;
 }
 
@@ -1078,15 +1100,15 @@ async function fetchCavsn(
   radiusKm: number,
 ): Promise<WazeAlert[]> {
   const box = boundingBox(lat, lng, Math.min(radiusKm, 15));
-  // Do not send alert_types / center+radius together with the bbox — this
-  // host has returned an empty alerts array when extra filters are present.
-  // Fetch the box, then keep ACCIDENT always and HAZARD only with crash text.
+  // ACCIDENT only: a mixed HAZARD query fills the ~200-row cap with
+  // construction and crowds out real crashes. max_jams stays 0.
   return fetchRapidApiAlerts(
     "waze-api-waze-scraper.p.rapidapi.com",
     "/waze/alerts-and-jams",
     new URLSearchParams({
       bottom_left: `${box.bottomLeft.lat},${box.bottomLeft.lng}`,
       top_right: `${box.topRight.lat},${box.topRight.lng}`,
+      alert_types: "ACCIDENT",
       max_alerts: "300",
       max_jams: "0",
     }),

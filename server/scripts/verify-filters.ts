@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import {
-  cavsnHazardHasCrashLanguage,
   extractAlertRows,
   isAccidentType,
   isBreakdown,
@@ -262,12 +261,8 @@ const checks: Array<[string, () => void]> = [
     },
   ],
   [
-    "CAVSN keeps accidents and crash-language hazards, drops construction/debris",
+    "CAVSN keeps ACCIDENT rows and drops all HAZARD rows",
     () => {
-      assert.equal(cavsnHazardHasCrashLanguage("HAZARD_ON_ROAD", "vehicle collision"), true);
-      assert.equal(cavsnHazardHasCrashLanguage("HAZARD_ON_ROAD_OBJECT", "debris in lane"), false);
-      assert.equal(cavsnHazardHasCrashLanguage("HAZARD_ON_ROAD_FEATURE", "car on other side"), true);
-
       const parsed = parseRawAlerts(
         [
           {
@@ -303,8 +298,9 @@ const checks: Array<[string, () => void]> = [
         ] as Record<string, unknown>[],
         "cavsn",
       );
-      const kept = parsed.map((alert) => alert.type).sort();
-      assert.deepEqual(kept, ["ACCIDENT", "ACCIDENT"]);
+      assert.equal(parsed.length, 1);
+      assert.equal(parsed[0]?.type, "ACCIDENT");
+      assert.equal(parsed[0]?.street, "Oxford St");
     },
   ],
   [
@@ -332,9 +328,8 @@ const checks: Array<[string, () => void]> = [
         ] as Record<string, unknown>[],
         "cavsn",
       );
-      assert.equal(parsed.length, 2);
+      assert.equal(parsed.length, 1);
       assert.equal(parsed[0]?.type, "ACCIDENT");
-      assert.equal(parsed[1]?.type, "HAZARD");
     },
   ],
   [
@@ -353,6 +348,27 @@ const checks: Array<[string, () => void]> = [
       });
       assert.equal(rows.length, 1);
       assert.equal(rows[0]?.type, "ACCIDENT");
+    },
+  ],
+  [
+    "nested CAVSN {alert:{...}} wrappers still ingest ACCIDENT",
+    () => {
+      const parsed = parseRawAlerts(
+        [
+          {
+            alert: {
+              type: "ACCIDENT",
+              latitude: 42.9849,
+              longitude: -81.2453,
+              street: "Richmond St",
+            },
+          },
+        ] as Record<string, unknown>[],
+        "cavsn",
+      );
+      assert.equal(parsed.length, 1);
+      assert.equal(parsed[0]?.type, "ACCIDENT");
+      assert.equal(parsed[0]?.street, "Richmond St");
     },
   ],
 ];
