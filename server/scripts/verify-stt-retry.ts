@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
+import { speechToText } from "../src/engine/deepgramClient";
 import {
-  isRetryableOpenAIError,
+  isRetryableTransientError,
   LOCATION_RETRY_POLICY,
-  speechToText,
   STT_RETRY_POLICY,
-  withOpenAIRetry,
-} from "../src/engine/openaiClient";
+  withTransientRetry,
+} from "../src/engine/retryPolicy";
 
 const WAV = Buffer.from("fake-wav-payload");
 const TRANSCRIPT = "765 calling Engine 3, MVC Wharncliffe and Oxford, code 4";
@@ -16,7 +16,7 @@ const TRANSCRIPT = "765 calling Engine 3, MVC Wharncliffe and Oxford, code 4";
  */
 function connectionReset(code = "ECONNRESET"): Error {
   const cause = Object.assign(
-    new Error(`request to https://api.openai.com/v1/audio/transcriptions failed`),
+    new Error(`request to https://api.deepgram.com/v1/listen failed`),
     { type: "system", errno: code, code },
   );
   return Object.assign(new Error("Connection error."), { cause });
@@ -24,6 +24,10 @@ function connectionReset(code = "ECONNRESET"): Error {
 
 function apiError(status: number, message: string): Error {
   return Object.assign(new Error(message), { status });
+}
+
+function deepgramError(statusCode: number, message: string): Error {
+  return Object.assign(new Error(message), { statusCode });
 }
 
 const checks: Array<[string, () => Promise<void>]> = [
@@ -78,12 +82,19 @@ const checks: Array<[string, () => Promise<void>]> = [
     },
   ],
   [
+    "Deepgram statusCode 401 is not retried; 503 is",
+    async () => {
+      assert.equal(isRetryableTransientError(deepgramError(401, "unauthorized")), false);
+      assert.equal(isRetryableTransientError(deepgramError(503, "unavailable")), true);
+    },
+  ],
+  [
     "the retry budget caps total wall clock even when every attempt burns its timeout",
     async () => {
       let clock = 0;
       let attempts = 0;
       await assert.rejects(
-        withOpenAIRetry(
+        withTransientRetry(
           STT_RETRY_POLICY,
           async () => {
             attempts++;
@@ -103,14 +114,14 @@ const checks: Array<[string, () => Promise<void>]> = [
     "transient transport and server faults retry, permanent request errors do not",
     async () => {
       for (const code of ["ECONNRESET", "ETIMEDOUT", "EPIPE", "ECONNREFUSED"]) {
-        assert.equal(isRetryableOpenAIError(connectionReset(code)), true, code);
+        assert.equal(isRetryableTransientError(connectionReset(code)), true, code);
       }
-      assert.equal(isRetryableOpenAIError(new Error("socket hang up")), true);
+      assert.equal(isRetryableTransientError(new Error("socket hang up")), true);
       for (const status of [408, 429, 500, 502, 503]) {
-        assert.equal(isRetryableOpenAIError(apiError(status, "upstream")), true, `${status}`);
+        assert.equal(isRetryableTransientError(apiError(status, "upstream")), true, `${status}`);
       }
       for (const status of [400, 401, 403, 404]) {
-        assert.equal(isRetryableOpenAIError(apiError(status, "rejected")), false, `${status}`);
+        assert.equal(isRetryableTransientError(apiError(status, "rejected")), false, `${status}`);
       }
     },
   ],

@@ -3,7 +3,7 @@
  *
  * Pipes the Broadcastify Feed 34296 ("London Fire and Public Works") public
  * HLS stream into 15-second in-memory audio buffers, transcribes each buffer
- * with OpenAI speech-to-text, scans transcripts for crash keywords, extracts
+ * with Deepgram Nova-3 live streaming, scans transcripts for crash keywords, extracts
  * and geocodes cross-streets, then stores crash dispatches as incidents with
  * provider `london_fire_dispatch` — gated by the standard 350m dedup filter —
  * and push/SMS-notifies immediately.
@@ -19,7 +19,8 @@
  */
 import { spawn } from "node:child_process";
 import fs from "node:fs";
-import { extractJsonLocation, speechToText } from "../openaiClient";
+import { extractJsonLocation } from "../openaiClient";
+import { speechToText } from "../deepgramClient";
 import { distanceKm } from "../geo";
 import { logger } from "../pinoCompat";
 import { config } from "../../config";
@@ -52,15 +53,15 @@ const SILENCE_RMS_DBFS = -50;
 /**
  * Crash detection patterns for London Fire dispatch traffic.
  *  - "MVC" (Motor Vehicle Collision) is the primary acronym, including
- *    punctuated ("M.V.C.") and radio-static/STT misreads ("NBC" — Whisper
- *    frequently mishears the acronym over carrier hiss).
+ *    punctuated ("M.V.C.") and radio-static/STT misreads ("NBC" — Nova-3 can
+ *    still mishear the acronym over carrier hiss).
  *  - Full terms: collision, accident, rollover, extrication, trapped,
  *    vehicle fire.
  *  - Multi-car counts: "1-car", "two-vehicle", "3 car", etc.
  */
 const CRASH_PATTERNS: { label: string; re: RegExp }[] = [
   // Acronyms incl. punctuated/spaced forms and STT misreads over static:
-  // "MVC" / "M.V.C." / "MV C", "MVA", "NBC" (Whisper misread), "N V C".
+  // "MVC" / "M.V.C." / "MV C", "MVA", "NBC" (STT misread), "N V C".
   { label: "MVC", re: /\bM\.?\s?V\.?\s?C\.?\b/i },
   { label: "MVA", re: /\bM\.?\s?V\.?\s?A\.?\b/i },
   { label: "MVC", re: /\bNBC\b/i }, // static/STT misread of "MVC"
@@ -1140,6 +1141,12 @@ async function pollOnce(state: StreamState): Promise<void> {
 
 export function startLondonFireListener(): void {
   if (started) return;
+  if (!config.deepgramApiKey) {
+    logger.error(
+      "[fire-dispatch] DEEPGRAM_API_KEY is not configured — audio listener disabled",
+    );
+    return;
+  }
   started = true;
 
   let probeFailed = false;

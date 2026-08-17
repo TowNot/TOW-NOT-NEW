@@ -54,6 +54,7 @@ export function createSourcesRouter(store: IncidentStore): Router {
         rapidApi: Boolean(config.rapidApiKey),
         apify: Boolean(config.apifyApiToken),
         openai: Boolean(config.openaiApiKey),
+        deepgram: Boolean(config.deepgramApiKey),
         progressier: Boolean(config.progressierApiKey),
       },
       push: {
