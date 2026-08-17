@@ -59,9 +59,10 @@ export function createSourcesRouter(store: IncidentStore): Router {
         intervalMs: config.pollIntervalMs,
       },
       cavsnQuery: {
-        alert_types: "ACCIDENT",
+        alert_types: "ACCIDENT (local filter; not sent — provider applies type filter after the 200-cap)",
         max_jams: "0",
-        max_alerts: "300",
+        max_alerts: "200",
+        tiles: 4,
         bottom_left: `${box.bottomLeft.lat},${box.bottomLeft.lng}`,
         top_right: `${box.topRight.lat},${box.topRight.lng}`,
       },

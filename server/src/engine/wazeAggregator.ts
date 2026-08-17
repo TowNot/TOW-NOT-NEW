@@ -1,5 +1,5 @@
 import { ProxyAgent, fetch as undiciFetch } from "undici";
-import { boundingBox, distanceKm } from "./geo";
+import { boundingBox, distanceKm, splitBoundingBox } from "./geo";
 import { logger } from "./pinoCompat";
 
 /** Every provider the aggregator can pull live accidents from. */
@@ -930,12 +930,12 @@ function looksLikeAlertRow(row: Record<string, unknown>): boolean {
   );
 }
 
-async function fetchRapidApiAlerts(
+async function fetchRapidApiRaw(
   host: string,
   path: string,
   params: URLSearchParams,
   provider: ProviderSource,
-): Promise<WazeAlert[]> {
+): Promise<{ rawAlerts: Record<string, unknown>[]; rawBody: string; parsed: unknown }> {
   const url = `https://${host}${path}?${params.toString()}`;
   const started = Date.now();
   const res = await timedProviderFetch(provider, url, {
@@ -945,8 +945,7 @@ async function fetchRapidApiAlerts(
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     logger.error(
-      { provider, status: res.status, latencyMs: Date.now() - started, body: body.slice(0, 300) },
-      "Provider request failed",
+      `Provider request failed provider=${provider} status=${res.status} latencyMs=${Date.now() - started} body=${body.slice(0, 300)}`,
     );
     throw new Error(`${provider} responded with status ${res.status}`);
   }
@@ -956,10 +955,28 @@ async function fetchRapidApiAlerts(
   try {
     parsed = JSON.parse(rawBody) as unknown;
   } catch (err) {
-    logger.error({ provider, sample: rawBody.slice(0, 300) }, "Provider returned malformed JSON");
+    logger.error(`Provider returned malformed JSON provider=${provider} sample=${rawBody.slice(0, 300)}`);
     throw err;
   }
-  const rawAlerts = extractAlertRows(parsed);
+  return { rawAlerts: extractAlertRows(parsed), rawBody, parsed };
+}
+
+async function fetchRapidApiAlerts(
+  host: string,
+  path: string,
+  params: URLSearchParams,
+  provider: ProviderSource,
+): Promise<WazeAlert[]> {
+  const { rawAlerts, rawBody, parsed } = await fetchRapidApiRaw(host, path, params, provider);
+  return ingestRapidApiAlerts(provider, rawAlerts, rawBody, parsed);
+}
+
+function ingestRapidApiAlerts(
+  provider: ProviderSource,
+  rawAlerts: Record<string, unknown>[],
+  rawBody: string,
+  parsed: unknown,
+): WazeAlert[] {
   const typeCounts = typeHistogram(rawAlerts);
   if (provider === "cavsn") {
     console.log(
@@ -969,7 +986,7 @@ async function fetchRapidApiAlerts(
   if (rawAlerts.length === 0 && rawBody.length > 20) {
     const keys = isPlainRecord(parsed) ? Object.keys(parsed) : [];
     logger.warn(
-      `Provider JSON had no alerts array provider=${provider} bytes=${rawBody.length} keys=${JSON.stringify(keys)}`,
+      `Provider JSON had no alerts array provider=${provider} bytes=${rawBody.length} keys=${JSON.stringify(keys)} body=${rawBody.slice(0, 400)}`,
     );
   } else {
     logger.info(
@@ -1093,25 +1110,54 @@ async function fetchBlocksInside(
 }
 
 /** Cavsn — waze-api-waze-scraper.p.rapidapi.com /waze/alerts-and-jams. */
+const CAVSN_TILE_DIVISIONS = 2;
+
 async function fetchCavsn(
   lat: number,
   lng: number,
   radiusKm: number,
 ): Promise<WazeAlert[]> {
   const box = boundingBox(lat, lng, Math.min(radiusKm, 15));
-  // ACCIDENT only: a mixed HAZARD query fills the ~200-row cap with
-  // construction and crowds out real crashes. max_jams stays 0.
-  return fetchRapidApiAlerts(
-    "waze-api-waze-scraper.p.rapidapi.com",
-    "/waze/alerts-and-jams",
-    new URLSearchParams({
-      bottom_left: `${box.bottomLeft.lat},${box.bottomLeft.lng}`,
-      top_right: `${box.topRight.lat},${box.topRight.lng}`,
-      alert_types: "ACCIDENT",
-      max_alerts: "300",
-      max_jams: "0",
-    }),
+  const tiles = splitBoundingBox(box, CAVSN_TILE_DIVISIONS);
+  // Do not send alert_types: this host filters AFTER the ~200-row cap, so
+  // ACCIDENT-only on a construction-filled cap returns data={} (0 rows).
+  // Tile the London bbox, keep max_jams=0, then keep ACCIDENT locally.
+  const batches = await Promise.all(
+    tiles.map((tile) =>
+      fetchRapidApiRaw(
+        "waze-api-waze-scraper.p.rapidapi.com",
+        "/waze/alerts-and-jams",
+        new URLSearchParams({
+          bottom_left: `${tile.bottomLeft.lat},${tile.bottomLeft.lng}`,
+          top_right: `${tile.topRight.lat},${tile.topRight.lng}`,
+          max_alerts: "200",
+          max_jams: "0",
+        }),
+        "cavsn",
+      ),
+    ),
+  );
+  const seen = new Set<string>();
+  const merged: Record<string, unknown>[] = [];
+  for (const batch of batches) {
+    for (const row of batch.rawAlerts) {
+      const unwrapped = unwrapAlertRow(row);
+      const id =
+        asString(unwrapped["uuid"]) ??
+        asString(unwrapped["alert_id"]) ??
+        asString(unwrapped["id"]) ??
+        `${unwrapped["latitude"] ?? unwrapped["lat"]},${unwrapped["longitude"] ?? unwrapped["lng"]}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      merged.push(row);
+    }
+  }
+  const sample = batches.find((batch) => batch.rawBody.length > 0) ?? batches[0];
+  return ingestRapidApiAlerts(
     "cavsn",
+    merged,
+    sample?.rawBody ?? "",
+    sample?.parsed ?? { tiles: batches.length },
   );
 }
 
