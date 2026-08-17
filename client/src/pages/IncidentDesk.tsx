@@ -11,12 +11,7 @@ import type { PushReceipt } from "../types";
 export function IncidentDesk() {
   const { incidents, connected, health } = useIncidents();
   const { enabled, enable, disable, play } = useAudioAlert();
-  const {
-    busy: pushEnableBusy,
-    enabled: pushEnabled,
-    error: progressierError,
-    togglePush,
-  } = useProgressier();
+  const { error: progressierError } = useProgressier();
   const [pushBusy, setPushBusy] = useState(false);
   const [lastPush, setLastPush] = useState<PushReceipt | null>(null);
   const [pushError, setPushError] = useState<string | null>(null);
@@ -53,9 +48,6 @@ export function IncidentDesk() {
         health={health}
         alertsEnabled={enabled}
         onToggleAlerts={onToggleAlerts}
-        onTogglePush={togglePush}
-        pushEnabled={pushEnabled}
-        pushEnableBusy={pushEnableBusy}
         onTestPush={onTestPush}
         pushBusy={pushBusy}
         lastPush={lastPush}

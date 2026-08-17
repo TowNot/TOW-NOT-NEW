@@ -5,9 +5,6 @@ interface HeaderProps {
   health: HealthStatus | null;
   alertsEnabled: boolean;
   onToggleAlerts: () => void;
-  onTogglePush: () => Promise<void>;
-  pushEnabled: boolean;
-  pushEnableBusy: boolean;
   onTestPush: () => Promise<void>;
   pushBusy: boolean;
   lastPush: PushReceipt | null;
@@ -19,9 +16,6 @@ export function Header({
   health,
   alertsEnabled,
   onToggleAlerts,
-  onTogglePush,
-  pushEnabled,
-  pushEnableBusy,
   onTestPush,
   pushBusy,
   lastPush,
@@ -57,25 +51,7 @@ export function Header({
           >
             {alertsEnabled ? "Audio alerts on" : "Enable audio alerts"}
           </button>
-          <button
-            type="button"
-            onClick={() => void onTogglePush()}
-            disabled={pushEnableBusy}
-            aria-pressed={pushEnabled}
-            className={`rounded-md border px-3 py-2 text-xs font-semibold tracking-wide disabled:opacity-60 ${
-              pushEnabled
-                ? "border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
-                : "border-line bg-panel text-gray-800 hover:border-gray-400"
-            }`}
-          >
-            {pushEnableBusy
-              ? pushEnabled
-                ? "Turning off…"
-                : "Enabling…"
-              : pushEnabled
-                ? "Push notifications on"
-                : "Enable Push Notifications"}
-          </button>
+          <StatusChip live label="push notifications on" />
           <button
             type="button"
             onClick={() => void onTestPush()}
