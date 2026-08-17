@@ -104,6 +104,7 @@ app.get("/progressier.js", (_req, res) => {
   });
 });
 
+// Desk UI lives in the client package and is copied into this image at build time.
 applyClientAssets(app);
 applyTerminalHandlers(app);
 

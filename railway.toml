@@ -1,6 +1,9 @@
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
+# Client dashboard UI is copied into the server image; skip-watch on
+# server/** alone left Header-only commits undeployed.
+watchPatterns = ["client/**", "server/**", "package.json", "Dockerfile", "railway.toml"]
 
 [deploy]
 startCommand = "npm start"

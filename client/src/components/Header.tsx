@@ -51,7 +51,7 @@ export function Header({
           >
             {alertsEnabled ? "Audio alerts on" : "Enable audio alerts"}
           </button>
-          <StatusChip live label="push notifications on" />
+          <StatusChip live label="Push Notifications: Active" />
           <button
             type="button"
             onClick={() => void onTestPush()}
