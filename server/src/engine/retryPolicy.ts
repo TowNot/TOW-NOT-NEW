@@ -64,9 +64,6 @@ export function isRetryableTransientError(err: unknown): boolean {
   return RETRYABLE_MESSAGE_RE.test(errorMessage(err));
 }
 
-/** @deprecated Use isRetryableTransientError — same classification rules. */
-export const isRetryableOpenAIError = isRetryableTransientError;
-
 export interface RetryPolicy {
   /** Operation name used in retry/failure logs. */
   label: string;
@@ -90,16 +87,6 @@ export const STT_RETRY_POLICY: RetryPolicy = {
   budgetMs: 60_000,
   baseDelayMs: 500,
   maxDelayMs: 4_000,
-};
-
-/** Tighter than STT: this runs after a crash keyword already matched, and the
- * transcript is posted with fallback coordinates if it never resolves. */
-export const LOCATION_RETRY_POLICY: RetryPolicy = {
-  label: "location-extraction",
-  maxAttempts: 3,
-  budgetMs: 25_000,
-  baseDelayMs: 400,
-  maxDelayMs: 2_000,
 };
 
 export interface RetryHooks {
@@ -178,6 +165,3 @@ export async function withTransientRetry<T>(
 
   throw lastError;
 }
-
-/** @deprecated Use withTransientRetry — same backoff and budget rules. */
-export const withOpenAIRetry = withTransientRetry;

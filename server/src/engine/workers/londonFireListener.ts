@@ -3,8 +3,9 @@
  *
  * Pipes the Broadcastify Feed 34296 ("London Fire and Public Works") public
  * HLS stream into 15-second in-memory audio buffers, transcribes each buffer
- * with Deepgram Nova-3 live streaming, scans transcripts for crash keywords, extracts
- * and geocodes cross-streets, then stores crash dispatches as incidents with
+ * with Deepgram Nova-3 live streaming, scans transcripts for crash keywords,
+ * extracts streets with a local regex parser, geocodes them, then stores
+ * crash dispatches as incidents with
  * provider `london_fire_dispatch` — gated by the standard 350m dedup filter —
  * and push/SMS-notifies immediately.
  *
@@ -19,7 +20,11 @@
  */
 import { spawn } from "node:child_process";
 import fs from "node:fs";
-import { extractJsonLocation } from "../openaiClient";
+import {
+  applyPhoneticFixes,
+  extractDispatchLocation,
+  fuzzyCorrectStreets,
+} from "../dispatchLocation";
 import { speechToText } from "../deepgramClient";
 import { distanceKm } from "../geo";
 import { logger } from "../pinoCompat";
@@ -452,11 +457,11 @@ function findCrashKeywords(transcript: string): string[] {
 /* ------------------------------------------------------------------ */
 
 /**
- * LLM pass to pull a street/intersection out of a noisy scanner transcript.
- * Only runs on the rare buffers that already hit a crash keyword.
+ * Local regex/keyword pass to pull a street/intersection out of a noisy
+ * scanner transcript. Only runs on buffers that already hit a crash keyword.
  */
-async function extractLocation(transcript: string): Promise<string | null> {
-  return extractJsonLocation(transcript);
+function extractLocation(transcript: string): string | null {
+  return extractDispatchLocation(transcript);
 }
 
 // London, ON bounding box for Overpass street-intersection queries.
@@ -486,7 +491,7 @@ function streetStem(street: string): string {
     .trim()
     .replace(/\s+/g, " ");
   // Strict allow-list before interpolation into the Overpass QL string:
-  // LLM-derived text must never carry quotes, backslashes, or regex/QL
+  // parser-derived text must never carry quotes, backslashes, or regex/QL
   // metacharacters into the query. Reject instead of stripping so a mangled
   // name falls through to the Nominatim path rather than querying garbage.
   if (
@@ -613,102 +618,6 @@ async function geocodeLondon(
     }
   }
   return null;
-}
-
-/* ------------------------------------------------------------------ */
-/* Phonetic dictionary + fuzzy street correction                      */
-/* ------------------------------------------------------------------ */
-
-/**
- * Whisper routinely garbles London street names over scanner static. Map
- * known misreads to the real street before any geocoding attempt.
- * Keys are matched as whole words, case-insensitively.
- */
-const PHONETIC_STREET_FIXES: [RegExp, string][] = [
-  [/\bde\s?bron\b/gi, "Deveron"],
-  [/\bdevron\b/gi, "Deveron"],
-  [/\bdeviron\b/gi, "Deveron"],
-  [/\bdev(?:e|a)ran\b/gi, "Deveron"],
-  [/\bwharncliff?\b/gi, "Wharncliffe"],
-  [/\bwarncliff?e?\b/gi, "Wharncliffe"],
-  [/\bhighbry\b/gi, "Highbury"],
-  [/\bhi-?berry\b/gi, "Highbury"],
-  [/\badelade\b/gi, "Adelaide"],
-  [/\bdundass?\b/gi, "Dundas"],
-  [/\boxfort\b/gi, "Oxford"],
-  [/\bwellingtin\b/gi, "Wellington"],
-  [/\bfan?shaw\b/gi, "Fanshawe"],
-  [/\bcommissioner'?s?\b/gi, "Commissioners"],
-];
-
-/** Common London, ON street names for fuzzy (edit-distance) correction. */
-const LONDON_STREETS = [
-  "Deveron", "Wharncliffe", "Highbury", "Adelaide", "Dundas", "Oxford",
-  "Wellington", "Fanshawe", "Commissioners", "Richmond", "Wonderland",
-  "Hamilton", "Huron", "Sarnia", "Western", "Windermere", "Springbank",
-  "Southdale", "Exeter", "Colonel Talbot", "Clarke", "Veterans Memorial",
-  "Trafalgar", "Gore", "Bradley", "Ernest", "Pond Mills", "Wilton Grove",
-  "Sunningdale", "Gainsborough", "Hyde Park", "Byron Baseline", "Riverside",
-  "Horton", "York", "King", "Queens", "Cheapside", "Egerton", "Quebec",
-  "Florence", "Brydges", "Culver", "Kipps", "Barker", "Cherryhill",
-  "Platt's Lane", "Sanatorium", "Boler", "Griffith", "Andover", "Topping",
-  "Wistow", "Blackacres", "Fallons", "Old Victoria", "Wickerson", "Jalna",
-  "Meadowlily", "Highview", "Homeview", "Berkshire", "Baseline", "Emery",
-  "Stanley", "Wortley", "Ridout", "Talbot", "Waterloo", "Colborne",
-  "Maitland", "William", "Ontario", "Rectory", "Ashland", "Elizabeth",
-  "Central", "Princess", "Dufferin", "Hillcrest", "McCormick", "Vauxhall",
-];
-
-function levenshtein(a: string, b: string): number {
-  const m = a.length, n = b.length;
-  if (m === 0) return n;
-  if (n === 0) return m;
-  let prev = Array.from({ length: n + 1 }, (_, i) => i);
-  for (let i = 1; i <= m; i++) {
-    const cur = [i];
-    for (let j = 1; j <= n; j++) {
-      cur[j] = Math.min(
-        prev[j]! + 1,
-        cur[j - 1]! + 1,
-        prev[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1),
-      );
-    }
-    prev = cur;
-  }
-  return prev[n]!;
-}
-
-/** Apply the phonetic misread dictionary to a heard location string. */
-function applyPhoneticFixes(location: string): string {
-  let fixed = location;
-  for (const [re, replacement] of PHONETIC_STREET_FIXES) {
-    fixed = fixed.replace(re, replacement);
-  }
-  return fixed;
-}
-
-/**
- * Fuzzy-correct each street-name word against the known London street list.
- * Only fires on close misses (edit distance ≤ 2, and ≤ 1/3 of the name) so
- * genuinely different streets are never rewritten.
- */
-function fuzzyCorrectStreets(location: string): string {
-  return location.replace(/[A-Za-z][A-Za-z']{3,}/g, (word) => {
-    const stemRe =
-      /^(north|south|east|west|road|street|avenue|drive|boulevard|line|highway|court|crescent|way|place|and|the)$/i;
-    if (stemRe.test(word)) return word;
-    let best: { street: string; dist: number } | null = null;
-    for (const street of LONDON_STREETS) {
-      const dist = levenshtein(word.toLowerCase(), street.toLowerCase());
-      if (dist > 0 && (!best || dist < best.dist)) best = { street, dist };
-      if (dist === 0) return word; // already an exact street name
-    }
-    if (best && best.dist <= 2 && best.dist <= Math.ceil(word.length / 3)) {
-      log(`Fuzzy street correction: "${word}" -> "${best.street}"`);
-      return best.street;
-    }
-    return word;
-  });
 }
 
 /* ------------------------------------------------------------------ */
@@ -871,10 +780,7 @@ async function processWav(wav: Buffer): Promise<void> {
   // MANDATORY POST RULE: from here on, a crash-keyword transcript is ALWAYS
   // saved and notified — location/geocode failures degrade to fallback
   // coordinates with unverifiedAddress=true, never to a dropped call.
-  const heard = await extractLocation(transcript).catch((err) => {
-    logger.warn({ err }, "[fire-dispatch] location extraction failed — posting unpinned");
-    return null;
-  });
+  const heard = extractLocation(transcript);
 
   let location = heard ? applyPhoneticFixes(heard) : null;
   if (location && location !== heard) {

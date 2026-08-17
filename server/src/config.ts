@@ -33,8 +33,6 @@ export const config = {
   pushIconUrl: process.env.PUSH_ICON_URL ?? "",
   rapidApiKey: process.env.RAPIDAPI_KEY ?? "",
   apifyApiToken: process.env.APIFY_API_TOKEN ?? "",
-  openaiApiKey: process.env.OPENAI_API_KEY ?? process.env.AI_INTEGRATIONS_OPENAI_API_KEY ?? "",
-  openaiBaseUrl: process.env.OPENAI_BASE_URL ?? process.env.AI_INTEGRATIONS_OPENAI_BASE_URL ?? "",
   deepgramApiKey: process.env.DEEPGRAM_API_KEY ?? "",
   residentialProxyUrl: process.env.RESIDENTIAL_PROXY_URL ?? "",
   londonLat: Number(process.env.LONDON_LAT ?? 42.9837),

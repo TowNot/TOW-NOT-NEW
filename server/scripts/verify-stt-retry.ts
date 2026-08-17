@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { speechToText } from "../src/engine/deepgramClient";
 import {
   isRetryableTransientError,
-  LOCATION_RETRY_POLICY,
   STT_RETRY_POLICY,
   withTransientRetry,
 } from "../src/engine/retryPolicy";
@@ -107,7 +106,6 @@ const checks: Array<[string, () => Promise<void>]> = [
       assert.equal(attempts, 2, "the budget must stop a third slow attempt");
       assert.ok(clock <= 90_000, `worst case ran ${clock}ms`);
       assert.ok(STT_RETRY_POLICY.budgetMs <= 60_000);
-      assert.ok(LOCATION_RETRY_POLICY.budgetMs <= STT_RETRY_POLICY.budgetMs);
     },
   ],
   [
