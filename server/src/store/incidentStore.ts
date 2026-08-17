@@ -40,6 +40,12 @@ export class IncidentStore extends EventEmitter {
       severity: existing ? higherSeverity(existing.severity, incident.severity) : incident.severity,
     };
     this.incidents.set(withExpiry.id, withExpiry);
+    console.log("[BROADCAST] Sending incident to client...", {
+      id: withExpiry.id,
+      title: withExpiry.title,
+      source: withExpiry.source,
+      isNew,
+    });
     this.emit("upsert", withExpiry);
     if (isNew) this.emit("created", withExpiry);
     return withExpiry;

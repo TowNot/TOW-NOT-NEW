@@ -16,7 +16,14 @@ export function createApp(store: IncidentStore, dispatcher: PushDispatcher): exp
   const app = express();
 
   app.disable("x-powered-by");
-  app.use(helmet({ contentSecurityPolicy: false }));
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      // Same-origin CORP can block EventSource when the desk is opened from
+      // a preview origin; live feed endpoints must stay readable.
+      crossOriginResourcePolicy: { policy: "cross-origin" },
+    }),
+  );
   app.use(
     cors({
       origin: [config.clientOrigin, "http://127.0.0.1:5173"],
@@ -25,6 +32,7 @@ export function createApp(store: IncidentStore, dispatcher: PushDispatcher): exp
   );
   app.use(express.json({ limit: "1mb" }));
 
+  // Health + incident snapshot/SSE are mounted with no auth or Stripe gate.
   app.use("/api", healthRouter);
   app.use("/api/incidents", createIncidentRouter(store));
   app.use("/api/push", createPushRouter(dispatcher));

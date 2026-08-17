@@ -403,6 +403,12 @@ export function cavsnHazardHasCrashLanguage(subtype: string | null, text: string
   return CAVSN_HAZARD_CRASH_RE.test(`${subtype ?? ""} ${text}`);
 }
 
+/** Waze/CAVSN accident types always ingest. Keyword filters apply to HAZARD only. */
+export function isAccidentType(type: string): boolean {
+  const t = type.toUpperCase();
+  return t.startsWith("ACCIDENT") || t === "CRASH" || t === "COLLISION" || t === "MVC" || t === "MVA";
+}
+
 export function isNotifiableCrash(
   type: string,
   subtype: string | null,
@@ -440,7 +446,10 @@ export function parseRawAlerts(
   // traceable without per-row log spam.
   const droppedCombos = new Map<string, number>();
   for (const raw of rawAlerts) {
-    const type = asString(raw["type"]);
+    const type =
+      asString(raw["type"]) ??
+      asString(raw["alert_type"]) ??
+      asString(raw["alertType"]);
     // Providers vary: subtype may arrive as subType/subtype, or under a
     // "category" style field on some RapidAPI feeds.
     const subtype =
@@ -451,6 +460,7 @@ export function parseRawAlerts(
     const sUp = (subtype ?? "").toUpperCase();
     const rawDescription =
       asString(raw["reportDescription"]) ?? asString(raw["description"]);
+    const streetLabel = asString(raw["street"]) ?? "-";
 
     // CRASH KEYWORD CRAWL — runs FIRST, before any blocklist. Scans
     // description/reportDescription/title/street/subtype text on EVERY row
@@ -475,27 +485,26 @@ export function parseRawAlerts(
 
     // CAVSN live-test gate: ACCIDENT always keeps; HAZARD keeps only with
     // crash language in description/subtype. Construction, debris, jams drop.
+    // Keepers skip the generic municipal/ingestion gates so an ACCIDENT row
+    // cannot be dropped later as "road construction" text or a non-crash hazard.
+    let bypassGenericGates = false;
     if (provider === "cavsn") {
-      const accident = tUp.startsWith("ACCIDENT");
-      const hazard = tUp.includes("HAZARD");
-      if (!accident && !hazard && !keywordHit) {
-        earlyDropped++;
-        const key = `cavsn-skip:${tUp || "<no-type>"}/${sUp || "<no-subtype>"}`;
-        droppedCombos.set(key, (droppedCombos.get(key) ?? 0) + 1);
-        continue;
-      }
-      if (
+      const accident = isAccidentType(tUp);
+      const hazard = tUp.includes("HAZARD") || sUp.includes("HAZARD");
+      if (accident) {
+        bypassGenericGates = true;
+      } else if (
         hazard &&
-        !accident &&
-        !keywordHit &&
-        !cavsnHazardHasCrashLanguage(subtype, crashText)
+        (Boolean(keywordHit) || cavsnHazardHasCrashLanguage(subtype, crashText))
       ) {
+        bypassGenericGates = true;
+      } else {
         earlyDropped++;
-        const key = `cavsn-hazard:${tUp || "<no-type>"}/${sUp || "<no-subtype>"}`;
+        const key = `${hazard ? "cavsn-hazard" : "cavsn-skip"}:${tUp || "<no-type>"}/${sUp || "<no-subtype>"}`;
         droppedCombos.set(key, (droppedCombos.get(key) ?? 0) + 1);
         logger.debug(
-          { provider, street: asString(raw["street"]) ?? "-", subtype: sUp || tUp },
-          "[Aggregator] dropped CAVSN hazard without crash language",
+          { provider, street: streetLabel, subtype: sUp || tUp },
+          "[Aggregator] dropped CAVSN row without accident type or crash language",
         );
         continue;
       }
@@ -519,8 +528,7 @@ export function parseRawAlerts(
     // Breakdown / disabled-vehicle rows are exempt from the subtype blocklist —
     // stalled cars needing a tow always pass the crash filter.
     const breakdownHit = isBreakdown(tUp, sUp);
-    const streetLabel = asString(raw["street"]) ?? "-";
-    if (!keywordHit && !breakdownHit && HARD_BLOCK_SUBTYPES.has(sUp)) {
+    if (!bypassGenericGates && !keywordHit && !breakdownHit && HARD_BLOCK_SUBTYPES.has(sUp)) {
       earlyDropped++;
       const key = `blocklist:${tUp || "<no-type>"}/${sUp || "<no-subtype>"}`;
       droppedCombos.set(key, (droppedCombos.get(key) ?? 0) + 1);
@@ -534,7 +542,7 @@ export function parseRawAlerts(
     // MUNICIPAL PUBLISHER HARD DROP: LDNONTTMC / Transnomis publish planned
     // road work, not incidents. Nothing they post survives without explicit
     // crash or stopped-vehicle language.
-    if (!keywordHit && !breakdownHit && isBlockedPublisher) {
+    if (!bypassGenericGates && !keywordHit && !breakdownHit && isBlockedPublisher) {
       earlyDropped++;
       const key = `municipal-publisher:${publisherUp}`;
       droppedCombos.set(key, (droppedCombos.get(key) ?? 0) + 1);
@@ -549,6 +557,7 @@ export function parseRawAlerts(
     // publishers or with a bare subtype — "Sections of roadway for surface
     // treatment", "Road construction", resurfacing, lane closures.
     if (
+      !bypassGenericGates &&
       !keywordHit &&
       !breakdownHit &&
       isMunicipalNotice(type, subtype, rawDescription, asString(raw["title"]))
@@ -569,7 +578,13 @@ export function parseRawAlerts(
     // unless its subtype explicitly carries crash/accident language or the
     // keyword crawl above already promoted it to a crash.
     const closureHasCrashSubtype = CRASH_KEYWORDS.some((k) => sUp.includes(k));
-    if (!keywordHit && !breakdownHit && tUp === "ROAD_CLOSED" && !closureHasCrashSubtype) {
+    if (
+      !bypassGenericGates &&
+      !keywordHit &&
+      !breakdownHit &&
+      tUp === "ROAD_CLOSED" &&
+      !closureHasCrashSubtype
+    ) {
       earlyDropped++;
       const key = `road-closed:${tUp}/${sUp || "<no-subtype>"}`;
       droppedCombos.set(key, (droppedCombos.get(key) ?? 0) + 1);
@@ -595,9 +610,15 @@ export function parseRawAlerts(
     //      single-vehicle events) — stored and mapped, never notified.
     // Everything else — minor municipal notices, jams, weather, congestion
     // pins — is rejected here.
-    const crashTyped = tUp.startsWith("ACCIDENT") || isTrueCrash(tUp, sUp);
+    const crashTyped = isAccidentType(tUp) || isTrueCrash(tUp, sUp);
     const majorHazardHit = isMajorHazard(tUp, sUp, crashText);
-    if (!keywordHit && !breakdownHit && !crashTyped && !majorHazardHit) {
+    if (
+      !bypassGenericGates &&
+      !keywordHit &&
+      !breakdownHit &&
+      !crashTyped &&
+      !majorHazardHit
+    ) {
       earlyDropped++;
       const key = `non-crash:${tUp || "<no-type>"}/${sUp || "<no-subtype>"}`;
       droppedCombos.set(key, (droppedCombos.get(key) ?? 0) + 1);
@@ -679,7 +700,7 @@ export function parseRawAlerts(
       // types (HAZARD/ROAD_CLOSED/JAM/OTHER) keep their raw type so the
       // gate can still distinguish crashes from stored-but-silent events.
       type:
-        keywordHit || tUp.startsWith("ACCIDENT") || isTrueCrash(tUp, sUp)
+        keywordHit || isAccidentType(tUp) || isTrueCrash(tUp, sUp)
           ? "ACCIDENT"
           : tUp || "OTHER",
       // Preserve the raw crash granularity: keep the provider subtype, or
@@ -730,6 +751,8 @@ export interface ProviderFetchStat {
   lastLatencyMs: number | null;
   lastSuccessAt: string | null;
   lastError: string | null;
+  lastReceived: number | null;
+  lastRetained: number | null;
 }
 
 const fetchStats = new Map<ProviderSource, ProviderFetchStat>();
@@ -746,6 +769,8 @@ function statFor(provider: ProviderSource): ProviderFetchStat {
       lastLatencyMs: null,
       lastSuccessAt: null,
       lastError: null,
+      lastReceived: null,
+      lastRetained: null,
     };
     fetchStats.set(provider, s);
   }
@@ -842,27 +867,52 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
 /**
  * Pull the alerts array out of every RapidAPI Waze payload shape observed
  * live: a bare array, `{alerts}`, `{data:{alerts}}` (OpenWeb Ninja),
- * `{data:[...]}`, `{result:{alerts}}`, and `{items}`.
+ * `{data:[...]}`, `{result:{alerts}}`, `{alerts_and_jams:{alerts}}`, and `{items}`.
  */
 export function extractAlertRows(parsed: unknown): Record<string, unknown>[] {
-  if (Array.isArray(parsed)) {
-    return parsed.filter(isPlainRecord);
-  }
-  if (!isPlainRecord(parsed)) return [];
+  const seen = new Set<unknown>();
+  const queue: unknown[] = [parsed];
+  const fallback: Record<string, unknown>[][] = [];
+  let steps = 0;
 
-  const data = isPlainRecord(parsed["data"]) ? parsed["data"] : parsed;
-  const nested: unknown[] = [
-    parsed["alerts"],
-    data["alerts"],
-    parsed["items"],
-    data["items"],
-    isPlainRecord(parsed["result"]) ? parsed["result"]["alerts"] : undefined,
-    Array.isArray(parsed["data"]) ? parsed["data"] : undefined,
-  ];
-  for (const candidate of nested) {
-    if (Array.isArray(candidate)) return candidate.filter(isPlainRecord);
+  while (queue.length > 0 && steps < 40) {
+    steps += 1;
+    const node = queue.shift();
+    if (node == null || seen.has(node)) continue;
+    seen.add(node);
+
+    if (Array.isArray(node)) {
+      const rows = node.filter(isPlainRecord);
+      if (rows.length === 0) continue;
+      if (rows.some(looksLikeAlertRow)) return rows;
+      fallback.push(rows);
+      continue;
+    }
+    if (!isPlainRecord(node)) continue;
+
+    for (const key of ["alerts", "waze_alerts", "traffic_alerts", "alerts_and_jams"]) {
+      if (key in node) queue.unshift(node[key]);
+    }
+    for (const [key, value] of Object.entries(node)) {
+      if (key === "jams" || key === "traffic_jams") continue;
+      queue.push(value);
+    }
   }
-  return [];
+  return fallback[0] ?? [];
+}
+
+function looksLikeAlertRow(row: Record<string, unknown>): boolean {
+  return (
+    "type" in row ||
+    "alert_type" in row ||
+    "alertType" in row ||
+    "subType" in row ||
+    "subtype" in row ||
+    "latitude" in row ||
+    "location" in row ||
+    "uuid" in row ||
+    "alert_id" in row
+  );
 }
 
 async function fetchRapidApiAlerts(
@@ -895,6 +945,9 @@ async function fetchRapidApiAlerts(
     throw err;
   }
   const rawAlerts = extractAlertRows(parsed);
+  if (provider === "cavsn") {
+    console.log(`[WAZE API] Fetched ${rawAlerts.length} incidents from CAVSN`);
+  }
   if (rawAlerts.length === 0 && rawBody.length > 20) {
     const keys = isPlainRecord(parsed) ? Object.keys(parsed) : [];
     logger.warn(
@@ -902,9 +955,13 @@ async function fetchRapidApiAlerts(
       "Provider JSON had no alerts array",
     );
   } else {
-    logger.debug({ provider, items: rawAlerts.length, bytes: rawBody.length }, "Provider payload");
+    logger.info({ provider, items: rawAlerts.length, bytes: rawBody.length }, "Provider payload");
   }
-  return parseRawAlerts(rawAlerts, provider);
+  const alerts = parseRawAlerts(rawAlerts, provider);
+  const stats = statFor(provider);
+  stats.lastReceived = rawAlerts.length;
+  stats.lastRetained = alerts.length;
+  return alerts;
 }
 
 /**
@@ -1021,17 +1078,16 @@ async function fetchCavsn(
   radiusKm: number,
 ): Promise<WazeAlert[]> {
   const box = boundingBox(lat, lng, Math.min(radiusKm, 15));
+  // Do not send alert_types / center+radius together with the bbox — this
+  // host has returned an empty alerts array when extra filters are present.
+  // Fetch the box, then keep ACCIDENT always and HAZARD only with crash text.
   return fetchRapidApiAlerts(
     "waze-api-waze-scraper.p.rapidapi.com",
     "/waze/alerts-and-jams",
     new URLSearchParams({
       bottom_left: `${box.bottomLeft.lat},${box.bottomLeft.lng}`,
       top_right: `${box.topRight.lat},${box.topRight.lng}`,
-      center: `${lat},${lng}`,
-      radius: String(Math.min(Math.max(radiusKm, 1), 15)),
-      radius_units: "KM",
-      alert_types: "ACCIDENT,HAZARD",
-      max_alerts: "200",
+      max_alerts: "300",
       max_jams: "0",
     }),
     "cavsn",

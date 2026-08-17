@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import {
   cavsnHazardHasCrashLanguage,
+  extractAlertRows,
+  isAccidentType,
   isBreakdown,
   isMajorHazard,
   isMunicipalNotice,
@@ -303,6 +305,54 @@ const checks: Array<[string, () => void]> = [
       );
       const kept = parsed.map((alert) => alert.type).sort();
       assert.deepEqual(kept, ["ACCIDENT", "ACCIDENT"]);
+    },
+  ],
+  [
+    "CAVSN ACCIDENT rows always pass even with municipal notice text",
+    () => {
+      assert.equal(isAccidentType("ACCIDENT"), true);
+      assert.equal(isAccidentType("ACCIDENTS"), true);
+      const parsed = parseRawAlerts(
+        [
+          {
+            alert_type: "ACCIDENT",
+            description: "Road construction after a crash",
+            latitude: 42.9849,
+            longitude: -81.2453,
+            street: "Oxford St",
+          },
+          {
+            type: "HAZARD",
+            subType: "HAZARD_ON_ROAD",
+            description: "mva at the lights",
+            latitude: 42.98,
+            longitude: -81.24,
+            street: "Richmond",
+          },
+        ] as Record<string, unknown>[],
+        "cavsn",
+      );
+      assert.equal(parsed.length, 2);
+      assert.equal(parsed[0]?.type, "ACCIDENT");
+      assert.equal(parsed[1]?.type, "HAZARD");
+    },
+  ],
+  [
+    "extractAlertRows finds nested CAVSN alerts_and_jams payloads",
+    () => {
+      const rows = extractAlertRows({
+        status: "ok",
+        data: {
+          alerts_and_jams: {
+            alerts: [
+              { type: "ACCIDENT", latitude: 42.98, longitude: -81.24 },
+            ],
+            jams: [{ speed: 10 }],
+          },
+        },
+      });
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0]?.type, "ACCIDENT");
     },
   ],
 ];

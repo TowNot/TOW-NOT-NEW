@@ -109,6 +109,11 @@ export class WazeTrafficPoller {
           continue;
         }
         const incident = mapWazeAlert(alert);
+        console.log("[BROADCAST] Sending incident to client...", {
+          id: incident.id,
+          title: incident.title,
+          provider: alert.provider,
+        });
         this.store.upsert(incident);
         ingested.push(incident);
       }

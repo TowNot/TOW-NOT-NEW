@@ -12,6 +12,14 @@ export default defineConfig({
         changeOrigin: true,
         timeout: 0,
         proxyTimeout: 0,
+        configure(proxy) {
+          proxy.on("proxyRes", (proxyRes, req) => {
+            if (req.url?.includes("/incidents/stream")) {
+              proxyRes.headers["cache-control"] = "no-cache, no-transform";
+              proxyRes.headers["x-accel-buffering"] = "no";
+            }
+          });
+        },
       },
     },
   },
