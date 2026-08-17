@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import { claimIncidentAlert, markPushAlerted } from "../lib/dispatchAlerts";
+import { claimIncidentAlert } from "../lib/dispatchAlerts";
+import { showIncidentNotification } from "../lib/showIncidentNotification";
 
 interface AlertNavAlertMessage {
   type?: string;
@@ -18,13 +19,8 @@ function incidentIdFromUrl(url: string | undefined): string | null {
 }
 
 /**
- * Sounds the dispatch siren for pushes that arrive while the app is open.
- *
- * With the app in the foreground the operator should hear the AlertNav siren,
- * not just the platform chime, so the push claims the incident and plays it —
- * which also cancels the queued feed tone, keeping it to one siren per
- * incident. When the app is backgrounded the incident is only recorded: audio
- * cannot play there, and the system notification is the alert.
+ * Foreground handler for Progressier push messages. Always banners and
+ * sounds — a focused /desk tab must not swallow the alert.
  */
 export function usePushAlertBridge(play: () => void): void {
   useEffect(() => {
@@ -35,15 +31,14 @@ export function usePushAlertBridge(play: () => void): void {
       if (data?.type !== "tow-not-alert") return;
 
       const incidentId = incidentIdFromUrl(data.url);
-      const visible = typeof document !== "undefined" && document.visibilityState === "visible";
+      showIncidentNotification({
+        id: incidentId ?? undefined,
+        title: data.title || "AlertNav",
+        body: data.body || "",
+      });
 
       if (!incidentId) {
-        if (visible) play();
-        return;
-      }
-
-      if (!visible) {
-        markPushAlerted(incidentId);
+        play();
         return;
       }
       if (claimIncidentAlert(incidentId)) play();

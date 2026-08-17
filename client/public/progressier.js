@@ -1,9 +1,6 @@
 importScripts("https://progressier.app/Bv9Rb1Vm5PkATyh6w0wG/sw.js");
 
-// Progressier's handler above renders the notification and the device plays
-// its notification sound. This listener only tells open windows which incident
-// was announced, so the app can suppress its own dispatch tone and the
-// operator never hears two sounds for one incident.
+// Always showNotification on push, even when a /desk tab is focused.
 self.addEventListener("push", (event) => {
   event.waitUntil(
     (async () => {
@@ -13,6 +10,17 @@ self.addEventListener("push", (event) => {
       } catch {
         payload = {};
       }
+      const title = payload.title || "AlertNav";
+      const body = payload.body || "";
+      const url = payload.url || "";
+      // Always banner, including when a /desk tab is focused. Progressier's
+      // imported handler may skip showNotification for visible clients.
+      await self.registration.showNotification(title, {
+        body,
+        tag: url || title,
+        renotify: true,
+        data: { url },
+      });
       const windows = await self.clients.matchAll({
         type: "window",
         includeUncontrolled: true,
@@ -20,9 +28,9 @@ self.addEventListener("push", (event) => {
       for (const client of windows) {
         client.postMessage({
           type: "tow-not-alert",
-          title: payload.title || "",
-          body: payload.body || "",
-          url: payload.url || "",
+          title,
+          body,
+          url,
         });
       }
     })(),
