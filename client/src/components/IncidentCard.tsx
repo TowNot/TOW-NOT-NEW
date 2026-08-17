@@ -20,7 +20,14 @@ export function IncidentCard({ incident }: { incident: Incident }) {
       <div className="font-mono text-[11px] text-gray-500 md:text-right">
         <p>{formatClock(incident.timestamp)}</p>
         <p>
-          {incident.coordinates.latitude.toFixed(4)}, {incident.coordinates.longitude.toFixed(4)}
+          <a
+            href={`https://waze.com/ul?ll=${incident.coordinates.latitude},${incident.coordinates.longitude}&navigate=yes`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sky-700 underline decoration-sky-300 underline-offset-2 hover:text-sky-900"
+          >
+            {incident.coordinates.latitude.toFixed(4)}, {incident.coordinates.longitude.toFixed(4)}
+          </a>
         </p>
         <p className="mt-1 uppercase tracking-widest">{incident.type.replaceAll("_", " ")}</p>
       </div>

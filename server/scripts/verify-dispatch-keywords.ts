@@ -35,6 +35,10 @@ const checks: Array<[string, () => void]> = [
       );
       assert.ok(findCrashKeywords("he hit the pole").includes("hit pole"));
       assert.ok(findCrashKeywords("tractor-trailer blocking").includes("tractor trailer"));
+      assert.ok(findCrashKeywords("vehicle fire on Highbury").includes("vehicle fire"));
+      assert.ok(findCrashKeywords("car fire at Oxford").includes("vehicle fire"));
+      assert.ok(findCrashKeywords("truck fire on the 401").includes("vehicle fire"));
+      assert.ok(findCrashKeywords("auto fire Wellington and Baseline").includes("vehicle fire"));
     },
   ],
   [

@@ -28,7 +28,8 @@ const CRASH_PATTERNS: { label: string; re: RegExp }[] = [
   { label: "trapped", re: /\btrapped\b/i },
   { label: "patients", re: /\bpatients?\s+total\b/i },
   { label: "personal injury", re: /\bpersonal\s+injur(?:y|ies)\b/i },
-  { label: "vehicle fire", re: /\b(?:vehicle|car|auto)\s+fire\b/i },
+  { label: "vehicle fire", re: /\b(?:vehicle|car|auto|truck|pickup|van|bus)\s+fires?\b/i },
+  { label: "vehicle fire", re: /\b(?:vehicle|car|auto|truck|pickup|van|bus)s?\s+on\s+fire\b/i },
   {
     label: "multi-vehicle",
     re: /\b(?:\d+|one|two|three|four|five|single|multi(?:ple)?)[\s-]?(?:car|vehicle)s?\b/i,

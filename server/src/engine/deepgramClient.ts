@@ -23,6 +23,10 @@ const DISPATCH_KEYTERMS = [
   "pole down",
   "wires down",
   "hit the pole",
+  "vehicle fire",
+  "car fire",
+  "truck fire",
+  "auto fire",
 ];
 
 export function getDeepgram(): DeepgramClient {
