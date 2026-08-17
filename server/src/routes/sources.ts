@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { config } from "../config";
 import { getProviderRuntimeStats } from "../engine/wazeAggregator";
-import { getFireDispatchRuntime, isFireListenerRunning } from "../engine/workers/londonFireListener";
+import { getFireDispatchRuntime } from "../engine/workers/londonFireListener";
 import type { IncidentStore } from "../store/incidentStore";
 import type { IncidentSource } from "../types/incident";
 
@@ -62,9 +62,8 @@ export function createSourcesRouter(store: IncidentStore): Router {
         recipientTag: "tow-not",
       },
       fireDispatch: {
-        listening: isFireListenerRunning(),
-        streamOverride: Boolean(config.radioHlsUrl),
         ...getFireDispatchRuntime(),
+        streamOverride: Boolean(config.radioHlsUrl),
       },
       providers: getProviderRuntimeStats(),
       incidents: {
