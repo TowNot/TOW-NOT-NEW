@@ -25,6 +25,11 @@ import {
   extractDispatchLocation,
   fuzzyCorrectStreets,
 } from "../dispatchLocation";
+import {
+  classifyPriority,
+  findCrashKeywords,
+  type DispatchPriority,
+} from "../dispatchKeywords";
 import { speechToText } from "../deepgramClient";
 import { distanceKm } from "../geo";
 import { logger } from "../pinoCompat";
@@ -54,63 +59,6 @@ const OVERLAP_TARGET_SECONDS = 4;
 // burn STT credits on static/silence. -50 dBFS is well below spoken dispatch
 // audio (~-25 to -15 dBFS) but above idle carrier hiss.
 const SILENCE_RMS_DBFS = -50;
-
-/**
- * Crash detection patterns for London Fire dispatch traffic.
- *  - "MVC" (Motor Vehicle Collision) is the primary acronym, including
- *    punctuated ("M.V.C.") and radio-static/STT misreads ("NBC" — Nova-3 can
- *    still mishear the acronym over carrier hiss).
- *  - Full terms: collision, accident, rollover, extrication, trapped,
- *    vehicle fire.
- *  - Multi-car counts: "1-car", "two-vehicle", "3 car", etc.
- */
-const CRASH_PATTERNS: { label: string; re: RegExp }[] = [
-  // Acronyms incl. punctuated/spaced forms and STT misreads over static:
-  // "MVC" / "M.V.C." / "MV C", "MVA", "NBC" (STT misread), "N V C".
-  { label: "MVC", re: /\bM\.?\s?V\.?\s?C\.?\b/i },
-  { label: "MVA", re: /\bM\.?\s?V\.?\s?A\.?\b/i },
-  { label: "MVC", re: /\bNBC\b/i }, // static/STT misread of "MVC"
-  { label: "MVC", re: /\bN\.?\s?V\.?\s?C\.?\b/i }, // static/STT misread of "MVC"
-  { label: "collision", re: /\bcollisions?\b/i },
-  { label: "vehicle collision", re: /\b(?:vehicle|motor\s+vehicle)\s+collisions?\b/i },
-  { label: "motor vehicle", re: /\bmotor\s+vehicles?\b/i },
-  { label: "accident", re: /\baccidents?\b/i },
-  { label: "rollover", re: /\broll[- ]?overs?\b/i },
-  { label: "t-bone", re: /\bt[- ]?bones?d?\b/i },
-  { label: "rear end", re: /\brear[- ]?end(?:ed|s)?\b/i },
-  { label: "extrication", re: /\bextricat(?:ion|e|ed|ing)\b/i },
-  { label: "trapped", re: /\btrapped\b/i },
-  { label: "patients", re: /\bpatients?\s+total\b/i },
-  { label: "personal injury", re: /\bpersonal\s+injur(?:y|ies)\b/i },
-  { label: "vehicle fire", re: /\b(?:vehicle|car|auto)\s+fire\b/i },
-  {
-    label: "multi-vehicle",
-    re: /\b(?:\d+|one|two|three|four|five|single|multi(?:ple)?)[\s-]?(?:car|vehicle)s?\b/i,
-  },
-];
-
-/**
- * Response-code urgency. London Fire: Code 4 = emergency (lights & sirens),
- * Code 3 = non-emergency/routine (e.g. debris cleanup).
- */
-const CODE4_RE = /\bcode\s*(?:4|four)\b/i;
-const CODE3_RE = /\bcode\s*(?:3|three)\b/i;
-
-type DispatchPriority = "critical" | "high" | "normal";
-
-/**
- * Priority rules: any MVC/crash keyword hit → "critical" (mandatory
- * post-and-notify, no exceptions). Code 4 without crash language → "high".
- * Code 3 routine calls → "normal".
- */
-function classifyPriority(transcript: string): DispatchPriority {
-  // Any collision-pattern hit is immediately CRITICAL — a matched dispatch
-  // is an active crash scene and must always be posted.
-  if (CRASH_PATTERNS.some(({ re }) => re.test(transcript))) return "critical";
-  if (CODE4_RE.test(transcript)) return "high";
-  if (CODE3_RE.test(transcript)) return "normal";
-  return "normal";
-}
 
 // London, ON coverage bounds for geocode sanity checks.
 const LONDON_CENTER = { lat: 42.9849, lng: -81.2453 };
@@ -439,17 +387,6 @@ function wavRmsDbfs(wav: Buffer): number {
   }
   const rms = Math.sqrt(sumSquares / samples);
   return rms > 0 ? 20 * Math.log10(rms) : -Infinity;
-}
-
-function findCrashKeywords(transcript: string): string[] {
-  const hits: string[] = [];
-  for (const { label, re } of CRASH_PATTERNS) {
-    if (re.test(transcript) && !hits.includes(label)) hits.push(label);
-  }
-  // The multi-vehicle count pattern alone ("two vehicles on scene") is too
-  // weak to declare a crash — require at least one substantive crash term.
-  if (hits.length === 1 && hits[0] === "multi-vehicle") return [];
-  return hits;
 }
 
 /* ------------------------------------------------------------------ */

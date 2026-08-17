@@ -18,6 +18,11 @@ const DISPATCH_KEYTERMS = [
   "motor vehicle collision",
   "London Fire",
   "765",
+  "tractor trailer",
+  "light pole",
+  "pole down",
+  "wires down",
+  "hit the pole",
 ];
 
 export function getDeepgram(): DeepgramClient {
