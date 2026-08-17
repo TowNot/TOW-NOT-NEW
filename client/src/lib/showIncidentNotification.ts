@@ -20,7 +20,6 @@ export function showIncidentNotification(input: {
   const options: NotificationOptions = {
     body: input.body,
     tag: `alertnav-${key}`,
-    renotify: true,
   };
 
   const viaPage = (): void => {
