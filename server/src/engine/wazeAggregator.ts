@@ -1,5 +1,5 @@
 import { ProxyAgent, fetch as undiciFetch } from "undici";
-import { boundingBox, distanceKm, splitBoundingBox } from "./geo";
+import { boundingBox, distanceKm } from "./geo";
 import { logger } from "./pinoCompat";
 
 /** Every provider the aggregator can pull live accidents from. */
@@ -1110,52 +1110,23 @@ async function fetchBlocksInside(
 }
 
 /** Cavsn — waze-api-waze-scraper.p.rapidapi.com /waze/alerts-and-jams. */
-const CAVSN_TILE_DIVISIONS = 2;
-
 async function fetchCavsn(
   lat: number,
   lng: number,
   radiusKm: number,
 ): Promise<WazeAlert[]> {
   const box = boundingBox(lat, lng, Math.min(radiusKm, 15));
-  const tiles = splitBoundingBox(box, CAVSN_TILE_DIVISIONS);
-  const batches = await Promise.all(
-    tiles.map((tile) =>
-      fetchRapidApiRaw(
-        "waze-api-waze-scraper.p.rapidapi.com",
-        "/waze/alerts-and-jams",
-        new URLSearchParams({
-          bottom_left: `${tile.bottomLeft.lat},${tile.bottomLeft.lng}`,
-          top_right: `${tile.topRight.lat},${tile.topRight.lng}`,
-          alert_types: "ACCIDENT",
-          max_alerts: "200",
-          max_jams: "0",
-        }),
-        "cavsn",
-      ),
-    ),
-  );
-  const seen = new Set<string>();
-  const merged: Record<string, unknown>[] = [];
-  for (const batch of batches) {
-    for (const row of batch.rawAlerts) {
-      const unwrapped = unwrapAlertRow(row);
-      const id =
-        asString(unwrapped["uuid"]) ??
-        asString(unwrapped["alert_id"]) ??
-        asString(unwrapped["id"]) ??
-        `${unwrapped["latitude"] ?? unwrapped["lat"]},${unwrapped["longitude"] ?? unwrapped["lng"]}`;
-      if (seen.has(id)) continue;
-      seen.add(id);
-      merged.push(row);
-    }
-  }
-  const sample = batches.find((batch) => batch.rawBody.length > 0) ?? batches[0];
-  return ingestRapidApiAlerts(
+  return fetchRapidApiAlerts(
+    "waze-api-waze-scraper.p.rapidapi.com",
+    "/waze/alerts-and-jams",
+    new URLSearchParams({
+      bottom_left: `${box.bottomLeft.lat},${box.bottomLeft.lng}`,
+      top_right: `${box.topRight.lat},${box.topRight.lng}`,
+      alert_types: "ACCIDENT",
+      max_alerts: "200",
+      max_jams: "0",
+    }),
     "cavsn",
-    merged,
-    sample?.rawBody ?? "",
-    sample?.parsed ?? { tiles: batches.length },
   );
 }
 

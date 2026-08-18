@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { boundingBox, splitBoundingBox } from "../src/engine/geo";
 import {
   extractAlertRows,
   isAccidentType,
@@ -370,20 +369,6 @@ const checks: Array<[string, () => void]> = [
       assert.equal(parsed.length, 1);
       assert.equal(parsed[0]?.type, "ACCIDENT");
       assert.equal(parsed[0]?.street, "Richmond St");
-    },
-  ],
-  [
-    "splitBoundingBox covers the original London box with a 2x2 grid",
-    () => {
-      const box = boundingBox(42.9849, -81.2453, 15);
-      const tiles = splitBoundingBox(box, 2);
-      assert.equal(tiles.length, 4);
-      assert.equal(tiles[0]?.bottomLeft.lat, box.bottomLeft.lat);
-      assert.equal(tiles[0]?.bottomLeft.lng, box.bottomLeft.lng);
-      const last = tiles[3];
-      assert.ok(last);
-      assert.equal(last.topRight.lat, box.topRight.lat);
-      assert.equal(last.topRight.lng, box.topRight.lng);
     },
   ],
 ];
