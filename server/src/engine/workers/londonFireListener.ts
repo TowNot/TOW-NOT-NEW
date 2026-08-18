@@ -68,7 +68,7 @@ const LONDON_CENTER = { lat: 42.9849, lng: -81.2453 };
 const LONDON_FALLBACK_COORDS = { lat: 42.9837, lng: -81.2497 };
 const MAX_GEOCODE_DISTANCE_KM = 25;
 
-const log = (msg: string) => logger.info(`[fire-dispatch] ${msg}`);
+const log = (msg: string) => logger.debug(`[fire-dispatch] ${msg}`);
 
 export type FireDispatchRuntimeStats = {
   listening: boolean;
@@ -723,12 +723,12 @@ async function saveAndNotify(
   fireRuntime.lastSkipReason = null;
   fireRuntime.lastError = null;
   if (existing) {
-    log(
-      `DEDUPED: dispatch at "${location}" refreshed existing fire-dispatch row ${id} — no re-notify`,
+    logger.info(
+      `[fire-dispatch] DEDUPED: dispatch at "${location}" refreshed existing fire-dispatch row ${id} — no re-notify`,
     );
   } else {
-    log(
-      `SAVED crash dispatch at "${location}" (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)})`,
+    logger.info(
+      `[fire-dispatch] SAVED crash dispatch at "${location}" (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)})`,
     );
   }
 }
@@ -756,7 +756,7 @@ async function processWav(wav: Buffer): Promise<void> {
   fireRuntime.counts.sttOk += 1;
   fireRuntime.lastTranscriptAt = new Date().toISOString();
   fireRuntime.lastTranscript = transcript.slice(0, 240);
-  console.log("[FIRE SCANNER] Transcription received", {
+  logger.debug("[FIRE SCANNER] Transcription received", {
     chars: transcript.length,
     preview: transcript.slice(0, 160),
   });
@@ -1033,7 +1033,7 @@ async function pollOnce(state: StreamState): Promise<void> {
       state.lastAudioAt = Date.now();
       fireRuntime.lastAudioAt = new Date().toISOString();
       fireRuntime.counts.audioSegments += 1;
-      console.log("[FIRE SCANNER] Audio chunk received", {
+      logger.debug("[FIRE SCANNER] Audio chunk received", {
         sequence: seg.sequence,
         bytes: data.length,
         seconds: seg.seconds,
@@ -1067,7 +1067,9 @@ async function pollOnce(state: StreamState): Promise<void> {
     // Processor stuck for multiple buffer windows — shed the oldest audio
     // rather than growing memory without bound.
     const dropped = shedOldestSegments(state);
-    log(`processor busy too long — dropped ${dropped} oldest buffered segment(s)`);
+    logger.warn(
+      `[fire-dispatch] processor busy too long — dropped ${dropped} oldest buffered segment(s)`,
+    );
   }
 }
 
@@ -1165,8 +1167,8 @@ function startHlsPolling(hlsUrl: string): void {
   const watchdogTimer = setInterval(() => {
     const silentMs = Date.now() - state.lastAudioAt;
     if (silentMs < WATCHDOG_SILENCE_MS) return;
-    log(
-      `WATCHDOG: no audio for ${Math.round(silentMs / 1000)}s (>120s) — restarting stream listener`,
+    logger.warn(
+      `[fire-dispatch] WATCHDOG: no audio for ${Math.round(silentMs / 1000)}s (>120s) — restarting stream listener`,
     );
     // Reset immediately so a slow rediscovery doesn't re-trigger every tick.
     state.lastAudioAt = Date.now();

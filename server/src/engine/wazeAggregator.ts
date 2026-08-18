@@ -754,7 +754,7 @@ export function parseRawAlerts(
   const stats = statFor(provider);
   stats.lastDroppedBy = droppedBy;
   stats.lastTypeCounts = typeCounts;
-  logger.info(
+  logger.debug(
     `[Aggregator] ingestion summary provider=${provider} received=${rawAlerts.length} retained=${alerts.length} dropped=${earlyDropped} types=${JSON.stringify(typeCounts)} droppedBy=${JSON.stringify(droppedBy)}`,
   );
   return alerts;
@@ -1029,17 +1029,17 @@ function ingestRapidApiAlerts(
 ): WazeAlert[] {
   const typeCounts = typeHistogram(rawAlerts);
   if (provider === "cavsn") {
-    console.log(
+    logger.debug(
       `[WAZE API] Fetched ${rawAlerts.length} incidents from CAVSN types=${JSON.stringify(typeCounts)} sampleKeys=${JSON.stringify(rawAlerts[0] ? Object.keys(rawAlerts[0]) : [])}`,
     );
   }
-  if (rawAlerts.length === 0 && rawBody.length > 20) {
+  if (rawAlerts.length === 0) {
     const keys = isPlainRecord(parsed) ? Object.keys(parsed) : [];
-    logger.warn(
-      `Provider JSON had no alerts array provider=${provider} bytes=${rawBody.length} keys=${JSON.stringify(keys)} body=${rawBody.slice(0, 400)}`,
+    logger.debug(
+      `Provider JSON empty alerts provider=${provider} bytes=${rawBody.length} keys=${JSON.stringify(keys)}`,
     );
   } else {
-    logger.info(
+    logger.debug(
       `Provider payload provider=${provider} items=${rawAlerts.length} types=${JSON.stringify(typeCounts)}`,
     );
   }
@@ -1179,7 +1179,7 @@ async function fetchBlocksInside(
     throw err;
   }
   const rawAlerts = extractAlertRows(parsed);
-  logger.info(
+  logger.debug(
     `[WAZE API] Fetched ${rawAlerts.length} incidents from BlocksInside bytes=${rawBody.length}`,
   );
   return ingestRapidApiAlerts("blocksinside", rawAlerts, rawBody, parsed);
@@ -1746,7 +1746,7 @@ export async function fetchWazeAlerts(
       kept.push(alert);
     }
   }
-  logger.info(
+  logger.debug(
     `Aggregator pass complete kept=${kept.length} responded=${byProvider.size} total=${PROVIDER_PRIORITY.length}`,
   );
   return kept;

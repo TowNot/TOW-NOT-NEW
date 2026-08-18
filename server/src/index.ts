@@ -140,3 +140,12 @@ function shutdown(signal: string): void {
 
 process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("unhandledRejection", (reason: unknown) => {
+  logger.error("Unhandled promise rejection", {
+    error: reason instanceof Error ? reason.message : String(reason),
+  });
+});
+process.on("uncaughtException", (error: Error) => {
+  logger.error("Uncaught exception", { error: error.message });
+  shutdown("uncaughtException");
+});

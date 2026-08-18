@@ -55,7 +55,7 @@ export function createIncidentRouter(store: IncidentStore): Router {
 
 function broadcast(clients: Set<SseClient>, event: string, data: unknown): void {
   const incident = data as Incident | undefined;
-  console.log("[BROADCAST] Sending incident to client...", {
+  logger.debug("[BROADCAST] Sending incident to client...", {
     event,
     clients: clients.size,
     id: incident?.id,
@@ -68,6 +68,13 @@ function broadcast(clients: Set<SseClient>, event: string, data: unknown): void 
 }
 
 function writeEvent(res: Response, event: string, data: unknown): void {
-  res.write(`event: ${event}\n`);
-  res.write(`data: ${JSON.stringify(data)}\n\n`);
+  if (res.writableEnded || res.destroyed) return;
+  try {
+    res.write(`event: ${event}\n`);
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  } catch (error) {
+    logger.debug("SSE write failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
