@@ -24,7 +24,13 @@ function resolveProgressierPushUrl(): string {
 export const config = {
   port: Number(process.env.PORT ?? 8080),
   clientOrigin: resolveClientOrigin(),
-  pollIntervalMs: Number(process.env.POLL_INTERVAL_MS ?? 10_000),
+  // CAVSN/Waze RapidAPI poll. Floor at 60s so a leftover POLL_INTERVAL_MS=10000
+  // in Railway cannot keep burning quota; Waze does not refresh faster than that.
+  pollIntervalMs: (() => {
+    const raw = Number(process.env.POLL_INTERVAL_MS ?? 60_000);
+    if (!Number.isFinite(raw) || raw < 60_000) return 60_000;
+    return raw;
+  })(),
   incidentTtlMs: Number(process.env.INCIDENT_TTL_MS ?? 3 * 60 * 60 * 1000),
   radioHlsUrl: process.env.RADIO_HLS_URL ?? "",
   progressierApiKey: process.env.PROGRESSIER_API_KEY ?? "",
