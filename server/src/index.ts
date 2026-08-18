@@ -110,11 +110,21 @@ applyTerminalHandlers(app);
 
 const server = createServer(app);
 
-store.start();
-engine.start();
+server.on("error", (error: unknown) => {
+  logger.error("HTTP server failed to bind", {
+    error: error instanceof Error ? error.message : String(error),
+    port: config.port,
+    host: config.host,
+  });
+  process.exit(1);
+});
 
-server.listen(config.port, () => {
-  logger.info("AlertNav server listening", { port: config.port });
+// Bind first so Railway healthchecks can pass. Pollers and the fire listener
+// start only after listen — they must not block module eval or port bind.
+server.listen(config.port, config.host, () => {
+  logger.info("AlertNav server listening", { port: config.port, host: config.host });
+  store.start();
+  engine.start();
 });
 
 function shutdown(signal: string): void {

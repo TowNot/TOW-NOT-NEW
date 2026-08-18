@@ -21,8 +21,15 @@ function resolveProgressierPushUrl(): string {
   return `https://progressier.app/${progressierAppId}/send`;
 }
 
+function resolvePort(): number {
+  const raw = Number(process.env.PORT);
+  if (Number.isFinite(raw) && raw > 0) return raw;
+  return 8080;
+}
+
 export const config = {
-  port: Number(process.env.PORT ?? 8080),
+  port: resolvePort(),
+  host: process.env.HOST?.trim() || "0.0.0.0",
   clientOrigin: resolveClientOrigin(),
   // BlocksInside (api.wazeapi.com) Waze poll. 10s cadence; ignore a leftover
   // 60s RapidAPI quota env so Railway deploys at 10s without a dashboard edit.
