@@ -62,6 +62,7 @@ export function createSourcesRouter(store: IncidentStore): Router {
         alert_types: "ACCIDENT",
         max_jams: "0",
         max_alerts: "200",
+        tiles: 4,
         bottom_left: `${box.bottomLeft.lat},${box.bottomLeft.lng}`,
         top_right: `${box.topRight.lat},${box.topRight.lng}`,
       },
