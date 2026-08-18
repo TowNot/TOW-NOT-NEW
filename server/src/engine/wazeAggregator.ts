@@ -1,5 +1,5 @@
 import { ProxyAgent, fetch as undiciFetch } from "undici";
-import { config } from "./config";
+import { config } from "../config";
 import { boundingBox, distanceKm } from "./geo";
 import { logger } from "./pinoCompat";
 
