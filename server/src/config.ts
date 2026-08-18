@@ -24,9 +24,9 @@ function resolveProgressierPushUrl(): string {
 export const config = {
   port: Number(process.env.PORT ?? 8080),
   clientOrigin: resolveClientOrigin(),
-  // BlocksInside Waze poll. 10s cadence; ignore a leftover 60s RapidAPI quota
-  // env so Railway deploys at 10s without a dashboard edit. inFlight skip plus
-  // an 8s abort keep hung calls from stacking.
+  // BlocksInside (api.wazeapi.com) Waze poll. 10s cadence; ignore a leftover
+  // 60s RapidAPI quota env so Railway deploys at 10s without a dashboard edit.
+  // inFlight skip plus an 8s abort keep hung calls from stacking.
   pollIntervalMs: (() => {
     const raw = Number(process.env.POLL_INTERVAL_MS ?? 10_000);
     if (!Number.isFinite(raw) || raw <= 0 || raw >= 60_000) return 10_000;
