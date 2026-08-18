@@ -3,6 +3,7 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 # Client dashboard UI is copied into the server image; skip-watch on
 # server/** alone left Header-only commits undeployed.
+# Retrigger after Railway Snapshot-code timeouts (2026-08-18 incident).
 watchPatterns = ["client/**", "server/**", "package.json", "Dockerfile", "railway.toml"]
 
 [deploy]
