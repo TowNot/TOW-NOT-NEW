@@ -1,4 +1,5 @@
 import { ProxyAgent, fetch as undiciFetch } from "undici";
+import { config } from "./config";
 import { boundingBox, distanceKm } from "./geo";
 import { logger } from "./pinoCompat";
 
@@ -873,6 +874,8 @@ export function getProviderRuntimeStats(): Record<
 
 /** Per-provider fetch timeout — generous so slow API calls aren't aborted early. */
 const PROVIDER_TIMEOUT_MS = 25_000;
+/** BlocksInside 10s poll: abort before the next tick so calls cannot overlap. */
+const BLOCKSINSIDE_TIMEOUT_MS = 8_000;
 
 /** Launch offset between providers so they never fire on the same millisecond. */
 const PROVIDER_STAGGER_MS = 250;
@@ -1134,26 +1137,52 @@ async function fetchOpenWebNinja(
   );
 }
 
-/** BlocksInside — waze-api.p.rapidapi.com /alerts, kebab-case box params. */
+/** BlocksInside — api.wazeapi.com /v1/alerts. Accident-only London box. */
 async function fetchBlocksInside(
   lat: number,
   lng: number,
   radiusKm: number,
 ): Promise<WazeAlert[]> {
-  const box = boundingBox(lat, lng, radiusKm);
-  return fetchRapidApiAlerts(
-    "waze-api.p.rapidapi.com",
-    "/alerts",
-    new URLSearchParams({
-      "bottom-left": `${box.bottomLeft.lat},${box.bottomLeft.lng}`,
-      "top-right": `${box.topRight.lat},${box.topRight.lng}`,
-      // Server-side filter: accidents only. HTTP 429 still trips the existing
-      // 15-minute cooldown and never crashes the aggregator.
-      filter: '["ACCIDENTS"]',
-      limit: "100",
-    }),
-    "blocksinside",
+  logger.debug(
+    { lat, lng, radiusKm, box: `${config.wazeBottomLeft} .. ${config.wazeTopRight}` },
+    "BlocksInside poll",
   );
+  const params = new URLSearchParams({
+    "bottom-left": config.wazeBottomLeft,
+    "top-right": config.wazeTopRight,
+    limit: "500",
+    filter: '["ACCIDENT"]',
+  });
+  const url = `https://api.wazeapi.com/v1/alerts?${params.toString()}`;
+  const started = Date.now();
+  const res = await timedProviderFetch("blocksinside", url, {
+    headers: {
+      "X-API-Key": config.wazeApiKey,
+      "X-Country": config.wazeApiCountry,
+      Accept: "application/json",
+    },
+    signal: AbortSignal.timeout(BLOCKSINSIDE_TIMEOUT_MS),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    logger.error(
+      `Provider request failed provider=blocksinside status=${res.status} latencyMs=${Date.now() - started} body=${body.slice(0, 300)}`,
+    );
+    throw new Error(`blocksinside responded with status ${res.status}`);
+  }
+  const rawBody = await res.text();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawBody) as unknown;
+  } catch (err) {
+    logger.error(`Provider returned malformed JSON provider=blocksinside sample=${rawBody.slice(0, 300)}`);
+    throw err;
+  }
+  const rawAlerts = extractAlertRows(parsed);
+  logger.info(
+    `[WAZE API] Fetched ${rawAlerts.length} incidents from BlocksInside bytes=${rawBody.length}`,
+  );
+  return ingestRapidApiAlerts("blocksinside", rawAlerts, rawBody, parsed);
 }
 
 /** Cavsn — waze-api-waze-scraper.p.rapidapi.com /waze/alerts-and-jams. */
@@ -1623,10 +1652,10 @@ const PROVIDER_FETCHERS: Record<
  * loop. Remove entries here to re-enable.
  */
 const DISABLED_PROVIDERS = new Set<ProviderSource>([
-  // Live-test isolation: only CAVSN Waze + London Fire STT run.
+  // Live feed: BlocksInside Waze + London Fire STT.
   "waze_direct",
   "openwebninja",
-  "blocksinside",
+  "cavsn",
   "google_maps",
   "apify_sian",
   "apify_phantom",

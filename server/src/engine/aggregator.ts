@@ -11,12 +11,12 @@ export class DataAggregatorEngine {
   ) {}
 
   start(): void {
-    console.log("[WAZE API] starting CAVSN Waze scraper");
+    console.log("[WAZE API] starting BlocksInside Waze scraper");
     this.waze.start();
-    // Google Maps RapidAPI scraper is paused for the live test — Fire + CAVSN only.
+    // Google Maps / CAVSN RapidAPI scrapers are paused — Fire + BlocksInside only.
     console.log("[FIRE SCANNER] starting London Fire listener");
     this.radio.start();
-    logger.info("Data aggregator engine running (fire dispatch + CAVSN)");
+    logger.info("Data aggregator engine running (fire dispatch + BlocksInside)");
   }
 
   stop(): void {

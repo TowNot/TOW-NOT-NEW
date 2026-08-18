@@ -73,7 +73,7 @@ export class WazeTrafficPoller {
       lat: config.londonLat,
       lng: config.londonLng,
       radiusKm: config.pollRadiusKm,
-      rapidApiConfigured: Boolean(config.rapidApiKey),
+      wazeApiConfigured: Boolean(config.wazeApiKey),
     });
     void this.poll();
     this.timer = setInterval(() => void this.poll(), config.pollIntervalMs);
@@ -88,8 +88,8 @@ export class WazeTrafficPoller {
   }
 
   async poll(): Promise<Incident[]> {
-    if (!config.rapidApiKey) {
-      logger.warn("Skipping live traffic poll; RAPIDAPI_KEY is not configured");
+    if (!config.wazeApiKey) {
+      logger.warn("Skipping live traffic poll; WAZEAPI_KEY is not configured");
       return [];
     }
     if (this.inFlight) {

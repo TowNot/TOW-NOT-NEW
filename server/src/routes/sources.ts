@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { config } from "../config";
-import { boundingBox } from "../engine/geo";
 import { getProviderRuntimeStats } from "../engine/wazeAggregator";
 import { getFireDispatchRuntime } from "../engine/workers/londonFireListener";
 import type { IncidentStore } from "../store/incidentStore";
@@ -44,12 +43,7 @@ export function createSourcesRouter(store: IncidentStore): Router {
   router.get("/status", (_req, res) => {
     const active = store.getActive();
     const providers = getProviderRuntimeStats();
-    const cavsn = providers.cavsn;
-    const box = boundingBox(
-      config.londonLat,
-      config.londonLng,
-      Math.min(config.pollRadiusKm, 15),
-    );
+    const blocksinside = providers.blocksinside;
     res.json({
       checkedAt: new Date().toISOString(),
       pollCenter: {
@@ -58,19 +52,21 @@ export function createSourcesRouter(store: IncidentStore): Router {
         radiusKm: config.pollRadiusKm,
         intervalMs: config.pollIntervalMs,
       },
-      cavsnQuery: {
-        alert_types: "ACCIDENT",
-        max_jams: "0",
-        max_alerts: "200",
-        bottom_left: `${box.bottomLeft.lat},${box.bottomLeft.lng}`,
-        top_right: `${box.topRight.lat},${box.topRight.lng}`,
+      wazeQuery: {
+        endpoint: "https://api.wazeapi.com/v1/alerts",
+        filter: '["ACCIDENT"]',
+        limit: "500",
+        "bottom-left": config.wazeBottomLeft,
+        "top-right": config.wazeTopRight,
+        country: config.wazeApiCountry,
       },
-      lastTypeCounts: cavsn.lastTypeCounts,
-      lastDroppedBy: cavsn.lastDroppedBy,
-      lastReceived: cavsn.lastReceived,
-      lastRetained: cavsn.lastRetained,
+      lastTypeCounts: blocksinside.lastTypeCounts,
+      lastDroppedBy: blocksinside.lastDroppedBy,
+      lastReceived: blocksinside.lastReceived,
+      lastRetained: blocksinside.lastRetained,
       credentials: {
         rapidApi: Boolean(config.rapidApiKey),
+        wazeApi: Boolean(config.wazeApiKey),
         apify: Boolean(config.apifyApiToken),
         deepgram: Boolean(config.deepgramApiKey),
         progressier: Boolean(config.progressierApiKey),

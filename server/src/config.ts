@@ -24,11 +24,12 @@ function resolveProgressierPushUrl(): string {
 export const config = {
   port: Number(process.env.PORT ?? 8080),
   clientOrigin: resolveClientOrigin(),
-  // CAVSN/Waze RapidAPI poll. Floor at 60s so a leftover POLL_INTERVAL_MS=10000
-  // in Railway cannot keep burning quota; Waze does not refresh faster than that.
+  // BlocksInside Waze poll. 10s cadence; ignore a leftover 60s RapidAPI quota
+  // env so Railway deploys at 10s without a dashboard edit. inFlight skip plus
+  // an 8s abort keep hung calls from stacking.
   pollIntervalMs: (() => {
-    const raw = Number(process.env.POLL_INTERVAL_MS ?? 60_000);
-    if (!Number.isFinite(raw) || raw < 60_000) return 60_000;
+    const raw = Number(process.env.POLL_INTERVAL_MS ?? 10_000);
+    if (!Number.isFinite(raw) || raw <= 0 || raw >= 60_000) return 10_000;
     return raw;
   })(),
   incidentTtlMs: Number(process.env.INCIDENT_TTL_MS ?? 3 * 60 * 60 * 1000),
@@ -41,6 +42,12 @@ export const config = {
     process.env.PUSH_ICON_URL?.trim() ||
     "https://oouxkyuexvzylckxeeks.supabase.co/storage/v1/object/public/pgsstoragebucket/Box8ybh6oF1k8MfNQjxX/YUEjbFcDfJDaWOI.png",
   rapidApiKey: process.env.RAPIDAPI_KEY ?? "",
+  wazeApiKey:
+    process.env.WAZEAPI_KEY?.trim() ||
+    "wz_live_XZDbg-TNpEJGfpAVcOfkeeV6ed0AtCp-",
+  wazeApiCountry: process.env.WAZEAPI_COUNTRY?.trim() || "usa",
+  wazeBottomLeft: process.env.WAZE_BOTTOM_LEFT?.trim() || "42.8949, -81.3683",
+  wazeTopRight: process.env.WAZE_TOP_RIGHT?.trim() || "43.0749, -81.1223",
   apifyApiToken: process.env.APIFY_API_TOKEN ?? "",
   deepgramApiKey: process.env.DEEPGRAM_API_KEY ?? "",
   residentialProxyUrl: process.env.RESIDENTIAL_PROXY_URL ?? "",
