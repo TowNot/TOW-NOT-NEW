@@ -162,7 +162,14 @@ function asString(v: unknown): string | null {
 }
 
 function asNumber(v: unknown): number | null {
-  return typeof v === "number" && Number.isFinite(v) ? v : null;
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const trimmed = v.trim();
+    if (!trimmed) return null;
+    const n = Number(trimmed);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
 }
 
 /**
@@ -679,8 +686,7 @@ export function parseRawAlerts(
       const key = "missing-coords";
       droppedCombos.set(key, (droppedCombos.get(key) ?? 0) + 1);
       logger.warn(
-        { provider, street: streetLabel, type: raw["type"] },
-        "[Aggregator] dropped row without coordinates",
+        `[Aggregator] dropped row without coordinates provider=${provider} street=${streetLabel} type=${JSON.stringify(raw["type"])} lat=${JSON.stringify(raw["latitude"] ?? raw["lat"] ?? location["lat"] ?? location["y"] ?? raw["locationY"])} lng=${JSON.stringify(raw["longitude"] ?? raw["lng"] ?? location["lng"] ?? location["x"] ?? raw["locationX"])}`,
       );
       continue;
     }
@@ -930,6 +936,46 @@ function looksLikeAlertRow(row: Record<string, unknown>): boolean {
   );
 }
 
+/** CAVSN `data.alerts` before extractAlertRows / parseRawAlerts filters. */
+function cavsnDataAlerts(parsed: unknown): Record<string, unknown>[] | null {
+  if (!isPlainRecord(parsed)) return null;
+  const data = parsed["data"];
+  if (Array.isArray(data)) return data.filter(isPlainRecord);
+  if (!isPlainRecord(data)) return null;
+  if (Array.isArray(data["alerts"])) return data["alerts"].filter(isPlainRecord);
+  const nested = data["alerts_and_jams"];
+  if (isPlainRecord(nested) && Array.isArray(nested["alerts"])) {
+    return nested["alerts"].filter(isPlainRecord);
+  }
+  return null;
+}
+
+function logCavsnRawPayload(parsed: unknown, rawBody: string): void {
+  const topKeys = isPlainRecord(parsed) ? Object.keys(parsed) : [];
+  const data = isPlainRecord(parsed) ? parsed["data"] : undefined;
+  const dataKeys = isPlainRecord(data) ? Object.keys(data) : [];
+  const dataAlerts = cavsnDataAlerts(parsed);
+  const count = dataAlerts?.length ?? 0;
+  logger.info(
+    `[CAVSN RAW] data.alerts count=${dataAlerts === null ? "missing" : count} bytes=${rawBody.length} topKeys=${JSON.stringify(topKeys)} dataKeys=${JSON.stringify(dataKeys)} dataType=${Array.isArray(data) ? "array" : data === null ? "null" : typeof data}`,
+  );
+  if (!dataAlerts || dataAlerts.length === 0) {
+    logger.info(`[CAVSN RAW] empty payload sample=${rawBody.slice(0, 500)}`);
+    return;
+  }
+  dataAlerts.forEach((row, i) => {
+    const unwrapped = unwrapAlertRow(row);
+    const loc = isPlainRecord(unwrapped["location"]) ? unwrapped["location"] : {};
+    const type =
+      unwrapped["type"] ?? unwrapped["alert_type"] ?? unwrapped["alertType"] ?? null;
+    const subtype =
+      unwrapped["subType"] ?? unwrapped["subtype"] ?? unwrapped["category"] ?? null;
+    logger.info(
+      `[CAVSN RAW] alert[${i}] type=${JSON.stringify(type)} subtype=${JSON.stringify(subtype)} lat=${JSON.stringify(unwrapped["latitude"] ?? unwrapped["lat"] ?? loc["lat"] ?? loc["y"])} lng=${JSON.stringify(unwrapped["longitude"] ?? unwrapped["lng"] ?? loc["lng"] ?? loc["x"])}`,
+    );
+  });
+}
+
 async function fetchRapidApiRaw(
   host: string,
   path: string,
@@ -958,6 +1004,7 @@ async function fetchRapidApiRaw(
     logger.error(`Provider returned malformed JSON provider=${provider} sample=${rawBody.slice(0, 300)}`);
     throw err;
   }
+  if (provider === "cavsn") logCavsnRawPayload(parsed, rawBody);
   return { rawAlerts: extractAlertRows(parsed), rawBody, parsed };
 }
 
