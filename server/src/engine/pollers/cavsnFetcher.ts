@@ -5,12 +5,9 @@ import { logger } from "../../logger";
 export const CAVSN_RAPIDAPI_HOST = "waze-api-waze-scraper.p.rapidapi.com";
 /** Primary alerts endpoint (not BlocksInside — separate host, path, and params). */
 export const CAVSN_ALERTS_PATH = "/waze/alerts-and-jams";
-/** Lightweight health probe — answers quickly when the subscription is active. */
-export const CAVSN_HEALTH_PATH = "/getHealth";
 
 /** Fail fast — never block BlocksInside's 10s poll loop on a hung upstream scrape. */
 const CAVSN_TIMEOUT_MS = 10_000;
-const CAVSN_HEALTH_TIMEOUT_MS = 5_000;
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -124,30 +121,5 @@ export async function fetchCavsnRaw(
       );
     }
     throw err;
-  }
-}
-
-/** One-shot subscription probe logged at startup — fails fast, never blocks polling. */
-export async function probeCavsnHealth(): Promise<void> {
-  if (!config.rapidApiKey.trim()) return;
-  const url = `https://${CAVSN_RAPIDAPI_HOST}${CAVSN_HEALTH_PATH}`;
-  const started = Date.now();
-  try {
-    const res = await fetch(url, {
-      headers: cavsnHeaders(),
-      signal: AbortSignal.timeout(CAVSN_HEALTH_TIMEOUT_MS),
-    });
-    const body = await res.text();
-    if (res.ok) {
-      logger.info(`[CAVSN] getHealth OK latencyMs=${Date.now() - started} body=${body.slice(0, 200)}`);
-      return;
-    }
-    console.error(
-      `[cavsn] getHealth HTTP ${res.status} ${res.statusText} latencyMs=${Date.now() - started} body=${body.slice(0, 500)}`,
-    );
-  } catch (err) {
-    console.error(
-      `[cavsn] getHealth failed latencyMs=${Date.now() - started}: ${err instanceof Error ? err.message : String(err)}`,
-    );
   }
 }

@@ -20,6 +20,10 @@ export class DataAggregatorEngine {
     });
     if (!config.rapidApiKey) {
       logger.warn("RAPIDAPI_KEY is unset — CAVSN poll will be skipped");
+    } else {
+      logger.info(
+        "[WAZE API] CAVSN upstream timeout protection active — BlocksInside acting as primary feed",
+      );
     }
     if (!config.twilioAccountSid || !config.twilioAuthToken) {
       logger.warn("Twilio credentials unset — SMS alerts will not send until configured");

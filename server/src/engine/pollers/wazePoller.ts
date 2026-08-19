@@ -3,7 +3,6 @@ import { logger } from "../../logger";
 import { IncidentStore } from "../../store/incidentStore";
 import type { Incident, IncidentSeverity, IncidentSource } from "../../types/incident";
 import { distanceKm } from "../geo";
-import { probeCavsnHealth } from "./cavsnFetcher";
 import {
   fetchLiveWazeProviders,
   GOOGLE_MAPS_DEDUP_RADIUS_KM,
@@ -83,7 +82,6 @@ export class WazeTrafficPoller {
       rapidApiConfigured: Boolean(config.rapidApiKey),
       cavsnHost: "waze-api-waze-scraper.p.rapidapi.com",
     });
-    if (config.rapidApiKey) void probeCavsnHealth();
     void this.poll();
     this.timer = setInterval(() => void this.poll(), config.pollIntervalMs);
     this.timer.unref();
