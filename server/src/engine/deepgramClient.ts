@@ -1,8 +1,21 @@
-import { DeepgramClient } from "@deepgram/sdk";
 import { config } from "../config";
 import { STT_RETRY_POLICY, withTransientRetry } from "./retryPolicy";
 
-let client: DeepgramClient | null = null;
+/** Minimal surface used by the dry-run script. Live STT uses fetch, not the SDK. */
+type DeepgramSdkClient = {
+  listen?: {
+    v1?: {
+      connect: (opts: Record<string, unknown>) => Promise<{
+        connect: () => void;
+        waitForOpen: () => Promise<void>;
+        sendCloseStream: (msg: { type: string }) => void;
+        close: () => void;
+      }>;
+    };
+  };
+};
+
+let client: DeepgramSdkClient | null = null;
 
 /**
  * Prerecorded Listen is the right API for a closed WAV chunk: a 10s dispatch
@@ -29,11 +42,16 @@ const DISPATCH_KEYTERMS = [
   "auto fire",
 ];
 
-export function getDeepgram(): DeepgramClient {
+export function getDeepgram(): DeepgramSdkClient {
   if (!config.deepgramApiKey) {
     throw new Error("DEEPGRAM_API_KEY is not configured");
   }
   if (!client) {
+    // Lazy require: a static import of @deepgram/sdk stalls `tsc` for 15+ min
+    // even with skipLibCheck, which is why Railway image builds timed out.
+    const { DeepgramClient } = require("@deepgram/sdk") as {
+      DeepgramClient: new (opts: Record<string, unknown>) => DeepgramSdkClient;
+    };
     client = new DeepgramClient({
       apiKey: config.deepgramApiKey,
       timeoutInSeconds: Math.ceil(REQUEST_TIMEOUT_MS / 1000),

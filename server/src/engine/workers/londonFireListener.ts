@@ -1085,8 +1085,12 @@ export function startLondonFireListener(): void {
 
   let probeFailed = false;
   const probe = spawn("ffmpeg", ["-version"]);
+  const probeKiller = setTimeout(() => {
+    probe.kill("SIGKILL");
+  }, 3_000);
   probe.on("error", () => {
     probeFailed = true;
+    clearTimeout(probeKiller);
     // Leave the listener stoppable/restartable rather than wedged as started.
     started = false;
     logger.error(
@@ -1094,6 +1098,7 @@ export function startLondonFireListener(): void {
     );
   });
   probe.on("close", (code) => {
+    clearTimeout(probeKiller);
     if (probeFailed) return;
     if (code === 0) {
       startPolling();
