@@ -59,7 +59,14 @@ export class PushDispatcher extends EventEmitter {
   }
 
   async notifyIncident(incident: Incident): Promise<PushReceipt | null> {
-    notifySmsSubscribers(incident);
+    try {
+      notifySmsSubscribers(incident);
+    } catch (error) {
+      logger.warn("Twilio SMS dispatch skipped", {
+        incidentId: incident.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
     return this.send(incidentToPushPayload(incident));
   }
 
