@@ -454,9 +454,20 @@ export function isNotifiableCrash(
 }
 
 function getRapidApiKey(): string {
-  const apiKey = process.env["RAPIDAPI_KEY"];
+  const apiKey = config.rapidApiKey.trim();
   if (!apiKey) throw new Error("RAPIDAPI_KEY is not configured");
   return apiKey;
+}
+
+/** RapidAPI host + path for the CAVSN Waze scraper subscription. */
+const CAVSN_RAPIDAPI_HOST = "waze-api-waze-scraper.p.rapidapi.com";
+const CAVSN_RAPIDAPI_PATH = "/waze/alerts-and-jams";
+
+/** Normalize "lat, lng" pairs from env (strip spaces) for query params. */
+function normalizeCoordPair(raw: string): string {
+  const [lat, lng] = raw.split(",").map((part) => part.trim());
+  if (!lat || !lng) throw new Error(`Invalid coordinate pair: ${raw}`);
+  return `${lat},${lng}`;
 }
 
 /**
@@ -835,6 +846,7 @@ async function timedProviderFetch(
       if (res.ok) {
         s.lastSuccessAt = new Date().toISOString();
         s.lastError = null;
+        failureWarnedUntil.delete(provider);
       } else {
         s.lastError = `HTTP ${res.status}`;
       }
@@ -876,6 +888,8 @@ export function getProviderRuntimeStats(): Record<
 const PROVIDER_TIMEOUT_MS = 25_000;
 /** BlocksInside 10s poll: abort before the next tick so calls cannot overlap. */
 const BLOCKSINSIDE_TIMEOUT_MS = 8_000;
+/** CAVSN: fail fast on upstream hangs so BlocksInside polls are never delayed. */
+const CAVSN_TIMEOUT_MS = 10_000;
 
 /** Launch offset between providers so they never fire on the same millisecond. */
 const PROVIDER_STAGGER_MS = 250;
@@ -984,31 +998,51 @@ async function fetchRapidApiRaw(
   path: string,
   params: URLSearchParams,
   provider: ProviderSource,
+  timeoutMs = PROVIDER_TIMEOUT_MS,
 ): Promise<{ rawAlerts: Record<string, unknown>[]; rawBody: string; parsed: unknown }> {
   const url = `https://${host}${path}?${params.toString()}`;
   const started = Date.now();
-  const res = await timedProviderFetch(provider, url, {
-    headers: { "x-rapidapi-host": host, "x-rapidapi-key": getRapidApiKey() },
-    signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    logger.error(
-      `Provider request failed provider=${provider} status=${res.status} latencyMs=${Date.now() - started} body=${body.slice(0, 300)}`,
-    );
-    throw new Error(`${provider} responded with status ${res.status}`);
-  }
-  logger.debug({ provider, status: res.status, latencyMs: Date.now() - started }, "Provider responded");
-  const rawBody = await res.text();
-  let parsed: unknown;
   try {
-    parsed = JSON.parse(rawBody) as unknown;
+    const res = await timedProviderFetch(provider, url, {
+      headers: {
+        Accept: "application/json",
+        "x-rapidapi-host": host,
+        "x-rapidapi-key": getRapidApiKey(),
+      },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.error(
+        `[${provider}] RapidAPI HTTP ${res.status} host=${host} path=${path} latencyMs=${Date.now() - started} body=${body.slice(0, 500)}`,
+      );
+      logger.error(
+        `Provider request failed provider=${provider} status=${res.status} latencyMs=${Date.now() - started} body=${body.slice(0, 300)}`,
+      );
+      throw new Error(`${provider} responded with status ${res.status}`);
+    }
+    logger.debug({ provider, status: res.status, latencyMs: Date.now() - started }, "Provider responded");
+    const rawBody = await res.text();
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(rawBody) as unknown;
+    } catch (err) {
+      console.error(
+        `[${provider}] RapidAPI malformed JSON host=${host} path=${path} sample=${rawBody.slice(0, 500)}`,
+      );
+      logger.error(`Provider returned malformed JSON provider=${provider} sample=${rawBody.slice(0, 300)}`);
+      throw err;
+    }
+    if (provider === "cavsn") logCavsnRawPayload(parsed, rawBody);
+    return { rawAlerts: extractAlertRows(parsed), rawBody, parsed };
   } catch (err) {
-    logger.error(`Provider returned malformed JSON provider=${provider} sample=${rawBody.slice(0, 300)}`);
+    if (!(err instanceof Error && /responded with status/.test(err.message))) {
+      console.error(
+        `[${provider}] RapidAPI network error host=${host} path=${path} latencyMs=${Date.now() - started}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
     throw err;
   }
-  if (provider === "cavsn") logCavsnRawPayload(parsed, rawBody);
-  return { rawAlerts: extractAlertRows(parsed), rawBody, parsed };
 }
 
 async function fetchRapidApiAlerts(
@@ -1016,8 +1050,15 @@ async function fetchRapidApiAlerts(
   path: string,
   params: URLSearchParams,
   provider: ProviderSource,
+  timeoutMs = PROVIDER_TIMEOUT_MS,
 ): Promise<WazeAlert[]> {
-  const { rawAlerts, rawBody, parsed } = await fetchRapidApiRaw(host, path, params, provider);
+  const { rawAlerts, rawBody, parsed } = await fetchRapidApiRaw(
+    host,
+    path,
+    params,
+    provider,
+    timeoutMs,
+  );
   return ingestRapidApiAlerts(provider, rawAlerts, rawBody, parsed);
 }
 
@@ -1185,24 +1226,28 @@ async function fetchBlocksInside(
   return ingestRapidApiAlerts("blocksinside", rawAlerts, rawBody, parsed);
 }
 
-/** Cavsn — waze-api-waze-scraper.p.rapidapi.com /waze/alerts-and-jams. */
+/**
+ * CAVSN — waze-api-waze-scraper.p.rapidapi.com /waze/alerts-and-jams.
+ * Uses the same tuned London box as BlocksInside (not a 15 km computed bbox,
+ * which was timing out upstream). Accident filtering happens in parseRawAlerts;
+ * omit server-side alert_types (that param has caused 25s+ hangs on this feed).
+ */
 async function fetchCavsn(
-  lat: number,
-  lng: number,
-  radiusKm: number,
+  _lat: number,
+  _lng: number,
+  _radiusKm: number,
 ): Promise<WazeAlert[]> {
-  const box = boundingBox(lat, lng, Math.min(radiusKm, 15));
   return fetchRapidApiAlerts(
-    "waze-api-waze-scraper.p.rapidapi.com",
-    "/waze/alerts-and-jams",
+    CAVSN_RAPIDAPI_HOST,
+    CAVSN_RAPIDAPI_PATH,
     new URLSearchParams({
-      bottom_left: `${box.bottomLeft.lat},${box.bottomLeft.lng}`,
-      top_right: `${box.topRight.lat},${box.topRight.lng}`,
-      alert_types: "ACCIDENT",
+      bottom_left: normalizeCoordPair(config.wazeBottomLeft),
+      top_right: normalizeCoordPair(config.wazeTopRight),
       max_alerts: "200",
       max_jams: "0",
     }),
     "cavsn",
+    CAVSN_TIMEOUT_MS,
   );
 }
 
@@ -1558,17 +1603,28 @@ async function fetchApifySian(
  * 30s so transient network blips recover on the next poll pass.
  */
 const COOLDOWN_429_MS = 15 * 60 * 1000;
-const COOLDOWN_ERROR_MS = 30 * 1000;
+const COOLDOWN_ERROR_MS = 60 * 1000;
+const COOLDOWN_TIMEOUT_MS = 2 * 60 * 1000;
 const cooldownUntil = new Map<ProviderSource, number>();
+const failureWarnedUntil = new Map<ProviderSource, number>();
 
 function noteProviderFailure(provider: ProviderSource, err: unknown): void {
   const msg = err instanceof Error ? err.message : String(err);
-  const ms = msg.includes("429") ? COOLDOWN_429_MS : COOLDOWN_ERROR_MS;
-  cooldownUntil.set(provider, Date.now() + ms);
-  logger.warn(
-    { provider, error: msg, cooldownSeconds: Math.round(ms / 1000) },
-    "Provider fetch failed — cooling down",
-  );
+  const is429 = msg.includes("429");
+  const isTimeout = /timeout|aborted|timed out/i.test(msg);
+  const ms = is429 ? COOLDOWN_429_MS : isTimeout ? COOLDOWN_TIMEOUT_MS : COOLDOWN_ERROR_MS;
+  const until = Date.now() + ms;
+  cooldownUntil.set(provider, until);
+
+  const alreadyWarned = (failureWarnedUntil.get(provider) ?? 0) > Date.now();
+  const summary = `${provider} fetch failed (${msg}) — cooling down ${Math.round(ms / 1000)}s`;
+  if (alreadyWarned) {
+    logger.debug({ provider, error: msg }, summary);
+    return;
+  }
+  failureWarnedUntil.set(provider, until);
+  console.error(`[${provider}] ${summary}`);
+  logger.warn({ provider, error: msg, cooldownSeconds: Math.round(ms / 1000) }, summary);
 }
 
 /**
