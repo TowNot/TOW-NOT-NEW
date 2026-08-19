@@ -1,13 +1,8 @@
 import { useEffect, useRef } from "react";
-import { scheduleIncidentAlert } from "../lib/dispatchAlerts";
 import { showIncidentNotification } from "../lib/showIncidentNotification";
 import type { Incident } from "../types";
 
-export function useAlertOnNewIncidents(
-  incidents: Incident[],
-  play: () => void,
-  enabled: boolean,
-): void {
+export function useAlertOnNewIncidents(incidents: Incident[]): void {
   const seen = useRef<Set<string>>(new Set());
   const primed = useRef(false);
 
@@ -27,9 +22,6 @@ export function useAlertOnNewIncidents(
         title: incident.title,
         body: incident.locationLabel,
       });
-      if (!enabled) continue;
-      if (incident.source !== "fire_dispatch" && incident.source !== "waze") continue;
-      scheduleIncidentAlert(incident.id, play);
     }
-  }, [incidents, play, enabled]);
+  }, [incidents]);
 }

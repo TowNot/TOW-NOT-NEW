@@ -1,5 +1,4 @@
 import { useEffect } from "react";
-import { claimIncidentAlert } from "../lib/dispatchAlerts";
 import { showIncidentNotification } from "../lib/showIncidentNotification";
 
 interface AlertNavAlertMessage {
@@ -19,10 +18,10 @@ function incidentIdFromUrl(url: string | undefined): string | null {
 }
 
 /**
- * Foreground handler for Progressier push messages. Always banners and
- * sounds — a focused /desk tab must not swallow the alert.
+ * Foreground handler for Progressier push messages. Always banners —
+ * a focused /desk tab must not swallow the alert.
  */
-export function usePushAlertBridge(play: () => void): void {
+export function usePushAlertBridge(): void {
   useEffect(() => {
     if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
 
@@ -36,15 +35,9 @@ export function usePushAlertBridge(play: () => void): void {
         title: data.title || "AlertNav",
         body: data.body || "",
       });
-
-      if (!incidentId) {
-        play();
-        return;
-      }
-      if (claimIncidentAlert(incidentId)) play();
     };
 
     navigator.serviceWorker.addEventListener("message", onMessage);
     return () => navigator.serviceWorker.removeEventListener("message", onMessage);
-  }, [play]);
+  }, []);
 }
