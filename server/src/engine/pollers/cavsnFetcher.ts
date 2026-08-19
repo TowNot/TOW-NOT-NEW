@@ -8,7 +8,8 @@ export const CAVSN_ALERTS_PATH = "/waze/alerts-and-jams";
 /** Lightweight health probe — answers quickly when the subscription is active. */
 export const CAVSN_HEALTH_PATH = "/getHealth";
 
-const CAVSN_TIMEOUT_MS = 12_000;
+/** Fail fast — never block BlocksInside's 10s poll loop on a hung upstream scrape. */
+const CAVSN_TIMEOUT_MS = 10_000;
 const CAVSN_HEALTH_TIMEOUT_MS = 5_000;
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
@@ -62,18 +63,18 @@ function logCavsnFailure(
 
 /**
  * Independent CAVSN fetch — never shares BlocksInside's api.wazeapi.com URL,
- * X-API-Key header, or hyphenated query params.
+ * X-API-Key header, or hyphenated query params. Uses the same tuned London
+ * bounding box as BlocksInside (wazeBottomLeft / wazeTopRight). No alert_types
+ * query param — accident filtering happens in parseRawAlerts.
  */
 export async function fetchCavsnRaw(
-  lat: number,
-  lng: number,
-  radiusKm: number,
+  _lat: number,
+  _lng: number,
+  _radiusKm: number,
 ): Promise<{ rawAlerts: Record<string, unknown>[]; rawBody: string; parsed: unknown }> {
-  const radius = String(Math.min(Math.max(radiusKm, 1), 12));
   const params = new URLSearchParams({
-    center: `${lat},${lng}`,
-    radius,
-    radius_units: "KM",
+    bottom_left: normalizeCoordPair(config.wazeBottomLeft),
+    top_right: normalizeCoordPair(config.wazeTopRight),
     max_alerts: "200",
     max_jams: "0",
   });
@@ -149,37 +150,4 @@ export async function probeCavsnHealth(): Promise<void> {
       `[cavsn] getHealth failed latencyMs=${Date.now() - started}: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
-}
-
-/** Bbox fallback using the tuned London env box (underscore params — CAVSN/RapidAPI style). */
-export async function fetchCavsnRawByBox(): Promise<{
-  rawAlerts: Record<string, unknown>[];
-  rawBody: string;
-  parsed: unknown;
-}> {
-  const params = new URLSearchParams({
-    bottom_left: normalizeCoordPair(config.wazeBottomLeft),
-    top_right: normalizeCoordPair(config.wazeTopRight),
-    max_alerts: "200",
-    max_jams: "0",
-  });
-  const url = `https://${CAVSN_RAPIDAPI_HOST}${CAVSN_ALERTS_PATH}?${params.toString()}`;
-  const started = Date.now();
-
-  const res = await fetch(url, {
-    headers: cavsnHeaders(),
-    signal: AbortSignal.timeout(CAVSN_TIMEOUT_MS),
-  });
-  const rawBody = await res.text();
-  if (!res.ok) {
-    logCavsnFailure(
-      `bbox RapidAPI HTTP ${res.status} ${res.statusText}`,
-      url,
-      started,
-      `body=${rawBody.slice(0, 800)}`,
-    );
-    throw new Error(`cavsn bbox responded with status ${res.status}`);
-  }
-  const parsed = JSON.parse(rawBody) as unknown;
-  return { rawAlerts: extractCavsnAlertRows(parsed), rawBody, parsed };
 }

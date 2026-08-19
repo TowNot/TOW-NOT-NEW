@@ -1592,9 +1592,8 @@ async function fetchApifySian(
 }
 
 /**
- * Per-provider failure cooldowns so a dead/exhausted upstream isn't hammered
- * every 30s poll: 429 (quota exhausted) backs off 15 min, other failures
- * 30s so transient network blips recover on the next poll pass.
+ * Per-provider failure cooldowns: 429 → 15 min, timeouts → 2 min, other → 1 min.
+ * One warn log per cooldown window; repeats go to debug.
  */
 const COOLDOWN_429_MS = 15 * 60 * 1000;
 const COOLDOWN_ERROR_MS = 60 * 1000;
