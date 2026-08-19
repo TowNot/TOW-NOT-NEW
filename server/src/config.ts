@@ -10,17 +10,39 @@ function resolveClientOrigin(): string {
   return "http://localhost:5173";
 }
 
+/**
+ * Normalize an env-provided origin. Strips accidental markdown link wrappers
+ * (e.g. `[https://app.example](https://app.example)`) that break Progressier.
+ */
+export function sanitizeHttpsOrigin(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  const markdown = trimmed.match(/\((https?:\/\/[^)\s]+)\)/i);
+  if (markdown?.[1]) return markdown[1].replace(/\/$/, "");
+
+  if (/^https?:\/\//i.test(trimmed)) return trimmed.replace(/\/$/, "");
+
+  return null;
+}
+
 /** Absolute origin for push deep-links — never localhost on mobile devices. */
 function resolvePublicUrl(): string {
-  const explicit = process.env.PUBLIC_URL?.trim();
-  if (explicit) return explicit.replace(/\/$/, "");
-  if (process.env.RAILWAY_PUBLIC_DOMAIN) {
-    return `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
+  const candidates = [
+    process.env.PUBLIC_URL,
+    process.env.RAILWAY_PUBLIC_DOMAIN
+      ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+      : undefined,
+    process.env.CLIENT_ORIGIN,
+  ];
+
+  for (const candidate of candidates) {
+    if (!candidate?.trim()) continue;
+    if (/localhost|127\.0\.0\.1/i.test(candidate)) continue;
+    const origin = sanitizeHttpsOrigin(candidate);
+    if (origin) return origin;
   }
-  const client = process.env.CLIENT_ORIGIN?.trim();
-  if (client && !/localhost|127\.0\.0\.1/i.test(client)) {
-    return client.replace(/\/$/, "");
-  }
+
   return PRODUCTION_PUBLIC_URL;
 }
 
