@@ -1,7 +1,8 @@
+import { config } from "../config";
+import { logger } from "../logger";
 import { GoogleMapsTrafficPoller } from "./pollers/googleMapsPoller";
 import { WazeTrafficPoller } from "./pollers/wazePoller";
 import { RadioIngestionWorker } from "./workers/radioIngestionWorker";
-import { logger } from "../logger";
 
 export class DataAggregatorEngine {
   constructor(
@@ -11,9 +12,19 @@ export class DataAggregatorEngine {
   ) {}
 
   start(): void {
-    logger.info("[WAZE API] starting BlocksInside + CAVSN Waze scrapers");
+    logger.info("[WAZE API] starting BlocksInside + CAVSN Waze scrapers", {
+      wazeApi: Boolean(config.wazeApiKey),
+      rapidApi: Boolean(config.rapidApiKey),
+      twilio: Boolean(config.twilioAccountSid && config.twilioAuthToken),
+      publicUrl: config.publicUrl,
+    });
+    if (!config.rapidApiKey) {
+      logger.warn("RAPIDAPI_KEY is unset — CAVSN poll will be skipped");
+    }
+    if (!config.twilioAccountSid || !config.twilioAuthToken) {
+      logger.warn("Twilio credentials unset — SMS alerts will not send until configured");
+    }
     this.waze.start();
-    // Google Maps / CAVSN RapidAPI scrapers are paused — Fire + BlocksInside only.
     logger.info("[FIRE SCANNER] starting London Fire listener");
     this.radio.start();
     logger.info("Data aggregator engine running (BlocksInside + CAVSN + fire dispatch)");

@@ -2,8 +2,8 @@ import { config } from "./config";
 import { logger } from "./logger";
 import type { Incident, PushPayload } from "./types/incident";
 
-const TITLE_MAX = 50;
-const BODY_MAX = 100;
+const TITLE_MAX = 72;
+const BODY_MAX = 160;
 
 /**
  * Broadcast to every Progressier-subscribed device. Tag targeting

@@ -45,7 +45,7 @@ export function mapWazeAlert(alert: WazeAlert): Incident {
   const street = alert.street?.trim() || "Unknown street";
   const city = alert.city?.trim() || "London, ON";
   return {
-    id: `${alert.provider}:${alert.alertId}`,
+    id: `waze:${alert.alertId}`,
     source: toSource(alert.provider),
     type: alert.type,
     subtype: alert.subtype,

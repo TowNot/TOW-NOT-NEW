@@ -658,7 +658,7 @@ export function parseRawAlerts(
       : breakdownHit
         ? "breakdown"
         : "major hazard (silent)";
-    logger.info(
+    logger.debug(
       {
         provider,
         street: streetLabel,
@@ -1667,8 +1667,9 @@ export const LIVE_WAZE_PROVIDERS = ["blocksinside", "cavsn"] as const;
 export type LiveWazeProvider = (typeof LIVE_WAZE_PROVIDERS)[number];
 
 /**
- * Fetch BlocksInside and CAVSN at the same instant. Each alert keeps its
- * provider tag; cross-provider dedup is left to incident IDs / the store.
+ * Fetch BlocksInside and CAVSN at the same instant. Failures are isolated.
+ * The faster provider wins when both return the same Waze alert ID (or a pin
+ * within 50 m). The winner keeps its provider tag for push/SMS/UI.
  */
 export async function fetchLiveWazeProviders(
   lat: number,
@@ -1676,24 +1677,61 @@ export async function fetchLiveWazeProviders(
   radiusKm: number,
   providers: readonly LiveWazeProvider[] = LIVE_WAZE_PROVIDERS,
 ): Promise<WazeAlert[]> {
-  const active = providers.filter((p) => !DISABLED_PROVIDERS.has(p));
+  const now = Date.now();
+  const active = providers.filter((p) => {
+    if (DISABLED_PROVIDERS.has(p)) return false;
+    const until = cooldownUntil.get(p) ?? 0;
+    return until <= now;
+  });
   if (active.length === 0) return [];
 
   const settled = await Promise.allSettled(
-    active.map((p) => PROVIDER_FETCHERS[p](lat, lng, radiusKm)),
+    active.map(async (p) => {
+      const alerts = await PROVIDER_FETCHERS[p](lat, lng, radiusKm);
+      return { provider: p, alerts, completedAt: Date.now() };
+    }),
   );
 
-  const alerts: WazeAlert[] = [];
+  const timed: Array<{ alert: WazeAlert; completedAt: number }> = [];
   settled.forEach((result, i) => {
     const provider = active[i]!;
     if (result.status === "fulfilled") {
-      logger.debug({ provider, alerts: result.value.length }, "Live Waze provider returned alerts");
-      alerts.push(...result.value);
+      logger.debug(
+        { provider, alerts: result.value.alerts.length, completedAt: result.value.completedAt },
+        "Live Waze provider returned alerts",
+      );
+      for (const alert of result.value.alerts) {
+        timed.push({ alert, completedAt: result.value.completedAt });
+      }
     } else {
       noteProviderFailure(provider, result.reason);
     }
   });
-  return alerts;
+
+  timed.sort((a, b) => a.completedAt - b.completedAt);
+  const kept: WazeAlert[] = [];
+  for (const { alert } of timed) {
+    const sameId = kept.find((k) => k.alertId === alert.alertId);
+    if (sameId) {
+      logger.debug(
+        { winner: sameId.provider, dropped: alert.provider, alertId: alert.alertId },
+        "Deduped duplicate Waze ID across providers",
+      );
+      continue;
+    }
+    const nearby = kept.find(
+      (k) => distanceKm(k.lat, k.lng, alert.lat, alert.lng) <= DEDUP_RADIUS_KM,
+    );
+    if (nearby) {
+      logger.debug(
+        { winner: nearby.provider, dropped: alert.provider, alertId: alert.alertId },
+        "Deduped nearby Waze pin across providers",
+      );
+      continue;
+    }
+    kept.push(alert);
+  }
+  return kept;
 }
 
 export async function fetchWazeAlerts(

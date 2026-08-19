@@ -58,20 +58,26 @@ export function notifySmsSubscribers(incident: Incident): void {
   if (recipients.length === 0) return;
 
   const body = smsBody(incident);
-  void Promise.allSettled(recipients.map((to) => sendOne(to, body))).then((results) => {
-    const failed = results.filter((r) => r.status === "rejected").length;
-    logger.info("Twilio SMS dispatch finished", {
-      incidentId: incident.id,
-      sent: results.length - failed,
-      failed,
+  void Promise.allSettled(recipients.map((to) => sendOne(to, body)))
+    .then((results) => {
+      const failed = results.filter((r) => r.status === "rejected").length;
+      logger.info("Twilio SMS dispatch finished", {
+        incidentId: incident.id,
+        sent: results.length - failed,
+        failed,
+      });
+      results.forEach((result, i) => {
+        if (result.status === "rejected") {
+          logger.warn("Twilio SMS failed", {
+            to: recipients[i],
+            error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+          });
+        }
+      });
+    })
+    .catch((error: unknown) => {
+      logger.warn("Twilio SMS dispatch aborted", {
+        error: error instanceof Error ? error.message : String(error),
+      });
     });
-    results.forEach((result, i) => {
-      if (result.status === "rejected") {
-        logger.warn("Twilio SMS failed", {
-          to: recipients[i],
-          error: result.reason instanceof Error ? result.reason.message : String(result.reason),
-        });
-      }
-    });
-  });
 }
