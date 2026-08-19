@@ -1,6 +1,7 @@
 import { ProxyAgent, fetch as undiciFetch } from "undici";
 import { config } from "../config";
 import { boundingBox, distanceKm } from "./geo";
+import { fetchCavsnRaw } from "./pollers/cavsnFetcher";
 import { logger } from "./pinoCompat";
 
 /** Every provider the aggregator can pull live accidents from. */
@@ -459,16 +460,7 @@ function getRapidApiKey(): string {
   return apiKey;
 }
 
-/** RapidAPI host + path for the CAVSN Waze scraper subscription. */
-const CAVSN_RAPIDAPI_HOST = "waze-api-waze-scraper.p.rapidapi.com";
-const CAVSN_RAPIDAPI_PATH = "/waze/alerts-and-jams";
-
-/** Normalize "lat, lng" pairs from env (strip spaces) for query params. */
-function normalizeCoordPair(raw: string): string {
-  const [lat, lng] = raw.split(",").map((part) => part.trim());
-  if (!lat || !lng) throw new Error(`Invalid coordinate pair: ${raw}`);
-  return `${lat},${lng}`;
-}
+/** RapidAPI host + path constants live in pollers/cavsnFetcher.ts (isolated from BlocksInside). */
 
 /**
  * Shared parser for all providers' raw alert objects. Coordinate fallbacks
@@ -888,8 +880,6 @@ export function getProviderRuntimeStats(): Record<
 const PROVIDER_TIMEOUT_MS = 25_000;
 /** BlocksInside 10s poll: abort before the next tick so calls cannot overlap. */
 const BLOCKSINSIDE_TIMEOUT_MS = 8_000;
-/** CAVSN: fail fast on upstream hangs so BlocksInside polls are never delayed. */
-const CAVSN_TIMEOUT_MS = 10_000;
 
 /** Launch offset between providers so they never fire on the same millisecond. */
 const PROVIDER_STAGGER_MS = 250;
@@ -1227,28 +1217,32 @@ async function fetchBlocksInside(
 }
 
 /**
- * CAVSN — waze-api-waze-scraper.p.rapidapi.com /waze/alerts-and-jams.
- * Uses the same tuned London box as BlocksInside (not a 15 km computed bbox,
- * which was timing out upstream). Accident filtering happens in parseRawAlerts;
- * omit server-side alert_types (that param has caused 25s+ hangs on this feed).
+ * CAVSN — isolated RapidAPI fetch (see pollers/cavsnFetcher.ts).
+ * BlocksInside uses api.wazeapi.com with X-API-Key; CAVSN uses
+ * waze-api-waze-scraper.p.rapidapi.com with x-rapidapi-* headers.
  */
 async function fetchCavsn(
-  _lat: number,
-  _lng: number,
-  _radiusKm: number,
+  lat: number,
+  lng: number,
+  radiusKm: number,
 ): Promise<WazeAlert[]> {
-  return fetchRapidApiAlerts(
-    CAVSN_RAPIDAPI_HOST,
-    CAVSN_RAPIDAPI_PATH,
-    new URLSearchParams({
-      bottom_left: normalizeCoordPair(config.wazeBottomLeft),
-      top_right: normalizeCoordPair(config.wazeTopRight),
-      max_alerts: "200",
-      max_jams: "0",
-    }),
-    "cavsn",
-    CAVSN_TIMEOUT_MS,
-  );
+  const started = Date.now();
+  const s = statFor("cavsn");
+  s.lastFetchAt = new Date(started).toISOString();
+  try {
+    const { rawAlerts, rawBody, parsed } = await fetchCavsnRaw(lat, lng, radiusKm);
+    s.lastLatencyMs = Date.now() - started;
+    s.lastStatus = 200;
+    s.lastSuccessAt = new Date().toISOString();
+    s.lastError = null;
+    failureWarnedUntil.delete("cavsn");
+    return ingestRapidApiAlerts("cavsn", rawAlerts, rawBody, parsed);
+  } catch (err) {
+    s.lastLatencyMs = Date.now() - started;
+    s.lastStatus = null;
+    s.lastError = err instanceof Error ? err.message : String(err);
+    throw err;
+  }
 }
 
 /**
