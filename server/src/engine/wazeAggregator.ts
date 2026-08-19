@@ -1,6 +1,6 @@
 import { ProxyAgent, fetch as undiciFetch } from "undici";
 import { config } from "../config";
-import { boundingBox, distanceKm } from "./geo";
+import { boundingBox, distanceKm, splitBoundingBox, type BoundingBox } from "./geo";
 import { logger } from "./pinoCompat";
 
 /** Every provider the aggregator can pull live accidents from. */
@@ -1096,28 +1096,34 @@ async function fetchOpenWebNinja(
   );
 }
 
+/** Owner EU grid test: 2×2 quadrants over the London accident box. */
+const BLOCKSINSIDE_TILE_DIVISIONS = 2;
+
 /** BlocksInside coordinate pair — owner format: "lat, lng" (comma + space). */
-function blocksInsideCoordPair(raw: string): string {
-  const [lat, lng] = raw.split(",").map((part) => part.trim());
-  if (!lat || !lng) throw new Error(`Invalid BlocksInside coordinate pair: ${raw}`);
+function blocksInsideCoordPair(lat: number, lng: number): string {
   return `${lat}, ${lng}`;
 }
 
-async function fetchBlocksInside(
-  _lat: number,
-  _lng: number,
-  _radiusKm: number,
-): Promise<WazeAlert[]> {
-  const bottomLeft = blocksInsideCoordPair(config.wazeBottomLeft);
-  const topRight = blocksInsideCoordPair(config.wazeTopRight);
-  logger.debug(
-    { box: `${bottomLeft} .. ${topRight}`, filter: '["ACCIDENT"]' },
-    "BlocksInside poll",
-  );
-  // Owner cURL: bottom-left, top-right, filter=["ACCIDENT"] — no limit param.
+function parseCoordPair(raw: string): { lat: number; lng: number } {
+  const [latRaw, lngRaw] = raw.split(",").map((part) => part.trim());
+  const lat = Number(latRaw);
+  const lng = Number(lngRaw);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    throw new Error(`Invalid BlocksInside coordinate pair: ${raw}`);
+  }
+  return { lat, lng };
+}
+
+function londonBlocksInsideBox(): BoundingBox {
+  const bottomLeft = parseCoordPair(config.wazeBottomLeft);
+  const topRight = parseCoordPair(config.wazeTopRight);
+  return { bottomLeft, topRight };
+}
+
+async function fetchBlocksInsideTile(tile: BoundingBox): Promise<WazeAlert[]> {
   const params = new URLSearchParams({
-    "bottom-left": bottomLeft,
-    "top-right": topRight,
+    "bottom-left": blocksInsideCoordPair(tile.bottomLeft.lat, tile.bottomLeft.lng),
+    "top-right": blocksInsideCoordPair(tile.topRight.lat, tile.topRight.lng),
     filter: '["ACCIDENT"]',
   });
   const url = `https://api.wazeapi.com/v1/alerts?${params.toString()}`;
@@ -1132,7 +1138,7 @@ async function fetchBlocksInside(
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     logger.error(
-      `Provider request failed provider=blocksinside status=${res.status} latencyMs=${Date.now() - started} body=${body.slice(0, 300)}`,
+      `Provider request failed provider=blocksinside status=${res.status} latencyMs=${Date.now() - started} body=${body.slice(0, 300)} tile=${blocksInsideCoordPair(tile.bottomLeft.lat, tile.bottomLeft.lng)}..${blocksInsideCoordPair(tile.topRight.lat, tile.topRight.lng)}`,
     );
     throw new Error(`blocksinside responded with status ${res.status}`);
   }
@@ -1146,9 +1152,56 @@ async function fetchBlocksInside(
   }
   const rawAlerts = extractAlertRows(parsed);
   logger.debug(
-    `[WAZE API] Fetched ${rawAlerts.length} incidents from BlocksInside bytes=${rawBody.length}`,
+    `[WAZE API] BlocksInside tile fetched=${rawAlerts.length} bytes=${rawBody.length} latencyMs=${Date.now() - started}`,
   );
-  return ingestRapidApiAlerts("blocksinside", rawAlerts, rawBody, parsed);
+  return parseRawAlerts(rawAlerts, "blocksinside");
+}
+
+async function fetchBlocksInside(
+  _lat: number,
+  _lng: number,
+  _radiusKm: number,
+): Promise<WazeAlert[]> {
+  const tiles = splitBoundingBox(londonBlocksInsideBox(), BLOCKSINSIDE_TILE_DIVISIONS);
+  logger.debug(
+    {
+      tiles: tiles.length,
+      country: config.wazeApiCountry,
+      filter: '["ACCIDENT"]',
+    },
+    "BlocksInside 4-tile poll",
+  );
+
+  const settled = await Promise.allSettled(tiles.map((tile) => fetchBlocksInsideTile(tile)));
+  const merged: WazeAlert[] = [];
+  const seenIds = new Set<string>();
+  let failedTiles = 0;
+
+  for (const result of settled) {
+    if (result.status === "rejected") {
+      failedTiles += 1;
+      logger.warn(
+        { error: result.reason instanceof Error ? result.reason.message : String(result.reason) },
+        "BlocksInside tile fetch failed",
+      );
+      continue;
+    }
+    for (const alert of result.value) {
+      if (seenIds.has(alert.alertId)) continue;
+      seenIds.add(alert.alertId);
+      merged.push(alert);
+    }
+  }
+
+  if (failedTiles === tiles.length) {
+    throw new Error("blocksinside all tile fetches failed");
+  }
+
+  const stats = statFor("blocksinside");
+  stats.lastReceived = merged.length;
+  stats.lastRetained = merged.length;
+  logger.debug(`[WAZE API] BlocksInside merged ${merged.length} accidents from ${tiles.length - failedTiles}/${tiles.length} tiles`);
+  return merged;
 }
 
 /**

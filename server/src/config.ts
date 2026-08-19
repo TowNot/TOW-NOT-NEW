@@ -69,7 +69,7 @@ export const config = {
   wazeApiKey:
     process.env.WAZEAPI_KEY?.trim() ||
     "wz_live_XZDbg-TNpEJGfpAVcOfkeeV6ed0AtCp-",
-  wazeApiCountry: process.env.WAZEAPI_COUNTRY?.trim() || "usa",
+  wazeApiCountry: process.env.WAZEAPI_COUNTRY?.trim() || "eur",
   wazeBottomLeft: process.env.WAZE_BOTTOM_LEFT?.trim() || "42.8949, -81.3683",
   wazeTopRight: process.env.WAZE_TOP_RIGHT?.trim() || "43.0749, -81.1223",
   apifyApiToken: process.env.APIFY_API_TOKEN ?? "",

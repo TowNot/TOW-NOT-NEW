@@ -75,6 +75,8 @@ export class WazeTrafficPoller {
       providers: LIVE_WAZE_PROVIDERS.filter((p) => p === "blocksinside" && config.wazeApiKey),
       wazeApiConfigured: Boolean(config.wazeApiKey),
       filter: '["ACCIDENT"]',
+      country: config.wazeApiCountry,
+      tiles: 4,
       bottomLeft: config.wazeBottomLeft,
       topRight: config.wazeTopRight,
     });

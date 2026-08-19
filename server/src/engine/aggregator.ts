@@ -12,11 +12,13 @@ export class DataAggregatorEngine {
   ) {}
 
   start(): void {
-    logger.info("[WAZE API] starting BlocksInside Waze scraper", {
+    logger.info("[WAZE API] starting BlocksInside 4-tile Waze scraper", {
       wazeApi: Boolean(config.wazeApiKey),
       twilio: Boolean(config.twilioAccountSid && config.twilioAuthToken),
       publicUrl: config.publicUrl,
       filter: '["ACCIDENT"]',
+      country: config.wazeApiCountry,
+      tiles: 4,
       box: `${config.wazeBottomLeft} .. ${config.wazeTopRight}`,
     });
     if (!config.wazeApiKey) {

@@ -56,6 +56,8 @@ export function createSourcesRouter(store: IncidentStore): Router {
         endpoint: "https://api.wazeapi.com/v1/alerts",
         filter: '["ACCIDENT"]',
         limit: "",
+        tiles: 4,
+        tileDivisions: 2,
         "bottom-left": config.wazeBottomLeft,
         "top-right": config.wazeTopRight,
         country: config.wazeApiCountry,
