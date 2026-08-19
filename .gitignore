@@ -18,3 +18,4 @@ temp
 **/*.wav
 server/dist/public/audio
 public/audio
+data/sms-subscribers.json

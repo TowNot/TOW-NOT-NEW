@@ -70,6 +70,7 @@ export function createSourcesRouter(store: IncidentStore): Router {
         apify: Boolean(config.apifyApiToken),
         deepgram: Boolean(config.deepgramApiKey),
         progressier: Boolean(config.progressierApiKey),
+        twilio: Boolean(config.twilioAccountSid && config.twilioAuthToken),
       },
       push: {
         endpoint: config.progressierPushUrl,

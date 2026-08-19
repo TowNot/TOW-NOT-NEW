@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { logger } from "../logger";
 import { incidentToPushPayload, sendProgressierPush } from "../push";
+import { notifySmsSubscribers } from "../sms/twilioClient";
 import type { Incident, PushPayload, PushReceipt } from "../types/incident";
 
 export interface PushChannel {
@@ -58,6 +59,7 @@ export class PushDispatcher extends EventEmitter {
   }
 
   async notifyIncident(incident: Incident): Promise<PushReceipt | null> {
+    notifySmsSubscribers(incident);
     return this.send(incidentToPushPayload(incident));
   }
 

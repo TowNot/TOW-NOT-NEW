@@ -82,4 +82,7 @@ export const config = {
   londonLng: Number(process.env.LONDON_LNG ?? -81.2453),
   pollRadiusKm: Number(process.env.POLL_RADIUS_KM ?? 15),
   logLevel: (process.env.LOG_LEVEL ?? "info") as "debug" | "info" | "warn" | "error",
+  twilioAccountSid: process.env.TWILIO_ACCOUNT_SID?.trim() || "",
+  twilioAuthToken: process.env.TWILIO_AUTH_TOKEN?.trim() || "",
+  twilioFromNumber: process.env.TWILIO_FROM_NUMBER?.trim() || "+12494025882",
 } as const;
