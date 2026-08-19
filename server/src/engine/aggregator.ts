@@ -12,18 +12,15 @@ export class DataAggregatorEngine {
   ) {}
 
   start(): void {
-    logger.info("[WAZE API] starting BlocksInside + CAVSN Waze scrapers", {
+    logger.info("[WAZE API] starting BlocksInside Waze scraper", {
       wazeApi: Boolean(config.wazeApiKey),
-      rapidApi: Boolean(config.rapidApiKey),
       twilio: Boolean(config.twilioAccountSid && config.twilioAuthToken),
       publicUrl: config.publicUrl,
+      filter: '["ACCIDENT"]',
+      box: `${config.wazeBottomLeft} .. ${config.wazeTopRight}`,
     });
-    if (!config.rapidApiKey) {
-      logger.warn("RAPIDAPI_KEY is unset — CAVSN poll will be skipped");
-    } else {
-      logger.info(
-        "[WAZE API] CAVSN upstream timeout protection active — BlocksInside acting as primary feed",
-      );
+    if (!config.wazeApiKey) {
+      logger.warn("WAZEAPI_KEY is unset — BlocksInside poll will be skipped");
     }
     if (!config.twilioAccountSid || !config.twilioAuthToken) {
       logger.warn("Twilio credentials unset — SMS alerts will not send until configured");
@@ -31,7 +28,7 @@ export class DataAggregatorEngine {
     this.waze.start();
     logger.info("[FIRE SCANNER] starting London Fire listener");
     this.radio.start();
-    logger.info("Data aggregator engine running (BlocksInside + CAVSN + fire dispatch)");
+    logger.info("Data aggregator engine running (BlocksInside + fire dispatch)");
   }
 
   stop(): void {

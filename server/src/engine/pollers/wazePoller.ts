@@ -72,15 +72,11 @@ export class WazeTrafficPoller {
     if (this.timer) return;
     logger.info("Live traffic aggregator started", {
       intervalMs: config.pollIntervalMs,
-      lat: config.londonLat,
-      lng: config.londonLng,
-      radiusKm: config.pollRadiusKm,
-      providers: LIVE_WAZE_PROVIDERS.filter(
-        (p) => (p === "blocksinside" && config.wazeApiKey) || (p === "cavsn" && config.rapidApiKey),
-      ),
+      providers: LIVE_WAZE_PROVIDERS.filter((p) => p === "blocksinside" && config.wazeApiKey),
       wazeApiConfigured: Boolean(config.wazeApiKey),
-      rapidApiConfigured: Boolean(config.rapidApiKey),
-      cavsnHost: "waze-api-waze-scraper.p.rapidapi.com",
+      filter: '["ACCIDENT"]',
+      bottomLeft: config.wazeBottomLeft,
+      topRight: config.wazeTopRight,
     });
     void this.poll();
     this.timer = setInterval(() => void this.poll(), config.pollIntervalMs);
@@ -97,9 +93,8 @@ export class WazeTrafficPoller {
   async poll(): Promise<Incident[]> {
     const providers: LiveWazeProvider[] = [];
     if (config.wazeApiKey) providers.push("blocksinside");
-    if (config.rapidApiKey) providers.push("cavsn");
     if (providers.length === 0) {
-      logger.warn("Skipping live traffic poll; WAZEAPI_KEY and RAPIDAPI_KEY are both unset");
+      logger.warn("Skipping live traffic poll; WAZEAPI_KEY is unset");
       return [];
     }
     if (this.inFlight) {

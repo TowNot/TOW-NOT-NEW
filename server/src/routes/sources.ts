@@ -65,13 +65,13 @@ export function createSourcesRouter(store: IncidentStore): Router {
       lastReceived: blocksinside.lastReceived,
       lastRetained: blocksinside.lastRetained,
       credentials: {
-        rapidApi: Boolean(config.rapidApiKey),
         wazeApi: Boolean(config.wazeApiKey),
         apify: Boolean(config.apifyApiToken),
         deepgram: Boolean(config.deepgramApiKey),
         progressier: Boolean(config.progressierApiKey),
         twilio: Boolean(config.twilioAccountSid && config.twilioAuthToken),
       },
+      liveWazeProvider: "blocksinside",
       push: {
         endpoint: config.progressierPushUrl,
         appId: config.progressierAppId,

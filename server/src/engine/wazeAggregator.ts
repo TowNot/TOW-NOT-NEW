@@ -1,7 +1,6 @@
 import { ProxyAgent, fetch as undiciFetch } from "undici";
 import { config } from "../config";
 import { boundingBox, distanceKm } from "./geo";
-import { fetchCavsnRaw } from "./pollers/cavsnFetcher";
 import { logger } from "./pinoCompat";
 
 /** Every provider the aggregator can pull live accidents from. */
@@ -459,8 +458,6 @@ function getRapidApiKey(): string {
   if (!apiKey) throw new Error("RAPIDAPI_KEY is not configured");
   return apiKey;
 }
-
-/** RapidAPI host + path constants live in pollers/cavsnFetcher.ts (isolated from BlocksInside). */
 
 /**
  * Shared parser for all providers' raw alert objects. Coordinate fallbacks
@@ -943,46 +940,6 @@ function looksLikeAlertRow(row: Record<string, unknown>): boolean {
   );
 }
 
-/** CAVSN `data.alerts` before extractAlertRows / parseRawAlerts filters. */
-function cavsnDataAlerts(parsed: unknown): Record<string, unknown>[] | null {
-  if (!isPlainRecord(parsed)) return null;
-  const data = parsed["data"];
-  if (Array.isArray(data)) return data.filter(isPlainRecord);
-  if (!isPlainRecord(data)) return null;
-  if (Array.isArray(data["alerts"])) return data["alerts"].filter(isPlainRecord);
-  const nested = data["alerts_and_jams"];
-  if (isPlainRecord(nested) && Array.isArray(nested["alerts"])) {
-    return nested["alerts"].filter(isPlainRecord);
-  }
-  return null;
-}
-
-function logCavsnRawPayload(parsed: unknown, rawBody: string): void {
-  const topKeys = isPlainRecord(parsed) ? Object.keys(parsed) : [];
-  const data = isPlainRecord(parsed) ? parsed["data"] : undefined;
-  const dataKeys = isPlainRecord(data) ? Object.keys(data) : [];
-  const dataAlerts = cavsnDataAlerts(parsed);
-  const count = dataAlerts?.length ?? 0;
-  logger.info(
-    `[CAVSN RAW] data.alerts count=${dataAlerts === null ? "missing" : count} bytes=${rawBody.length} topKeys=${JSON.stringify(topKeys)} dataKeys=${JSON.stringify(dataKeys)} dataType=${Array.isArray(data) ? "array" : data === null ? "null" : typeof data}`,
-  );
-  if (!dataAlerts || dataAlerts.length === 0) {
-    logger.info(`[CAVSN RAW] empty payload sample=${rawBody.slice(0, 500)}`);
-    return;
-  }
-  dataAlerts.forEach((row, i) => {
-    const unwrapped = unwrapAlertRow(row);
-    const loc = isPlainRecord(unwrapped["location"]) ? unwrapped["location"] : {};
-    const type =
-      unwrapped["type"] ?? unwrapped["alert_type"] ?? unwrapped["alertType"] ?? null;
-    const subtype =
-      unwrapped["subType"] ?? unwrapped["subtype"] ?? unwrapped["category"] ?? null;
-    logger.info(
-      `[CAVSN RAW] alert[${i}] type=${JSON.stringify(type)} subtype=${JSON.stringify(subtype)} lat=${JSON.stringify(unwrapped["latitude"] ?? unwrapped["lat"] ?? loc["lat"] ?? loc["y"])} lng=${JSON.stringify(unwrapped["longitude"] ?? unwrapped["lng"] ?? loc["lng"] ?? loc["x"])}`,
-    );
-  });
-}
-
 async function fetchRapidApiRaw(
   host: string,
   path: string,
@@ -1023,7 +980,6 @@ async function fetchRapidApiRaw(
       logger.error(`Provider returned malformed JSON provider=${provider} sample=${rawBody.slice(0, 300)}`);
       throw err;
     }
-    if (provider === "cavsn") logCavsnRawPayload(parsed, rawBody);
     return { rawAlerts: extractAlertRows(parsed), rawBody, parsed };
   } catch (err) {
     if (!(err instanceof Error && /responded with status/.test(err.message))) {
@@ -1059,11 +1015,6 @@ function ingestRapidApiAlerts(
   parsed: unknown,
 ): WazeAlert[] {
   const typeCounts = typeHistogram(rawAlerts);
-  if (provider === "cavsn") {
-    logger.debug(
-      `[WAZE API] Fetched ${rawAlerts.length} incidents from CAVSN types=${JSON.stringify(typeCounts)} sampleKeys=${JSON.stringify(rawAlerts[0] ? Object.keys(rawAlerts[0]) : [])}`,
-    );
-  }
   if (rawAlerts.length === 0) {
     const keys = isPlainRecord(parsed) ? Object.keys(parsed) : [];
     logger.debug(
@@ -1214,35 +1165,6 @@ async function fetchBlocksInside(
     `[WAZE API] Fetched ${rawAlerts.length} incidents from BlocksInside bytes=${rawBody.length}`,
   );
   return ingestRapidApiAlerts("blocksinside", rawAlerts, rawBody, parsed);
-}
-
-/**
- * CAVSN — isolated RapidAPI fetch (see pollers/cavsnFetcher.ts).
- * BlocksInside uses api.wazeapi.com with X-API-Key; CAVSN uses
- * waze-api-waze-scraper.p.rapidapi.com with x-rapidapi-* headers.
- */
-async function fetchCavsn(
-  lat: number,
-  lng: number,
-  radiusKm: number,
-): Promise<WazeAlert[]> {
-  const started = Date.now();
-  const s = statFor("cavsn");
-  s.lastFetchAt = new Date(started).toISOString();
-  try {
-    const { rawAlerts, rawBody, parsed } = await fetchCavsnRaw(lat, lng, radiusKm);
-    s.lastLatencyMs = Date.now() - started;
-    s.lastStatus = 200;
-    s.lastSuccessAt = new Date().toISOString();
-    s.lastError = null;
-    failureWarnedUntil.delete("cavsn");
-    return ingestRapidApiAlerts("cavsn", rawAlerts, rawBody, parsed);
-  } catch (err) {
-    s.lastLatencyMs = Date.now() - started;
-    s.lastStatus = null;
-    s.lastError = err instanceof Error ? err.message : String(err);
-    throw err;
-  }
 }
 
 /**
@@ -1680,7 +1602,8 @@ const PROVIDER_FETCHERS: Record<
   waze_direct: fetchWazeDirect,
   openwebninja: fetchOpenWebNinja,
   blocksinside: fetchBlocksInside,
-  cavsn: fetchCavsn,
+  // CAVSN removed from live polling — stub keeps ProviderSource typing intact.
+  cavsn: async () => [],
   google_maps: fetchGoogleMaps,
   apify_phantom: makeNonBlocking("apify_phantom", fetchApifyPhantom),
   apify_sian: makeNonBlocking("apify_sian", fetchApifySian),
@@ -1701,7 +1624,8 @@ const PROVIDER_FETCHERS: Record<
  * loop. Remove entries here to re-enable.
  */
 const DISABLED_PROVIDERS = new Set<ProviderSource>([
-  // Live feed: BlocksInside + CAVSN Waze + London Fire STT.
+  // Live feed: BlocksInside Waze only (+ London Fire STT outside this module).
+  "cavsn",
   "waze_direct",
   "openwebninja",
   "google_maps",
@@ -1711,14 +1635,13 @@ const DISABLED_PROVIDERS = new Set<ProviderSource>([
   "apify_mai_amm",
 ]);
 
-/** London live Waze feeds polled in parallel every tick. */
-export const LIVE_WAZE_PROVIDERS = ["blocksinside", "cavsn"] as const;
+/** Sole live Waze feed: BlocksInside accident-only London box. */
+export const LIVE_WAZE_PROVIDERS = ["blocksinside"] as const;
 export type LiveWazeProvider = (typeof LIVE_WAZE_PROVIDERS)[number];
 
 /**
- * Fetch BlocksInside and CAVSN at the same instant. Failures are isolated.
- * The faster provider wins when both return the same Waze alert ID (or a pin
- * within 50 m). The winner keeps its provider tag for push/SMS/UI.
+ * Fetch the active live Waze provider(s). Failures are isolated per provider.
+ * Cross-provider ID/proximity dedup remains for safety if more feeds are re-enabled.
  */
 export async function fetchLiveWazeProviders(
   lat: number,
