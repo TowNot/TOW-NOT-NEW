@@ -756,10 +756,10 @@ async function processWav(wav: Buffer): Promise<void> {
   fireRuntime.counts.sttOk += 1;
   fireRuntime.lastTranscriptAt = new Date().toISOString();
   fireRuntime.lastTranscript = transcript.slice(0, 240);
-  logger.debug("[FIRE SCANNER] Transcription received", {
-    chars: transcript.length,
-    preview: transcript.slice(0, 160),
-  });
+  logger.debug(
+    { chars: transcript.length, preview: transcript.slice(0, 160) },
+    "[FIRE SCANNER] Transcription received",
+  );
   log(
     `STT complete in ${Date.now() - startedAt}ms: ${Math.round((wav.length - 44) / 32000)}s audio -> ${transcript.length} chars`,
   );
@@ -1033,11 +1033,10 @@ async function pollOnce(state: StreamState): Promise<void> {
       state.lastAudioAt = Date.now();
       fireRuntime.lastAudioAt = new Date().toISOString();
       fireRuntime.counts.audioSegments += 1;
-      logger.debug("[FIRE SCANNER] Audio chunk received", {
-        sequence: seg.sequence,
-        bytes: data.length,
-        seconds: seg.seconds,
-      });
+      logger.debug(
+        { sequence: seg.sequence, bytes: data.length, seconds: seg.seconds },
+        "[FIRE SCANNER] Audio chunk received",
+      );
     } catch (err) {
       logger.warn({ err, url: seg.url }, "[fire-dispatch] segment fetch failed");
       state.lastSequence = seg.sequence; // don't refetch a dead segment forever
