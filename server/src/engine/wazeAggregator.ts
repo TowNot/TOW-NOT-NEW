@@ -1096,11 +1096,11 @@ async function fetchOpenWebNinja(
   );
 }
 
-/** BlocksInside — api.wazeapi.com /v1/alerts (owner-recommended London accident query). */
+/** BlocksInside coordinate pair — owner format: "lat, lng" (comma + space). */
 function blocksInsideCoordPair(raw: string): string {
   const [lat, lng] = raw.split(",").map((part) => part.trim());
   if (!lat || !lng) throw new Error(`Invalid BlocksInside coordinate pair: ${raw}`);
-  return `${lat},${lng}`;
+  return `${lat}, ${lng}`;
 }
 
 async function fetchBlocksInside(
@@ -1114,7 +1114,7 @@ async function fetchBlocksInside(
     { box: `${bottomLeft} .. ${topRight}`, filter: '["ACCIDENT"]' },
     "BlocksInside poll",
   );
-  // Official BlocksInside params: no `limit` (leave empty so their default applies).
+  // Owner cURL: bottom-left, top-right, filter=["ACCIDENT"] — no limit param.
   const params = new URLSearchParams({
     "bottom-left": bottomLeft,
     "top-right": topRight,
@@ -1126,7 +1126,6 @@ async function fetchBlocksInside(
     headers: {
       "X-API-Key": config.wazeApiKey,
       "X-Country": config.wazeApiCountry,
-      Accept: "application/json",
     },
     signal: AbortSignal.timeout(BLOCKSINSIDE_TIMEOUT_MS),
   });

@@ -70,8 +70,8 @@ export const config = {
     process.env.WAZEAPI_KEY?.trim() ||
     "wz_live_XZDbg-TNpEJGfpAVcOfkeeV6ed0AtCp-",
   wazeApiCountry: process.env.WAZEAPI_COUNTRY?.trim() || "usa",
-  wazeBottomLeft: process.env.WAZE_BOTTOM_LEFT?.trim() || "42.8949,-81.3683",
-  wazeTopRight: process.env.WAZE_TOP_RIGHT?.trim() || "43.0749,-81.1223",
+  wazeBottomLeft: process.env.WAZE_BOTTOM_LEFT?.trim() || "42.8949, -81.3683",
+  wazeTopRight: process.env.WAZE_TOP_RIGHT?.trim() || "43.0749, -81.1223",
   apifyApiToken: process.env.APIFY_API_TOKEN ?? "",
   deepgramApiKey: process.env.DEEPGRAM_API_KEY ?? "",
   residentialProxyUrl: process.env.RESIDENTIAL_PROXY_URL ?? "",
