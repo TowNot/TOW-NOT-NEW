@@ -53,7 +53,6 @@ export function IncidentCard({ incident }: { incident: Incident }) {
 function formatProvider(provider: string): string {
   const labels: Record<string, string> = {
     blocksinside: "BlocksInside",
-    cavsn: "CAVSN",
     london_fire_dispatch: "Fire dispatch",
   };
   return labels[provider] ?? provider;

@@ -202,15 +202,15 @@ const checks: Array<[string, () => void]> = [
       const accidents = parseRawAlerts(
         [
           {
-            uuid: "cavsn-1",
+            uuid: "bi-1",
             type: "ACCIDENTS",
             location: { lat: 43.0092, lng: -81.2738 },
           },
         ] as Record<string, unknown>[],
-        "cavsn",
+        "blocksinside",
       );
       assert.equal(accidents.length, 1);
-      assert.equal(accidents[0]?.alertId, "cavsn-1");
+      assert.equal(accidents[0]?.alertId, "bi-1");
       assert.equal(accidents[0]?.lat, 43.0092);
       assert.equal(accidents[0]?.lng, -81.2738);
       assert.equal(accidents[0]?.type, "ACCIDENT");
@@ -223,7 +223,7 @@ const checks: Array<[string, () => void]> = [
             location: { x: -81.2453, y: 42.9849 },
           },
         ] as Record<string, unknown>[],
-        "cavsn",
+        "blocksinside",
       );
       assert.equal(xy.length, 1);
       assert.equal(xy[0]?.alertId, "99");
@@ -261,7 +261,7 @@ const checks: Array<[string, () => void]> = [
     },
   ],
   [
-    "CAVSN keeps ACCIDENT rows and drops all HAZARD rows",
+    "BlocksInside ACCIDENT rows ingest; construction HAZARD is dropped",
     () => {
       const parsed = parseRawAlerts(
         [
@@ -273,14 +273,6 @@ const checks: Array<[string, () => void]> = [
           },
           {
             type: "HAZARD",
-            subType: "HAZARD_ON_ROAD",
-            description: "he hit the pole",
-            latitude: 42.98,
-            longitude: -81.24,
-            street: "Highbury",
-          },
-          {
-            type: "HAZARD",
             subType: "HAZARD_ON_ROAD_CONSTRUCTION",
             description: "Road construction",
             latitude: 42.98,
@@ -288,15 +280,13 @@ const checks: Array<[string, () => void]> = [
             street: "Dundas",
           },
           {
-            type: "HAZARD",
-            subType: "HAZARD_ON_ROAD_OBJECT",
-            description: "debris",
+            type: "POLICE",
             latitude: 42.97,
             longitude: -81.25,
             street: "Wonderland",
           },
         ] as Record<string, unknown>[],
-        "cavsn",
+        "blocksinside",
       );
       assert.equal(parsed.length, 1);
       assert.equal(parsed[0]?.type, "ACCIDENT");
@@ -304,7 +294,7 @@ const checks: Array<[string, () => void]> = [
     },
   ],
   [
-    "CAVSN ACCIDENT rows always pass even with municipal notice text",
+    "BlocksInside ACCIDENT rows always pass even with municipal notice text",
     () => {
       assert.equal(isAccidentType("ACCIDENT"), true);
       assert.equal(isAccidentType("ACCIDENTS"), true);
@@ -317,23 +307,15 @@ const checks: Array<[string, () => void]> = [
             longitude: -81.2453,
             street: "Oxford St",
           },
-          {
-            type: "HAZARD",
-            subType: "HAZARD_ON_ROAD",
-            description: "mva at the lights",
-            latitude: 42.98,
-            longitude: -81.24,
-            street: "Richmond",
-          },
         ] as Record<string, unknown>[],
-        "cavsn",
+        "blocksinside",
       );
       assert.equal(parsed.length, 1);
       assert.equal(parsed[0]?.type, "ACCIDENT");
     },
   ],
   [
-    "extractAlertRows finds nested CAVSN alerts_and_jams payloads",
+    "extractAlertRows finds nested alerts_and_jams payloads",
     () => {
       const rows = extractAlertRows({
         status: "ok",
@@ -351,7 +333,7 @@ const checks: Array<[string, () => void]> = [
     },
   ],
   [
-    "nested CAVSN {alert:{...}} wrappers still ingest ACCIDENT",
+    "nested {alert:{...}} wrappers still ingest ACCIDENT",
     () => {
       const parsed = parseRawAlerts(
         [
@@ -364,7 +346,7 @@ const checks: Array<[string, () => void]> = [
             },
           },
         ] as Record<string, unknown>[],
-        "cavsn",
+        "blocksinside",
       );
       assert.equal(parsed.length, 1);
       assert.equal(parsed[0]?.type, "ACCIDENT");

@@ -8,7 +8,6 @@ export type ProviderSource =
   | "waze_direct"
   | "openwebninja"
   | "blocksinside"
-  | "cavsn"
   | "google_maps"
   | "apify_phantom"
   | "apify_sian"
@@ -25,7 +24,6 @@ const PROVIDER_PRIORITY: ProviderSource[] = [
   "waze_direct",
   "blocksinside",
   "openwebninja",
-  "cavsn",
   "google_maps",
   "apify_phantom",
   "apify_sian",
@@ -433,7 +431,7 @@ export function isTrueCrash(type: string, subtype: string | null): boolean {
   return CRASH_KEYWORDS.some((k) => t.includes(k) || s.includes(k));
 }
 
-/** Waze/CAVSN accident types always ingest. */
+/** Waze accident types always ingest. */
 export function isAccidentType(type: string): boolean {
   const t = type.toUpperCase();
   return t.startsWith("ACCIDENT") || t === "CRASH" || t === "COLLISION" || t === "MVC" || t === "MVA";
@@ -512,24 +510,6 @@ export function parseRawAlerts(
       ).test(crashText),
     );
 
-    // CAVSN is queried as ACCIDENT-only. Keep accident types; drop HAZARD and
-    // everything else so leftover construction rows cannot fill the store.
-    let bypassGenericGates = false;
-    if (provider === "cavsn") {
-      if (isAccidentType(tUp)) {
-        bypassGenericGates = true;
-      } else {
-        earlyDropped++;
-        const key = `cavsn-skip:${tUp || "<no-type>"}/${sUp || "<no-subtype>"}`;
-        droppedCombos.set(key, (droppedCombos.get(key) ?? 0) + 1);
-        logger.debug(
-          { provider, street: streetLabel, subtype: sUp || tUp },
-          "[Aggregator] dropped CAVSN non-accident row",
-        );
-        continue;
-      }
-    }
-
     // HARD BLOCKLIST (strict match only, keyword hits exempt): drop ONLY
     // rows whose subtype exactly equals a known roadwork subtype, or whose
     // reported_by exactly matches a blocked municipal publisher. Nothing
@@ -548,7 +528,7 @@ export function parseRawAlerts(
     // Breakdown / disabled-vehicle rows are exempt from the subtype blocklist —
     // stalled cars needing a tow always pass the crash filter.
     const breakdownHit = isBreakdown(tUp, sUp);
-    if (!bypassGenericGates && !keywordHit && !breakdownHit && HARD_BLOCK_SUBTYPES.has(sUp)) {
+    if (!keywordHit && !breakdownHit && HARD_BLOCK_SUBTYPES.has(sUp)) {
       earlyDropped++;
       const key = `blocklist:${tUp || "<no-type>"}/${sUp || "<no-subtype>"}`;
       droppedCombos.set(key, (droppedCombos.get(key) ?? 0) + 1);
@@ -562,7 +542,7 @@ export function parseRawAlerts(
     // MUNICIPAL PUBLISHER HARD DROP: LDNONTTMC / Transnomis publish planned
     // road work, not incidents. Nothing they post survives without explicit
     // crash or stopped-vehicle language.
-    if (!bypassGenericGates && !keywordHit && !breakdownHit && isBlockedPublisher) {
+    if (!keywordHit && !breakdownHit && isBlockedPublisher) {
       earlyDropped++;
       const key = `municipal-publisher:${publisherUp}`;
       droppedCombos.set(key, (droppedCombos.get(key) ?? 0) + 1);
@@ -577,7 +557,6 @@ export function parseRawAlerts(
     // publishers or with a bare subtype — "Sections of roadway for surface
     // treatment", "Road construction", resurfacing, lane closures.
     if (
-      !bypassGenericGates &&
       !keywordHit &&
       !breakdownHit &&
       isMunicipalNotice(type, subtype, rawDescription, asString(raw["title"]))
@@ -599,7 +578,6 @@ export function parseRawAlerts(
     // keyword crawl above already promoted it to a crash.
     const closureHasCrashSubtype = CRASH_KEYWORDS.some((k) => sUp.includes(k));
     if (
-      !bypassGenericGates &&
       !keywordHit &&
       !breakdownHit &&
       tUp === "ROAD_CLOSED" &&
@@ -633,7 +611,6 @@ export function parseRawAlerts(
     const crashTyped = isAccidentType(tUp) || isTrueCrash(tUp, sUp);
     const majorHazardHit = isMajorHazard(tUp, sUp, crashText);
     if (
-      !bypassGenericGates &&
       !keywordHit &&
       !breakdownHit &&
       !crashTyped &&
@@ -1119,20 +1096,28 @@ async function fetchOpenWebNinja(
   );
 }
 
-/** BlocksInside — api.wazeapi.com /v1/alerts. Accident-only London box. */
+/** BlocksInside — api.wazeapi.com /v1/alerts (owner-recommended London accident query). */
+function blocksInsideCoordPair(raw: string): string {
+  const [lat, lng] = raw.split(",").map((part) => part.trim());
+  if (!lat || !lng) throw new Error(`Invalid BlocksInside coordinate pair: ${raw}`);
+  return `${lat},${lng}`;
+}
+
 async function fetchBlocksInside(
-  lat: number,
-  lng: number,
-  radiusKm: number,
+  _lat: number,
+  _lng: number,
+  _radiusKm: number,
 ): Promise<WazeAlert[]> {
+  const bottomLeft = blocksInsideCoordPair(config.wazeBottomLeft);
+  const topRight = blocksInsideCoordPair(config.wazeTopRight);
   logger.debug(
-    { lat, lng, radiusKm, box: `${config.wazeBottomLeft} .. ${config.wazeTopRight}` },
+    { box: `${bottomLeft} .. ${topRight}`, filter: '["ACCIDENT"]' },
     "BlocksInside poll",
   );
+  // Official BlocksInside params: no `limit` (leave empty so their default applies).
   const params = new URLSearchParams({
-    "bottom-left": config.wazeBottomLeft,
-    "top-right": config.wazeTopRight,
-    limit: "500",
+    "bottom-left": bottomLeft,
+    "top-right": topRight,
     filter: '["ACCIDENT"]',
   });
   const url = `https://api.wazeapi.com/v1/alerts?${params.toString()}`;
@@ -1602,8 +1587,6 @@ const PROVIDER_FETCHERS: Record<
   waze_direct: fetchWazeDirect,
   openwebninja: fetchOpenWebNinja,
   blocksinside: fetchBlocksInside,
-  // CAVSN removed from live polling — stub keeps ProviderSource typing intact.
-  cavsn: async () => [],
   google_maps: fetchGoogleMaps,
   apify_phantom: makeNonBlocking("apify_phantom", fetchApifyPhantom),
   apify_sian: makeNonBlocking("apify_sian", fetchApifySian),
@@ -1625,7 +1608,6 @@ const PROVIDER_FETCHERS: Record<
  */
 const DISABLED_PROVIDERS = new Set<ProviderSource>([
   // Live feed: BlocksInside Waze only (+ London Fire STT outside this module).
-  "cavsn",
   "waze_direct",
   "openwebninja",
   "google_maps",

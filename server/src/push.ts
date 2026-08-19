@@ -36,7 +36,6 @@ function absoluteUrl(pathOrUrl: string): string {
 
 const PROVIDER_LABELS: Record<string, string> = {
   blocksinside: "BlocksInside",
-  cavsn: "CAVSN",
   waze_direct: "Waze Direct",
   openwebninja: "OpenWebNinja",
   google_maps: "Google Maps",
