@@ -1652,16 +1652,49 @@ const PROVIDER_FETCHERS: Record<
  * loop. Remove entries here to re-enable.
  */
 const DISABLED_PROVIDERS = new Set<ProviderSource>([
-  // Live feed: BlocksInside Waze + London Fire STT.
+  // Live feed: BlocksInside + CAVSN Waze + London Fire STT.
   "waze_direct",
   "openwebninja",
-  "cavsn",
   "google_maps",
   "apify_sian",
   "apify_phantom",
   "apify_burbn",
   "apify_mai_amm",
 ]);
+
+/** London live Waze feeds polled in parallel every tick. */
+export const LIVE_WAZE_PROVIDERS = ["blocksinside", "cavsn"] as const;
+export type LiveWazeProvider = (typeof LIVE_WAZE_PROVIDERS)[number];
+
+/**
+ * Fetch BlocksInside and CAVSN at the same instant. Each alert keeps its
+ * provider tag; cross-provider dedup is left to incident IDs / the store.
+ */
+export async function fetchLiveWazeProviders(
+  lat: number,
+  lng: number,
+  radiusKm: number,
+  providers: readonly LiveWazeProvider[] = LIVE_WAZE_PROVIDERS,
+): Promise<WazeAlert[]> {
+  const active = providers.filter((p) => !DISABLED_PROVIDERS.has(p));
+  if (active.length === 0) return [];
+
+  const settled = await Promise.allSettled(
+    active.map((p) => PROVIDER_FETCHERS[p](lat, lng, radiusKm)),
+  );
+
+  const alerts: WazeAlert[] = [];
+  settled.forEach((result, i) => {
+    const provider = active[i]!;
+    if (result.status === "fulfilled") {
+      logger.debug({ provider, alerts: result.value.length }, "Live Waze provider returned alerts");
+      alerts.push(...result.value);
+    } else {
+      noteProviderFailure(provider, result.reason);
+    }
+  });
+  return alerts;
+}
 
 export async function fetchWazeAlerts(
   lat: number,

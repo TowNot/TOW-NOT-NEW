@@ -3,6 +3,7 @@ import path from "node:path";
 import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
 import helmet from "helmet";
+import { ensureAudioDir, resolveAudioRoot } from "./audioStorage";
 import { config } from "./config";
 import type { PushDispatcher } from "./dispatch/pushDispatcher";
 import { logger } from "./logger";
@@ -31,6 +32,18 @@ export function createApp(store: IncidentStore, dispatcher: PushDispatcher): exp
     }),
   );
   app.use(express.json({ limit: "1mb" }));
+
+  ensureAudioDir();
+  app.use(
+    "/audio",
+    express.static(resolveAudioRoot(), {
+      index: false,
+      maxAge: "1h",
+      setHeaders(res) {
+        res.setHeader("Cache-Control", "public, max-age=3600");
+      },
+    }),
+  );
 
   // Health + incident snapshot/SSE are mounted with no auth or Stripe gate.
   app.use("/api", healthRouter);
@@ -88,7 +101,7 @@ export function applyClientAssets(app: express.Express): void {
   );
 
   app.get("/", sendIndex);
-  app.get(/^\/(?!api(?:\/|$)|progressier\.js$).*/, (req, res, next) => {
+  app.get(/^\/(?!api(?:\/|$)|progressier\.js$|audio\/).*/, (req, res, next) => {
     if (req.method !== "GET" && req.method !== "HEAD") {
       next();
       return;

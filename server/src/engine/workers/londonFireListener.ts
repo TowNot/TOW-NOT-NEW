@@ -34,6 +34,7 @@ import {
 import { speechToText } from "../deepgramClient";
 import { distanceKm } from "../geo";
 import { logger } from "../pinoCompat";
+import { saveFireDispatchAudio } from "../../audioStorage";
 import { config } from "../../config";
 import type { Incident } from "../../types/incident";
 import type { IncidentStore } from "../../store/incidentStore";
@@ -670,6 +671,7 @@ async function saveAndNotify(
   transcript: string,
   priority: DispatchPriority,
   unverifiedAddress = false,
+  wav?: Buffer,
 ): Promise<void> {
   if (!incidentStore) {
     logger.error("[fire-dispatch] incident store is not attached");
@@ -699,6 +701,17 @@ async function saveAndNotify(
     log(`DEDUPED: alertId ${id} already dispatched within the last 30min — skipping`);
     return;
   }
+  let audioUrl = existing?.audioUrl;
+  if (wav && wav.length > 44 && !existing) {
+    try {
+      audioUrl = await saveFireDispatchAudio(wav, id);
+    } catch (err) {
+      logger.warn(
+        { err, id },
+        "[fire-dispatch] failed to persist dispatch audio clip",
+      );
+    }
+  }
   const incident: Incident = {
     id,
     source: "fire_dispatch",
@@ -716,6 +729,7 @@ async function saveAndNotify(
     expiresAt: new Date(now.getTime() + config.incidentTtlMs).toISOString(),
     provider: "london_fire_dispatch",
     unverifiedAddress,
+    audioUrl,
   };
   incidentStore.upsert(incident);
   fireRuntime.counts.posted += 1;
@@ -836,6 +850,7 @@ async function processWav(wav: Buffer): Promise<void> {
     transcript,
     priority,
     unverifiedAddress,
+    wav,
   );
 }
 

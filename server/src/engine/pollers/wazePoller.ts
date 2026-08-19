@@ -4,10 +4,12 @@ import { IncidentStore } from "../../store/incidentStore";
 import type { Incident, IncidentSeverity, IncidentSource } from "../../types/incident";
 import { distanceKm } from "../geo";
 import {
-  fetchWazeAlerts,
+  fetchLiveWazeProviders,
   GOOGLE_MAPS_DEDUP_RADIUS_KM,
   isBreakdown,
   isNotifiableCrash,
+  LIVE_WAZE_PROVIDERS,
+  type LiveWazeProvider,
   type ProviderSource,
   type WazeAlert,
 } from "../wazeAggregator";
@@ -73,7 +75,11 @@ export class WazeTrafficPoller {
       lat: config.londonLat,
       lng: config.londonLng,
       radiusKm: config.pollRadiusKm,
+      providers: LIVE_WAZE_PROVIDERS.filter(
+        (p) => (p === "blocksinside" && config.wazeApiKey) || (p === "cavsn" && config.rapidApiKey),
+      ),
       wazeApiConfigured: Boolean(config.wazeApiKey),
+      rapidApiConfigured: Boolean(config.rapidApiKey),
     });
     void this.poll();
     this.timer = setInterval(() => void this.poll(), config.pollIntervalMs);
@@ -88,8 +94,11 @@ export class WazeTrafficPoller {
   }
 
   async poll(): Promise<Incident[]> {
-    if (!config.wazeApiKey) {
-      logger.warn("Skipping live traffic poll; WAZEAPI_KEY is not configured");
+    const providers: LiveWazeProvider[] = [];
+    if (config.wazeApiKey) providers.push("blocksinside");
+    if (config.rapidApiKey) providers.push("cavsn");
+    if (providers.length === 0) {
+      logger.warn("Skipping live traffic poll; WAZEAPI_KEY and RAPIDAPI_KEY are both unset");
       return [];
     }
     if (this.inFlight) {
@@ -98,7 +107,12 @@ export class WazeTrafficPoller {
     }
     this.inFlight = true;
     try {
-      const alerts = await fetchWazeAlerts(config.londonLat, config.londonLng, config.pollRadiusKm);
+      const alerts = await fetchLiveWazeProviders(
+        config.londonLat,
+        config.londonLng,
+        config.pollRadiusKm,
+        providers,
+      );
       const ingested: Incident[] = [];
       for (const alert of alerts) {
         if (alert.provider === "google_maps" && this.hasNearbyCrash(alert)) {

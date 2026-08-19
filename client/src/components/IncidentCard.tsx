@@ -16,6 +16,21 @@ export function IncidentCard({ incident }: { incident: Incident }) {
         <h3 className="text-base font-semibold text-gray-900">{incident.title}</h3>
         <p className="mt-1 text-sm text-gray-600">{incident.description}</p>
         <p className="mt-2 font-mono text-[11px] text-gray-500">{incident.locationLabel}</p>
+        {incident.provider ? (
+          <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.14em] text-gray-400">
+            via {formatProvider(incident.provider)}
+          </p>
+        ) : null}
+        {incident.audioUrl ? (
+          <div className="mt-3">
+            <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.16em] text-orange-700">
+              Dispatch audio
+            </p>
+            <audio controls preload="none" className="h-8 w-full max-w-md">
+              <source src={incident.audioUrl} type="audio/wav" />
+            </audio>
+          </div>
+        ) : null}
       </div>
       <div className="font-mono text-[11px] text-gray-500 md:text-right">
         <p>{formatClock(incident.timestamp)}</p>
@@ -33,6 +48,15 @@ export function IncidentCard({ incident }: { incident: Incident }) {
       </div>
     </article>
   );
+}
+
+function formatProvider(provider: string): string {
+  const labels: Record<string, string> = {
+    blocksinside: "BlocksInside",
+    cavsn: "CAVSN",
+    london_fire_dispatch: "Fire dispatch",
+  };
+  return labels[provider] ?? provider;
 }
 
 function SourceBadge({ source }: { source: IncidentSource }) {

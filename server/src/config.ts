@@ -1,11 +1,27 @@
 import "dotenv/config";
 
+const PRODUCTION_PUBLIC_URL = "https://tow-notserver-production.up.railway.app";
+
 function resolveClientOrigin(): string {
   if (process.env.CLIENT_ORIGIN) return process.env.CLIENT_ORIGIN;
   if (process.env.RAILWAY_PUBLIC_DOMAIN) {
     return `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
   }
   return "http://localhost:5173";
+}
+
+/** Absolute origin for push deep-links — never localhost on mobile devices. */
+function resolvePublicUrl(): string {
+  const explicit = process.env.PUBLIC_URL?.trim();
+  if (explicit) return explicit.replace(/\/$/, "");
+  if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+    return `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
+  }
+  const client = process.env.CLIENT_ORIGIN?.trim();
+  if (client && !/localhost|127\.0\.0\.1/i.test(client)) {
+    return client.replace(/\/$/, "");
+  }
+  return PRODUCTION_PUBLIC_URL;
 }
 
 const progressierAppId = process.env.PROGRESSIER_APP_ID ?? "Bv9Rb1Vm5PkATyh6w0wG";
@@ -31,6 +47,7 @@ export const config = {
   port: resolvePort(),
   host: process.env.HOST?.trim() || "0.0.0.0",
   clientOrigin: resolveClientOrigin(),
+  publicUrl: resolvePublicUrl(),
   // BlocksInside (api.wazeapi.com) Waze poll. 10s cadence; ignore a leftover
   // 60s RapidAPI quota env so Railway deploys at 10s without a dashboard edit.
   // inFlight skip plus an 8s abort keep hung calls from stacking.

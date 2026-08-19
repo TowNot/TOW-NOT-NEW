@@ -21,6 +21,8 @@ export interface Incident {
   subtype?: string | null;
   provider?: string;
   unverifiedAddress?: boolean;
+  /** Fire-dispatch clip for manual address verification. */
+  audioUrl?: string;
   /** False for major hazards, which are mapped and listed but never pushed. */
   notified?: boolean;
 }

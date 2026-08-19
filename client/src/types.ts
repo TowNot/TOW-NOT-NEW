@@ -20,6 +20,7 @@ export interface Incident {
   subtype?: string | null;
   provider?: string;
   unverifiedAddress?: boolean;
+  audioUrl?: string;
   notified?: boolean;
 }
 

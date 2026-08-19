@@ -30,8 +30,24 @@ const SOURCE_LABELS: Record<Incident["source"], string> = {
 
 function absoluteUrl(pathOrUrl: string): string {
   if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
-  const origin = config.clientOrigin.replace(/\/$/, "");
+  const origin = config.publicUrl.replace(/\/$/, "");
   return `${origin}${pathOrUrl.startsWith("/") ? "" : "/"}${pathOrUrl}`;
+}
+
+const PROVIDER_LABELS: Record<string, string> = {
+  blocksinside: "BlocksInside",
+  cavsn: "CAVSN",
+  waze_direct: "Waze Direct",
+  openwebninja: "OpenWebNinja",
+  google_maps: "Google Maps",
+  london_fire_dispatch: "Fire dispatch",
+};
+
+function labelForIncident(incident: Incident): string {
+  if (incident.provider) {
+    return PROVIDER_LABELS[incident.provider] ?? incident.provider;
+  }
+  return SOURCE_LABELS[incident.source];
 }
 
 export function resolvePushDestination(payload: PushPayload): string {
@@ -54,12 +70,13 @@ export function buildProgressierPayload(payload: PushPayload): ProgressierPushRe
 }
 
 export function incidentToPushPayload(incident: Incident): PushPayload {
+  const providerLabel = labelForIncident(incident);
   return {
-    title: `AlertNav · ${incident.title}`,
-    body: `${incident.locationLabel} — ${SOURCE_LABELS[incident.source]}`,
+    title: `AlertNav · ${providerLabel} · ${incident.title}`,
+    body: `${incident.locationLabel} — caught by ${providerLabel}`,
     severity: incident.severity,
     incidentId: incident.id,
-    url: `${config.clientOrigin}/desk?incident=${encodeURIComponent(incident.id)}`,
+    url: `/desk?incident=${encodeURIComponent(incident.id)}`,
   };
 }
 
