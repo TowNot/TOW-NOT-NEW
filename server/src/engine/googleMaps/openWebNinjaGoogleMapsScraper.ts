@@ -16,6 +16,25 @@ export interface GoogleMapsCity {
   lat: number;
   lng: number;
   radiusKm: number;
+  /** Optional fixed box (preferred over radius for London coverage). */
+  box?: BoundingBox;
+}
+
+function parseCoordPair(raw: string): { lat: number; lng: number } | null {
+  const [latRaw, lngRaw] = raw.split(",").map((part) => part.trim());
+  const lat = Number(latRaw);
+  const lng = Number(lngRaw);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { lat, lng };
+}
+
+function londonCoverageBox(): BoundingBox {
+  const bottomLeft = parseCoordPair(config.wazeBottomLeft);
+  const topRight = parseCoordPair(config.wazeTopRight);
+  if (bottomLeft && topRight) {
+    return { bottomLeft, topRight };
+  }
+  return boundingBox(config.londonLat, config.londonLng, config.pollRadiusKm);
 }
 
 /** City registry — London, ON first; add more cities later without touching Waze/Fire. */
@@ -26,6 +45,7 @@ export const GOOGLE_MAPS_CITIES: GoogleMapsCity[] = [
     lat: config.londonLat,
     lng: config.londonLng,
     radiusKm: config.pollRadiusKm,
+    box: londonCoverageBox(),
   },
 ];
 
@@ -38,6 +58,7 @@ export interface OpenWebNinjaGoogleMapsRuntime {
   lastRawCount: number | null;
   lastDedupedCount: number | null;
   lastZoomsOk: number | null;
+  lastTypeCounts: Record<string, number> | null;
   city: string;
 }
 
@@ -50,6 +71,7 @@ const runtime: OpenWebNinjaGoogleMapsRuntime = {
   lastRawCount: null,
   lastDedupedCount: null,
   lastZoomsOk: null,
+  lastTypeCounts: null,
   city: "london_on",
 };
 
@@ -76,7 +98,7 @@ interface RawAlert {
   crossStreet?: unknown;
 }
 
-/** Explicit crash/collision types only — never construction, closures, or generic pins. */
+/** Explicit crash/collision types → notifiable ACCIDENT. */
 const ACCIDENT_TYPE_WHITELIST = new Set([
   "accident",
   "crash",
@@ -86,6 +108,56 @@ const ACCIDENT_TYPE_WHITELIST = new Set([
   "car_crash",
   "car crash",
 ]);
+
+/** Always drop — these are what caused Highbury-style noise. */
+const HARD_DROP_TYPES = new Set([
+  "construction",
+  "road_closed",
+  "roadclosed",
+  "road_closure",
+  "roadwork",
+  "maintenance",
+  "closure",
+]);
+
+/**
+ * OpenWebNinja types (per their docs):
+ * - accident → explicit crash
+ * - incident → generic when Google has not classified further (often a real crash)
+ * - construction / road_closed → never retain
+ *
+ * After Highbury we dropped `incident` entirely, which also hid real crashes
+ * Google still labels as generic "incident" (e.g. Commissioners / Rideout).
+ */
+function classify(rawType: string): {
+  type: string;
+  subtype: string | null;
+  title: string;
+  severity: IncidentSeverity;
+} | null {
+  const key = rawType.toLowerCase().trim();
+  if (!key || HARD_DROP_TYPES.has(key)) return null;
+
+  if (ACCIDENT_TYPE_WHITELIST.has(key)) {
+    return {
+      type: "ACCIDENT",
+      subtype: null,
+      title: "Traffic accident",
+      severity: "high",
+    };
+  }
+
+  if (key === "incident") {
+    return {
+      type: "ACCIDENT",
+      subtype: "GOOGLE_MAPS_INCIDENT",
+      title: "Traffic accident",
+      severity: "high",
+    };
+  }
+
+  return null;
+}
 
 function asNumber(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -115,31 +187,6 @@ function extractAlerts(payload: unknown): RawAlert[] {
   const data = (root["data"] ?? root) as Record<string, unknown>;
   const alerts = data["alerts"];
   return Array.isArray(alerts) ? (alerts as RawAlert[]) : [];
-}
-
-/**
- * Strict whitelist: ACCIDENT (notifiable) only for explicit crash/collision types.
- * construction / road_closed / incident / anything else → dropped.
- */
-function classify(rawType: string): {
-  type: string;
-  subtype: string | null;
-  title: string;
-  severity: IncidentSeverity;
-  retain: boolean;
-} | null {
-  const key = rawType.toLowerCase().trim();
-  if (ACCIDENT_TYPE_WHITELIST.has(key)) {
-    return {
-      type: "ACCIDENT",
-      subtype: null,
-      title: "Traffic accident",
-      severity: "high",
-      retain: true,
-    };
-  }
-  // Drop construction, road_closed, generic incident, hazards, unknowns.
-  return null;
 }
 
 /** Pull any street-like string OpenWebNinja may include beyond the OpenAPI schema. */
@@ -176,21 +223,20 @@ function formatLocationLabel(
   city: GoogleMapsCity,
   lat: number,
   lng: number,
-): { locationLabel: string; description: string; title: string } {
+  title: string,
+): { locationLabel: string; description: string } {
   const street = extractStreetLabel(raw);
   const coords = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
   if (street) {
     return {
       locationLabel: `${street}, ${city.name}`,
-      description: `Traffic accident reported on ${street}, ${city.name}.`,
-      title: "Traffic accident",
+      description: `${title} reported on ${street}, ${city.name}.`,
     };
   }
   // API schema has no street — never show "Unknown street".
   return {
     locationLabel: `${city.name} · ${coords}`,
-    description: `Traffic accident reported in ${city.name} near ${coords}.`,
-    title: "Traffic accident",
+    description: `${title} reported in ${city.name} near ${coords}.`,
   };
 }
 
@@ -219,7 +265,7 @@ function toIncident(
   if (!mapped) return null;
 
   const providerId = asString(raw.id) ?? asString(raw.alert_id);
-  const labels = formatLocationLabel(raw, city, lat, lng);
+  const labels = formatLocationLabel(raw, city, lat, lng, mapped.title);
 
   return {
     id: stableIncidentId({
@@ -231,7 +277,7 @@ function toIncident(
     source: "google_maps",
     type: mapped.type,
     subtype: mapped.subtype,
-    title: labels.title,
+    title: mapped.title,
     description: asString(raw.description) || labels.description,
     coordinates: { latitude: lat, longitude: lng },
     locationLabel: labels.locationLabel,
@@ -307,11 +353,12 @@ export async function fetchOpenWebNinjaGoogleMapsForCity(
     throw new Error("OPENWEBNINJA_API_KEY is not configured");
   }
 
-  const box = boundingBox(city.lat, city.lng, city.radiusKm);
+  const box = city.box ?? boundingBox(city.lat, city.lng, city.radiusKm);
   const started = Date.now();
   runtime.lastFetchAt = new Date().toISOString();
   runtime.city = city.id;
   runtime.lastError = null;
+  runtime.lastTypeCounts = null;
 
   const zoomLevels = Array.from(
     { length: ZOOM_MAX - ZOOM_MIN + 1 },
@@ -349,7 +396,10 @@ export async function fetchOpenWebNinjaGoogleMapsForCity(
   const now = new Date();
   const mapped: Incident[] = [];
   let dropped = 0;
+  const typeCounts: Record<string, number> = {};
   for (const raw of rawMerged) {
+    const rawType = (asString(raw.type) ?? "unknown").toLowerCase();
+    typeCounts[rawType] = (typeCounts[rawType] ?? 0) + 1;
     const incident = toIncident(raw, city, now);
     if (incident) mapped.push(incident);
     else dropped += 1;
@@ -358,6 +408,7 @@ export async function fetchOpenWebNinjaGoogleMapsForCity(
   const deduped = dedupeGoogleMapsIncidents(mapped);
   runtime.lastDedupedCount = deduped.length;
   runtime.lastSuccessAt = now.toISOString();
+  runtime.lastTypeCounts = typeCounts;
 
   logger.info("OpenWebNinja Google Maps poll complete", {
     city: city.id,
@@ -367,6 +418,7 @@ export async function fetchOpenWebNinjaGoogleMapsForCity(
     retainedAccidents: mapped.length,
     droppedNonAccidents: dropped,
     deduped: deduped.length,
+    typeCounts,
     latencyMs: runtime.lastLatencyMs,
   });
 
