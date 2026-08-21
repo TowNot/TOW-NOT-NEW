@@ -12,7 +12,7 @@ export function AuthControls() {
         <SignInButton mode="modal">
           <button
             type="button"
-            className="rounded-md border border-line bg-white px-3 py-2 font-mono text-[11px] uppercase tracking-widest text-gray-700 hover:bg-ink"
+            className="rounded-md border border-line bg-white px-3 py-2 text-xs font-semibold tracking-wide text-cobalt hover:bg-ink"
           >
             Sign in
           </button>
@@ -20,7 +20,7 @@ export function AuthControls() {
         <SignUpButton mode="modal">
           <button
             type="button"
-            className="rounded-md bg-gray-900 px-3 py-2 font-mono text-[11px] uppercase tracking-widest text-white hover:bg-black"
+            className="rounded-md bg-cobalt px-3 py-2 text-xs font-semibold tracking-wide text-white hover:brightness-110"
           >
             Sign up
           </button>

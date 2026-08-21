@@ -1,14 +1,16 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
-  --font-display: "Ultra", "Cooper Black", "Georgia", serif;
+  --font-sans: "League Spartan", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "League Spartan", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "League Spartan", ui-sans-serif, system-ui, sans-serif;
+  --color-cobalt: #004aad;
+  --color-sky: #38b6ff;
   --color-ink: #ffffff;
   --color-panel: #ffffff;
-  --color-line: #e5e7eb;
-  --color-waze: #0369a1;
-  --color-maps: #047857;
+  --color-line: #e8eef5;
+  --color-waze: #004aad;
+  --color-maps: #38b6ff;
   --color-fire: #c2410c;
 }
 
@@ -26,6 +28,7 @@ body,
 body {
   margin: 0;
   background: #ffffff;
-  color: #111827;
+  color: #1f2937;
   font-family: var(--font-sans);
+  font-optical-sizing: auto;
 }

@@ -14,7 +14,7 @@ export function Header({ connected, health }: HeaderProps) {
     <header className="border-b border-line bg-panel">
       <div className="mx-auto flex max-w-6xl flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-3">
-          <a href="/" className="font-display text-2xl leading-none text-gray-900 no-underline">
+          <a href="/" className="text-2xl font-bold tracking-tight text-cobalt no-underline">
             AlertNav
           </a>
           <div>
@@ -32,7 +32,7 @@ export function Header({ connected, health }: HeaderProps) {
           <StatusChip live label="Push Notifications: Active" />
           <a
             href={STRIPE_CHECKOUT_URL}
-            className="inline-flex items-center rounded-md bg-gray-900 px-3 py-2 font-mono text-[11px] uppercase tracking-widest text-white no-underline hover:bg-black"
+            className="inline-flex items-center rounded-md bg-sky px-3 py-2 text-[11px] font-semibold uppercase tracking-widest text-white no-underline hover:brightness-105"
           >
             Upgrade
           </a>
