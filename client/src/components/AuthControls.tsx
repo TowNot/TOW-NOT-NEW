@@ -1,7 +1,11 @@
 import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from "@clerk/clerk-react";
+import { isClerkConfigured } from "../lib/clerkKey";
 
 /** Sign-in / sign-up when logged out; profile menu when logged in. */
 export function AuthControls() {
+  // Avoid Clerk hooks/components when ClerkProvider is not mounted.
+  if (!isClerkConfigured()) return null;
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       <SignedOut>

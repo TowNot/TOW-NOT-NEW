@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { clerkMiddleware } from "@clerk/express";
 import cors from "cors";
@@ -116,10 +116,22 @@ export function applyClientAssets(app: express.Express): void {
   logger.info("Serving client assets", { clientDist });
 
   const indexFile = path.join(clientDist, "index.html");
+  const indexTemplate = readFileSync(indexFile, "utf8");
+
   const sendIndex = (_req: Request, res: Response, next: NextFunction): void => {
-    res.sendFile(indexFile, (error) => {
-      if (error) next(error);
-    });
+    try {
+      const key = config.clerkPublishableKey;
+      const inject =
+        key && /^pk_(test|live)_/.test(key)
+          ? `<script>window.__CLERK_PUBLISHABLE_KEY__=${JSON.stringify(key)};</script>`
+          : "";
+      const html = inject
+        ? indexTemplate.replace(/<head([^>]*)>/i, `<head$1>${inject}`)
+        : indexTemplate;
+      res.type("html").send(html);
+    } catch (error) {
+      next(error);
+    }
   };
 
   app.use(

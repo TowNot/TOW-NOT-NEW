@@ -17,4 +17,6 @@ interface ProgressierClient {
 
 interface Window {
   progressier?: ProgressierClient;
+  /** Injected by Express from CLERK_PUBLISHABLE_KEY when serving index.html. */
+  __CLERK_PUBLISHABLE_KEY__?: string;
 }
