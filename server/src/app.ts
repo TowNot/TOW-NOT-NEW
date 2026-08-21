@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { clerkMiddleware } from "@clerk/express";
 import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
 import helmet from "helmet";
@@ -7,6 +8,7 @@ import { ensureAudioDir, resolveAudioRoot } from "./audioStorage";
 import { config } from "./config";
 import type { PushDispatcher } from "./dispatch/pushDispatcher";
 import { logger } from "./logger";
+import { requireClerkAuth } from "./middleware/requireClerkAuth";
 import { createIncidentRouter } from "./routes/incidents";
 import { healthRouter } from "./routes/health";
 import { createPushRouter } from "./routes/push";
@@ -20,6 +22,21 @@ export function createApp(store: IncidentStore, dispatcher: PushDispatcher): exp
   const app = express();
 
   app.disable("x-powered-by");
+
+  // Clerk must run before other middleware so `getAuth()` / requireClerkAuth work.
+  app.use(
+    clerkMiddleware({
+      publishableKey: config.clerkPublishableKey || undefined,
+      secretKey: config.clerkSecretKey || undefined,
+      authorizedParties: [
+        config.publicUrl,
+        config.clientOrigin,
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+      ].filter((origin, index, list) => Boolean(origin) && list.indexOf(origin) === index),
+    }),
+  );
+
   app.use(
     helmet({
       contentSecurityPolicy: false,
@@ -32,10 +49,12 @@ export function createApp(store: IncidentStore, dispatcher: PushDispatcher): exp
     cors({
       origin: [config.clientOrigin, "http://127.0.0.1:5173"],
       methods: ["GET", "POST", "DELETE", "OPTIONS"],
+      credentials: true,
     }),
   );
 
   // Stripe needs the raw body for signature verification — mount before json().
+  // Webhook stays public (Stripe signs with its own secret).
   app.post(
     "/api/webhooks/stripe",
     express.raw({ type: "application/json" }),
@@ -58,13 +77,15 @@ export function createApp(store: IncidentStore, dispatcher: PushDispatcher): exp
     }),
   );
 
-  // Health + incident snapshot/SSE are mounted with no auth or Stripe gate.
+  // Health + incident snapshot/SSE stay public (EventSource cannot send Bearer tokens).
   app.use("/api", healthRouter);
   app.use("/api/incidents", createIncidentRouter(store));
-  app.use("/api/push", createPushRouter(dispatcher));
-  app.use("/api/sms", createSmsRouter());
   app.use("/api/sources", createSourcesRouter(store));
-  app.use("/api/subscriptions", createSubscriptionsRouter());
+
+  // Authenticated API surfaces
+  app.use("/api/push", requireClerkAuth, createPushRouter(dispatcher));
+  app.use("/api/sms", requireClerkAuth, createSmsRouter());
+  app.use("/api/subscriptions", requireClerkAuth, createSubscriptionsRouter());
 
   return app;
 }

@@ -74,6 +74,7 @@ export function createSourcesRouter(store: IncidentStore): Router {
         progressier: Boolean(config.progressierApiKey),
         twilio: Boolean(config.twilioAccountSid && config.twilioAuthToken),
         stripe: Boolean(config.stripeSecretKey && config.stripeWebhookSecret),
+        clerk: Boolean(config.clerkPublishableKey && config.clerkSecretKey),
       },
       subscriptions: subscriptionStoreStats(),
       liveWazeProvider: "blocksinside",

@@ -1,4 +1,5 @@
 import { resolveStripeCheckoutUrl } from "../lib/stripeCheckout";
+import { AuthControls } from "../components/AuthControls";
 
 const BENEFITS = [
   {
@@ -34,7 +35,7 @@ export function LandingPage() {
           <a href="/" className="font-display text-3xl leading-none text-gray-900 no-underline">
             AlertNav
           </a>
-          <nav className="flex items-center gap-6" aria-label="Primary">
+          <nav className="flex items-center gap-4 sm:gap-6" aria-label="Primary">
             <a href="#benefits" className="hidden text-sm font-medium text-gray-600 no-underline hover:text-gray-900 sm:inline">
               Why AlertNav
             </a>
@@ -44,6 +45,7 @@ export function LandingPage() {
             >
               Subscribe
             </a>
+            <AuthControls />
           </nav>
         </div>
       </header>

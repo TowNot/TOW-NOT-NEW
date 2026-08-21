@@ -1,9 +1,10 @@
 import type { NextFunction, Request, Response } from "express";
 
 /**
- * Live incident APIs used by `/desk` (snapshot + SSE) are public.
- * Stripe/auth middleware must not wrap these routes — EventSource cannot
- * attach an Authorization header, so a paywall here empties the feed.
+ * Live incident APIs used by `/desk` (snapshot + SSE) stay public.
+ * Clerk `clerkMiddleware()` still runs so cookies are parsed, but these
+ * routes are not gated with `requireClerkAuth` — EventSource cannot attach
+ * an Authorization header, and a hard gate would empty the feed.
  */
 export const LIVE_FEED_PATHS = ["/api/health", "/api/incidents", "/api/sources"] as const;
 

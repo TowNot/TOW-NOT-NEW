@@ -1,5 +1,6 @@
 import { resolveStripeCheckoutUrl } from "../lib/stripeCheckout";
 import type { HealthStatus } from "../types";
+import { AuthControls } from "./AuthControls";
 
 interface HeaderProps {
   connected: boolean;
@@ -35,6 +36,7 @@ export function Header({ connected, health }: HeaderProps) {
           >
             Upgrade
           </a>
+          <AuthControls />
         </nav>
       </div>
     </header>

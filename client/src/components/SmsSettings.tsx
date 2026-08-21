@@ -34,8 +34,13 @@ export function SmsSettings() {
     } catch {
       // Private browsing.
     }
-    void fetch("/api/sms/status")
+    void fetch("/api/sms/status", { credentials: "include" })
       .then(async (res) => {
+        if (res.status === 401) {
+          setConfigured(null);
+          setError("Sign in to manage SMS alerts");
+          return;
+        }
         const body = (await res.json()) as { configured?: boolean };
         setConfigured(Boolean(body.configured));
       })
@@ -60,10 +65,14 @@ export function SmsSettings() {
     try {
       const response = await fetch("/api/sms/opt-in", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone }),
       });
       const body = (await response.json()) as { phone?: string; error?: string; created?: boolean };
+      if (response.status === 401) {
+        throw new Error("Sign in to manage SMS alerts");
+      }
       if (!response.ok || !body.phone) {
         throw new Error(body.error ?? "Unable to save phone number");
       }
@@ -89,10 +98,14 @@ export function SmsSettings() {
     try {
       const response = await fetch("/api/sms/opt-in", {
         method: "DELETE",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: target }),
       });
       const body = (await response.json()) as { error?: string };
+      if (response.status === 401) {
+        throw new Error("Sign in to manage SMS alerts");
+      }
       if (!response.ok) {
         throw new Error(body.error ?? "Unable to remove phone number");
       }

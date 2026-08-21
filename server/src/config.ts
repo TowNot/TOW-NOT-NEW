@@ -112,4 +112,6 @@ export const config = {
   stripeCheckoutUrl:
     process.env.STRIPE_CHECKOUT_URL?.trim() ||
     "https://buy.stripe.com/5kQbJ0eL3ahB6ax6dc8Vi00",
+  clerkPublishableKey: process.env.CLERK_PUBLISHABLE_KEY?.trim() || "",
+  clerkSecretKey: process.env.CLERK_SECRET_KEY?.trim() || "",
 } as const;

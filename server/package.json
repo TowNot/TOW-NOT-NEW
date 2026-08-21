@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@clerk/express": "^2.1.61",
     "@deepgram/sdk": "^5.8.0",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
