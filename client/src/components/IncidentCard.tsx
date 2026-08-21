@@ -1,6 +1,10 @@
 import type { Incident, IncidentSeverity, IncidentSource } from "../types";
 
 export function IncidentCard({ incident }: { incident: Incident }) {
+  const { latitude: lat, longitude: lng } = incident.coordinates;
+  const wazeUrl = `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
+  const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+
   return (
     <article className="grid gap-3 rounded-lg border border-line bg-panel p-4 md:grid-cols-[9rem_1fr_auto]">
       <div className="flex items-start justify-between gap-3 md:block">
@@ -31,18 +35,15 @@ export function IncidentCard({ incident }: { incident: Incident }) {
             </audio>
           </div>
         ) : null}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <NavLink href={wazeUrl} label="Open in Waze" />
+          <NavLink href={googleMapsUrl} label="Open in Google Maps" />
+        </div>
       </div>
       <div className="font-mono text-[11px] text-gray-500 md:text-right">
         <p>{formatClock(incident.timestamp)}</p>
-        <p>
-          <a
-            href={`https://waze.com/ul?ll=${incident.coordinates.latitude},${incident.coordinates.longitude}&navigate=yes`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sky-700 underline decoration-sky-300 underline-offset-2 hover:text-sky-900"
-          >
-            {incident.coordinates.latitude.toFixed(4)}, {incident.coordinates.longitude.toFixed(4)}
-          </a>
+        <p className="mt-1">
+          {lat.toFixed(4)}, {lng.toFixed(4)}
         </p>
         <p className="mt-1 uppercase tracking-widest">{incident.type.replaceAll("_", " ")}</p>
       </div>
@@ -50,9 +51,23 @@ export function IncidentCard({ incident }: { incident: Incident }) {
   );
 }
 
+function NavLink({ href, label }: { href: string; label: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex rounded-md border border-line bg-white px-3 py-1.5 text-xs font-semibold text-gray-800 no-underline hover:border-gray-400 hover:bg-ink"
+    >
+      {label}
+    </a>
+  );
+}
+
 function formatProvider(provider: string): string {
   const labels: Record<string, string> = {
     blocksinside: "BlocksInside",
+    openwebninja_google_maps: "OpenWebNinja · Google Maps",
     london_fire_dispatch: "Fire dispatch",
   };
   return labels[provider] ?? provider;

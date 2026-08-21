@@ -66,8 +66,26 @@ interface RawAlert {
   id?: unknown;
   alert_id?: unknown;
   street?: unknown;
+  road?: unknown;
+  address?: unknown;
+  location?: unknown;
   description?: unknown;
+  title?: unknown;
+  name?: unknown;
+  cross_street?: unknown;
+  crossStreet?: unknown;
 }
+
+/** Explicit crash/collision types only — never construction, closures, or generic pins. */
+const ACCIDENT_TYPE_WHITELIST = new Set([
+  "accident",
+  "crash",
+  "collision",
+  "vehicle_collision",
+  "vehicle collision",
+  "car_crash",
+  "car crash",
+]);
 
 function asNumber(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -99,16 +117,19 @@ function extractAlerts(payload: unknown): RawAlert[] {
   return Array.isArray(alerts) ? (alerts as RawAlert[]) : [];
 }
 
-/** Map Google Maps types into our incident taxonomy (crash-focused). */
+/**
+ * Strict whitelist: ACCIDENT (notifiable) only for explicit crash/collision types.
+ * construction / road_closed / incident / anything else → dropped.
+ */
 function classify(rawType: string): {
   type: string;
   subtype: string | null;
   title: string;
   severity: IncidentSeverity;
   retain: boolean;
-} {
-  const key = rawType.toLowerCase();
-  if (key === "accident" || key === "crash" || key === "collision") {
+} | null {
+  const key = rawType.toLowerCase().trim();
+  if (ACCIDENT_TYPE_WHITELIST.has(key)) {
     return {
       type: "ACCIDENT",
       subtype: null,
@@ -117,23 +138,59 @@ function classify(rawType: string): {
       retain: true,
     };
   }
-  if (key === "incident") {
-    // Generic Google pin — keep on map, non-crash type so notifyGate stays quiet.
+  // Drop construction, road_closed, generic incident, hazards, unknowns.
+  return null;
+}
+
+/** Pull any street-like string OpenWebNinja may include beyond the OpenAPI schema. */
+function extractStreetLabel(raw: RawAlert): string | null {
+  const direct =
+    asString(raw.street) ||
+    asString(raw.road) ||
+    asString(raw.address) ||
+    asString(raw.cross_street) ||
+    asString(raw.crossStreet) ||
+    asString(raw.name) ||
+    asString(raw.title);
+  if (direct) return direct;
+
+  if (raw.location && typeof raw.location === "object") {
+    const loc = raw.location as Record<string, unknown>;
+    const nested =
+      asString(loc["street"]) ||
+      asString(loc["road"]) ||
+      asString(loc["address"]) ||
+      asString(loc["name"]) ||
+      asString(loc["label"]);
+    if (nested) return nested;
+  }
+
+  const description = asString(raw.description);
+  if (description && !/^incident$/i.test(description)) return description;
+
+  return null;
+}
+
+function formatLocationLabel(
+  raw: RawAlert,
+  city: GoogleMapsCity,
+  lat: number,
+  lng: number,
+): { locationLabel: string; description: string; title: string } {
+  const street = extractStreetLabel(raw);
+  const coords = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  if (street) {
     return {
-      type: "OTHER",
-      subtype: "GOOGLE_MAPS_GENERIC_INCIDENT",
-      title: "Traffic incident",
-      severity: "medium",
-      retain: true,
+      locationLabel: `${street}, ${city.name}`,
+      description: `Traffic accident reported on ${street}, ${city.name}.`,
+      title: "Traffic accident",
     };
   }
-  // Construction / closures are noisy for tow ops — drop here.
+  // API schema has no street — never show "Unknown street".
   return {
-    type: "OTHER",
-    subtype: key.toUpperCase(),
-    title: rawType || "Traffic update",
-    severity: "low",
-    retain: false,
+    locationLabel: `${city.name} · ${coords}`,
+    description: `Traffic accident reported in ${city.name} near ${coords}.`,
+    title: "Traffic accident",
   };
 }
 
@@ -157,14 +214,12 @@ function toIncident(
   const lng = asNumber(raw.longitude) ?? asNumber(raw.lng);
   if (lat == null || lng == null) return null;
 
-  const rawType = asString(raw.type) ?? "incident";
+  const rawType = asString(raw.type) ?? "";
   const mapped = classify(rawType);
-  if (!mapped.retain) return null;
+  if (!mapped) return null;
 
   const providerId = asString(raw.id) ?? asString(raw.alert_id);
-  const street = asString(raw.street) || "Unknown street";
-  const description =
-    asString(raw.description) || `${mapped.title} reported near ${street}, ${city.name}.`;
+  const labels = formatLocationLabel(raw, city, lat, lng);
 
   return {
     id: stableIncidentId({
@@ -176,10 +231,10 @@ function toIncident(
     source: "google_maps",
     type: mapped.type,
     subtype: mapped.subtype,
-    title: mapped.title,
-    description,
+    title: labels.title,
+    description: asString(raw.description) || labels.description,
     coordinates: { latitude: lat, longitude: lng },
-    locationLabel: `${street}, ${city.name}`,
+    locationLabel: labels.locationLabel,
     severity: mapped.severity,
     timestamp: now.toISOString(),
     expiresAt: new Date(now.getTime() + config.incidentTtlMs).toISOString(),
@@ -293,9 +348,11 @@ export async function fetchOpenWebNinjaGoogleMapsForCity(
 
   const now = new Date();
   const mapped: Incident[] = [];
+  let dropped = 0;
   for (const raw of rawMerged) {
     const incident = toIncident(raw, city, now);
     if (incident) mapped.push(incident);
+    else dropped += 1;
   }
 
   const deduped = dedupeGoogleMapsIncidents(mapped);
@@ -307,7 +364,8 @@ export async function fetchOpenWebNinjaGoogleMapsForCity(
     zoomsOk,
     zoomsTotal: zoomLevels.length,
     raw: rawMerged.length,
-    retained: mapped.length,
+    retainedAccidents: mapped.length,
+    droppedNonAccidents: dropped,
     deduped: deduped.length,
     latencyMs: runtime.lastLatencyMs,
   });
