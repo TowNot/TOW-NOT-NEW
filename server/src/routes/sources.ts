@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { config } from "../config";
 import { getProviderRuntimeStats } from "../engine/wazeAggregator";
+import { getOpenWebNinjaGoogleMapsRuntime } from "../engine/googleMaps/openWebNinjaGoogleMapsScraper";
 import { getFireDispatchRuntime } from "../engine/workers/londonFireListener";
 import type { IncidentStore } from "../store/incidentStore";
 import { subscriptionStoreStats } from "../store/subscriptionStore";
@@ -75,6 +76,13 @@ export function createSourcesRouter(store: IncidentStore): Router {
         twilio: Boolean(config.twilioAccountSid && config.twilioAuthToken),
         stripe: Boolean(config.stripeSecretKey && config.stripeWebhookSecret),
         clerk: Boolean(config.clerkPublishableKey && config.clerkSecretKey),
+        openWebNinja: Boolean(config.openWebNinjaApiKey),
+      },
+      googleMapsOpenWebNinja: {
+        ...getOpenWebNinjaGoogleMapsRuntime(),
+        intervalMs: config.googleMapsPollIntervalMs,
+        zooms: "11-16",
+        endpoint: "https://api.openwebninja.com/google-maps-traffic-alerts/traffic-alerts",
       },
       subscriptions: subscriptionStoreStats(),
       liveWazeProvider: "blocksinside",

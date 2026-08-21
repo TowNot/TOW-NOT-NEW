@@ -39,6 +39,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   blocksinside: "BlocksInside",
   waze_direct: "Waze Direct",
   openwebninja: "OpenWebNinja",
+  openwebninja_google_maps: "Google Maps",
   google_maps: "Google Maps",
   london_fire_dispatch: "Fire dispatch",
 };

@@ -30,7 +30,8 @@ export class DataAggregatorEngine {
     this.waze.start();
     logger.info("[FIRE SCANNER] starting London Fire listener");
     this.radio.start();
-    logger.info("Data aggregator engine running (BlocksInside + fire dispatch)");
+    this.googleMaps.start();
+    logger.info("Data aggregator engine running (BlocksInside + fire dispatch + OpenWebNinja Google Maps)");
   }
 
   stop(): void {
