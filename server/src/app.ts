@@ -12,6 +12,8 @@ import { healthRouter } from "./routes/health";
 import { createPushRouter } from "./routes/push";
 import { createSmsRouter } from "./routes/sms";
 import { createSourcesRouter } from "./routes/sources";
+import { createSubscriptionsRouter } from "./routes/subscriptions";
+import { stripeWebhookHandler } from "./routes/stripeWebhook";
 import type { IncidentStore } from "./store/incidentStore";
 
 export function createApp(store: IncidentStore, dispatcher: PushDispatcher): express.Express {
@@ -32,6 +34,16 @@ export function createApp(store: IncidentStore, dispatcher: PushDispatcher): exp
       methods: ["GET", "POST", "DELETE", "OPTIONS"],
     }),
   );
+
+  // Stripe needs the raw body for signature verification — mount before json().
+  app.post(
+    "/api/webhooks/stripe",
+    express.raw({ type: "application/json" }),
+    (req, res, next) => {
+      void stripeWebhookHandler(req, res).catch(next);
+    },
+  );
+
   app.use(express.json({ limit: "1mb" }));
 
   ensureAudioDir();
@@ -52,6 +64,7 @@ export function createApp(store: IncidentStore, dispatcher: PushDispatcher): exp
   app.use("/api/push", createPushRouter(dispatcher));
   app.use("/api/sms", createSmsRouter());
   app.use("/api/sources", createSourcesRouter(store));
+  app.use("/api/subscriptions", createSubscriptionsRouter());
 
   return app;
 }

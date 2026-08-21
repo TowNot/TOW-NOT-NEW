@@ -1,9 +1,12 @@
+import { resolveStripeCheckoutUrl } from "../lib/stripeCheckout";
 import type { HealthStatus } from "../types";
 
 interface HeaderProps {
   connected: boolean;
   health: HealthStatus | null;
 }
+
+const STRIPE_CHECKOUT_URL = resolveStripeCheckoutUrl();
 
 export function Header({ connected, health }: HeaderProps) {
   return (
@@ -26,6 +29,12 @@ export function Header({ connected, health }: HeaderProps) {
             label={connected ? "feed live" : "feed offline"}
           />
           <StatusChip live label="Push Notifications: Active" />
+          <a
+            href={STRIPE_CHECKOUT_URL}
+            className="inline-flex items-center rounded-md bg-gray-900 px-3 py-2 font-mono text-[11px] uppercase tracking-widest text-white no-underline hover:bg-black"
+          >
+            Upgrade
+          </a>
         </nav>
       </div>
     </header>

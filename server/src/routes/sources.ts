@@ -3,6 +3,7 @@ import { config } from "../config";
 import { getProviderRuntimeStats } from "../engine/wazeAggregator";
 import { getFireDispatchRuntime } from "../engine/workers/londonFireListener";
 import type { IncidentStore } from "../store/incidentStore";
+import { subscriptionStoreStats } from "../store/subscriptionStore";
 import type { IncidentSource } from "../types/incident";
 
 export function createSourcesRouter(store: IncidentStore): Router {
@@ -72,7 +73,9 @@ export function createSourcesRouter(store: IncidentStore): Router {
         deepgram: Boolean(config.deepgramApiKey),
         progressier: Boolean(config.progressierApiKey),
         twilio: Boolean(config.twilioAccountSid && config.twilioAuthToken),
+        stripe: Boolean(config.stripeSecretKey && config.stripeWebhookSecret),
       },
+      subscriptions: subscriptionStoreStats(),
       liveWazeProvider: "blocksinside",
       push: {
         endpoint: config.progressierPushUrl,

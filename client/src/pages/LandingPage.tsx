@@ -1,3 +1,5 @@
+import { resolveStripeCheckoutUrl } from "../lib/stripeCheckout";
+
 const BENEFITS = [
   {
     index: "01",
@@ -22,6 +24,8 @@ const TRUST = [
   { value: "London, ON", label: "Coverage area" },
 ] as const;
 
+const STRIPE_CHECKOUT_URL = resolveStripeCheckoutUrl();
+
 export function LandingPage() {
   return (
     <div className="min-h-screen bg-white text-gray-900">
@@ -35,10 +39,10 @@ export function LandingPage() {
               Why AlertNav
             </a>
             <a
-              href="/desk"
+              href={STRIPE_CHECKOUT_URL}
               className="rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white no-underline hover:bg-black"
             >
-              Get Instant Access
+              Subscribe
             </a>
           </nav>
         </div>
@@ -58,12 +62,17 @@ export function LandingPage() {
           </p>
           <div className="mt-10 flex flex-wrap items-center gap-4">
             <a
-              href="/desk"
+              href={STRIPE_CHECKOUT_URL}
               className="inline-flex rounded-md bg-gray-900 px-6 py-3 text-base font-semibold text-white no-underline hover:bg-black"
             >
-              Get Instant Access
+              Subscribe
             </a>
-            <p className="text-sm text-gray-500">No payment required for this preview.</p>
+            <a
+              href="/desk"
+              className="inline-flex rounded-md border border-line bg-white px-6 py-3 text-base font-semibold text-gray-900 no-underline hover:bg-ink"
+            >
+              Open live desk
+            </a>
           </div>
         </section>
 
@@ -112,10 +121,10 @@ export function LandingPage() {
               </footer>
             </blockquote>
             <a
-              href="/desk"
+              href={STRIPE_CHECKOUT_URL}
               className="mt-8 inline-flex rounded-md bg-gray-900 px-6 py-3 text-base font-semibold text-white no-underline hover:bg-black md:mt-0"
             >
-              Get Instant Access
+              Upgrade
             </a>
           </div>
         </section>

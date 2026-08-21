@@ -107,4 +107,9 @@ export const config = {
   twilioAccountSid: process.env.TWILIO_ACCOUNT_SID?.trim() || "",
   twilioAuthToken: process.env.TWILIO_AUTH_TOKEN?.trim() || "",
   twilioFromNumber: process.env.TWILIO_FROM_NUMBER?.trim() || "+12494025882",
+  stripeSecretKey: process.env.STRIPE_SECRET_KEY?.trim() || "",
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET?.trim() || "",
+  stripeCheckoutUrl:
+    process.env.STRIPE_CHECKOUT_URL?.trim() ||
+    "https://buy.stripe.com/5kQbJ0eL3ahB6ax6dc8Vi00",
 } as const;

@@ -19,3 +19,4 @@ temp
 server/dist/public/audio
 public/audio
 data/sms-subscribers.json
+data/subscriptions.json
