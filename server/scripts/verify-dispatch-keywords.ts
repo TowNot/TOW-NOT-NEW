@@ -100,6 +100,89 @@ const checks: Array<[string, () => void]> = [
       assert.ok(findCrashKeywords("MVC Oxford and Highbury, person extricated").includes("MVC"));
     },
   ],
+  [
+    "blacklist drops lift assist, wellness, CO, and automatic alarm",
+    () => {
+      assert.deepEqual(
+        findCrashKeywords("Engine 4, lift assist, MVC reported Oxford Street"),
+        [],
+      );
+      assert.deepEqual(
+        findCrashKeywords("Engine 2, wellness check, accident on Wellington"),
+        [],
+      );
+      assert.deepEqual(
+        findCrashKeywords("Engine 5, carbon monoxide alarm, accident reported"),
+        [],
+      );
+      assert.deepEqual(findCrashKeywords("Engine 3, CO alarm, collision reported"), []);
+      assert.deepEqual(
+        findCrashKeywords("Engine 1, automatic alarm, accident at Dundas"),
+        [],
+      );
+      assert.ok(findNegativeKeywords("lift assist requested").includes("lift assist"));
+      assert.ok(findNegativeKeywords("wellness check on scene").includes("wellness check"));
+    },
+  ],
+  [
+    "pedestrian, ditch, guardrail, jackknife, and pinning phrases post",
+    () => {
+      assert.ok(findCrashKeywords("pedestrian struck on Oxford").includes("pedestrian struck"));
+      assert.ok(findCrashKeywords("ped struck at Highbury").includes("pedestrian struck"));
+      assert.ok(findCrashKeywords("vs pedestrian Wonderland").includes("pedestrian struck"));
+      assert.ok(findCrashKeywords("patient ejected on the 401").includes("ejected"));
+      assert.ok(findCrashKeywords("vehicle overturned on Wellington").includes("overturned"));
+      assert.ok(findCrashKeywords("tractor jackknifed on highway").includes("jackknife"));
+      assert.ok(findCrashKeywords("into the ditch on Oxford").includes("in the ditch"));
+      assert.ok(findCrashKeywords("hit the guardrail on the 401").includes("guardrail"));
+      assert.ok(findCrashKeywords("struck a building on Dundas").includes("struck building"));
+      assert.ok(findCrashKeywords("pinned in the vehicle at Oxford").includes("vehicle pinning"));
+      assert.ok(findCrashKeywords("car is pinning at the intersection").includes("vehicle pinning"));
+    },
+  ],
+  [
+    "entrapment, VSBR, spills, cyclist, STT misreads, and blocking lanes post",
+    () => {
+      assert.ok(findCrashKeywords("patient entrapment on Oxford").includes("entrapment"));
+      assert.ok(findCrashKeywords("VSBR at Wellington and Baseline").includes("VSBR"));
+      assert.ok(
+        findCrashKeywords("vehicle into structure on Dundas").includes("vehicle into structure"),
+      );
+      assert.ok(findCrashKeywords("fuel spill on the 401").includes("fuel spill"));
+      assert.ok(findCrashKeywords("fluid spill blocking Oxford").includes("fluid spill"));
+      assert.ok(findCrashKeywords("cyclist struck on Wonderland").includes("cyclist struck"));
+      assert.ok(findCrashKeywords("bicyclist struck at Richmond").includes("cyclist struck"));
+      assert.ok(findCrashKeywords("empty seat at Oxford and Highbury").includes("MVC"));
+      assert.ok(findCrashKeywords("empty vee on Wellington").includes("MVA"));
+      assert.ok(
+        findCrashKeywords("MVC Oxford, vehicle blocking two lanes").includes("blocking lanes"),
+      );
+      assert.deepEqual(findCrashKeywords("blocking two lanes, standby"), []);
+    },
+  ],
+  [
+    "extended blacklist drops smoke investigation, lift, and medical calls",
+    () => {
+      assert.deepEqual(
+        findCrashKeywords("Engine 3, smoke investigation, accident reported"),
+        [],
+      );
+      assert.deepEqual(
+        findCrashKeywords("Engine 5, odour of smoke, collision on Oxford"),
+        [],
+      );
+      assert.deepEqual(findCrashKeywords("Engine 2, lift, MVC reported"), []);
+      assert.deepEqual(findCrashKeywords("Engine 7, medical call, accident on Dundas"), []);
+      assert.deepEqual(
+        findCrashKeywords("Engine 4, automatic fire alarm, collision reported"),
+        [],
+      );
+      assert.deepEqual(
+        findCrashKeywords("Engine 5, person entrapment in the elevator, Main Street"),
+        [],
+      );
+    },
+  ],
 ];
 
 let failures = 0;

@@ -22,6 +22,18 @@ export const negativeKeywords = [
   "medical assist",
   "medical assistance",
   "alarm",
+  "lift assist",
+  "wellness check",
+  "carbon monoxide",
+  "CO alarm",
+  "automatic alarm",
+  "automatic fire alarm",
+  "smoke investigation",
+  "odour of smoke",
+  "odor of smoke",
+  "lift",
+  "medical call",
+  "medical emergency",
 ];
 
 function keywordBoundaryRe(keyword: string): RegExp {
@@ -46,6 +58,8 @@ const CRASH_PATTERNS: { label: string; re: RegExp }[] = [
   { label: "MVA", re: /\bM\.?\s?V\.?\s?A\.?\b/i },
   { label: "MVC", re: /\bNBC\b/i }, // static/STT misread of "MVC"
   { label: "MVC", re: /\bN\.?\s?V\.?\s?C\.?\b/i }, // static/STT misread of "MVC"
+  { label: "MVC", re: /\bempty\s+seat\b/i }, // STT misread of "MVC"
+  { label: "MVA", re: /\bempty\s+vee\b/i }, // STT misread of "MVA"
   { label: "collision", re: /\bcollisions?\b/i },
   { label: "vehicle collision", re: /\b(?:vehicle|motor\s+vehicle)\s+collisions?\b/i },
   { label: "motor vehicle", re: /\bmotor\s+vehicles?\b/i },
@@ -81,10 +95,45 @@ const CRASH_PATTERNS: { label: string; re: RegExp }[] = [
     re: /\b(?:wires?|lines?)\s+across\s+(?:the\s+)?(?:street|road|roadway|lanes?)\b/i,
   },
   { label: "tractor trailer", re: /\btractor[\s-]?trailers?\b/i },
+  // Pedestrian, highway, and entrapment phrasing common on London traffic calls.
+  { label: "pedestrian struck", re: /\b(?:ped(?:estrian)?|pedestrian)\s+struck\b/i },
+  { label: "pedestrian struck", re: /\b(?:struck|hit)\s+(?:a\s+)?ped(?:estrian)?\b/i },
+  { label: "pedestrian struck", re: /\bvs\.?\s+ped(?:estrian)?\b/i },
+  { label: "ejected", re: /\bejected\b/i },
+  { label: "overturned", re: /\boverturn(?:ed|s)?\b/i },
+  { label: "jackknife", re: /\bjack[\s-]?knif(?:ed|e|ing)\b/i },
+  { label: "in the ditch", re: /\b(?:in|into)\s+(?:the\s+)?ditch\b/i },
+  { label: "guardrail", re: /\bguard[\s-]?rails?\b/i },
+  {
+    label: "struck building",
+    re: /\b(?:hit|struck|ran\s+into|into)\s+(?:the\s+|a\s+)?building\b/i,
+  },
+  {
+    label: "vehicle pinning",
+    re: /\b(?:pinn?(?:ed|ing)|pinning)\s+(?:in\s+)?(?:the\s+)?(?:vehicle|car|truck|auto)\b/i,
+  },
+  {
+    label: "vehicle pinning",
+    re: /\b(?:vehicle|car|truck|auto)s?\s+(?:is\s+)?pinn?(?:ed|ing)\b/i,
+  },
+  { label: "entrapment", re: /\bentrapments?\b/i },
+  { label: "VSBR", re: /\bVSBR\b/i },
+  {
+    label: "vehicle into structure",
+    re: /\bvehicle\s+into\s+(?:a\s+)?structure\b/i,
+  },
+  { label: "fuel spill", re: /\bfuel\s+spills?\b/i },
+  { label: "fluid spill", re: /\bfluid\s+spills?\b/i },
+  { label: "cyclist struck", re: /\b(?:bicyclist|cyclist|bike)\s+struck\b/i },
+  { label: "cyclist struck", re: /\b(?:struck|hit)\s+(?:a\s+)?(?:bicyclist|cyclist|bike)\b/i },
 ];
 
 const CODE4_RE = /\bcode\s*(?:4|four)\b/i;
 const CODE3_RE = /\bcode\s*(?:3|three)\b/i;
+const BLOCKING_LANES_RE =
+  /\b(?:blocking|blocked)\s+(?:the\s+)?(?:(?:\d+|one|two|three|four|five)\s+)?lanes?\b/i;
+const VEHICLE_CONTEXT_RE =
+  /\b(?:vehicle|car|truck|trailer|semi|MVC|MVA|accident|collision|motor\s+vehicle)s?\b/i;
 
 export function findCrashKeywords(transcript: string): string[] {
   if (findNegativeKeywords(transcript).length > 0) return [];
@@ -101,6 +150,13 @@ export function findCrashKeywords(transcript: string): string[] {
     !hits.includes("code 4 vehicle")
   ) {
     hits.push("code 4 vehicle");
+  }
+  if (
+    BLOCKING_LANES_RE.test(transcript) &&
+    VEHICLE_CONTEXT_RE.test(transcript) &&
+    !hits.includes("blocking lanes")
+  ) {
+    hits.push("blocking lanes");
   }
   // The multi-vehicle count pattern alone ("two vehicles on scene") is too
   // weak to declare a crash — require at least one substantive crash term.
