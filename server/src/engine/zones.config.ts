@@ -2,6 +2,23 @@
 export const ZONE_LAT_HALF = 0.09;
 export const ZONE_LNG_HALF = 0.123;
 
+export interface ZoneStreamAudioSource {
+  enabled: boolean;
+  type: "stream";
+  url: string;
+  description: string;
+}
+
+export interface ZoneCallsAudioSource {
+  enabled: boolean;
+  type: "calls";
+  nodeId: number;
+  talkgroups?: number[];
+  description: string;
+}
+
+export type ZoneAudioSource = ZoneStreamAudioSource | ZoneCallsAudioSource;
+
 export interface CoverageZoneDef {
   id: string;
   name: string;
@@ -10,11 +27,7 @@ export interface CoverageZoneDef {
     southWest: { lat: number; lng: number };
     northEast: { lat: number; lng: number };
   };
-  audio: {
-    enabled: boolean;
-    url: string;
-    description: string;
-  };
+  audioSources: ZoneAudioSource[];
 }
 
 interface ZoneSeed {
@@ -22,7 +35,7 @@ interface ZoneSeed {
   name: string;
   center: { lat: number; lng: number };
   enabled?: boolean;
-  audio?: CoverageZoneDef["audio"];
+  audioSources?: ZoneAudioSource[];
 }
 
 function boundsFromCenter(center: { lat: number; lng: number }): CoverageZoneDef["bounds"] {
@@ -39,18 +52,21 @@ function boundsFromCenter(center: { lat: number; lng: number }): CoverageZoneDef
 }
 
 function buildZone(seed: ZoneSeed): CoverageZoneDef {
-  const enabled = seed.enabled === true;
   return {
     id: seed.id,
     name: seed.name,
-    enabled,
+    enabled: seed.enabled === true,
     bounds: boundsFromCenter(seed.center),
-    audio: seed.audio ?? {
-      enabled: false,
-      url: "",
-      description: `${seed.name} Fire`,
-    },
+    audioSources: seed.audioSources ?? [],
   };
+}
+
+function streamSource(
+  description: string,
+  url: string,
+  enabled: boolean,
+): ZoneStreamAudioSource {
+  return { enabled, type: "stream", url, description };
 }
 
 /** Southern Ontario expansion list — enable zones individually for Waze + audio. */
@@ -60,88 +76,96 @@ const ZONE_SEEDS: ZoneSeed[] = [
     name: "London",
     center: { lat: 42.9849, lng: -81.2453 },
     enabled: true,
-    audio: {
-      enabled: true,
-      url: "https://broadcastify.cdnstream1.com/34296",
-      description: "London Fire and Public Works",
-    },
+    audioSources: [
+      {
+        enabled: true,
+        type: "stream",
+        url: "https://broadcastify.cdnstream1.com/34296",
+        description: "London Stream",
+      },
+      {
+        enabled: true,
+        type: "calls",
+        nodeId: 6294,
+        talkgroups: [432, 433],
+        description: "London Calls",
+      },
+    ],
   },
   {
     id: "woodstock",
     name: "Woodstock",
     center: { lat: 43.1306, lng: -80.7467 },
     enabled: true,
-    audio: {
-      enabled: false,
-      url: "",
-      description: "Oxford County Fire (Calls Node)",
-    },
+    audioSources: [
+      streamSource("Oxford County Fire (Calls Node)", "", false),
+    ],
   },
   {
     id: "kitchener",
     name: "Kitchener / Waterloo",
     center: { lat: 43.4587, lng: -80.5129 },
     enabled: true,
-    audio: {
-      enabled: true,
-      url: "http://cykf.net:8000/scanner",
-      description: "Waterloo Region Fire (CYKF Feed)",
-    },
+    audioSources: [
+      streamSource(
+        "Waterloo Region Fire (CYKF Feed)",
+        "http://cykf.net:8000/scanner",
+        true,
+      ),
+    ],
   },
   {
     id: "guelph",
     name: "Guelph",
     center: { lat: 43.5448, lng: -80.2482 },
     enabled: false,
-    audio: {
-      enabled: false,
-      url: "",
-      description: "Guelph Fire (Encrypted)",
-    },
+    audioSources: [streamSource("Guelph Fire (Encrypted)", "", false)],
   },
   {
     id: "cambridge",
     name: "Cambridge",
     center: { lat: 43.3972, lng: -80.3114 },
     enabled: true,
-    audio: {
-      enabled: true,
-      url: "http://cykf.net:8000/scanner",
-      description: "Waterloo Region Fire (CYKF Feed)",
-    },
+    audioSources: [
+      streamSource(
+        "Waterloo Region Fire (CYKF Feed)",
+        "http://cykf.net:8000/scanner",
+        true,
+      ),
+    ],
   },
   {
     id: "milton",
     name: "Milton",
     center: { lat: 43.5167, lng: -79.8833 },
     enabled: true,
-    audio: {
-      enabled: true,
-      url: "https://broadcastify.cdnstream1.com/43263",
-      description: "Halton Hills / Milton Fire Department",
-    },
+    audioSources: [
+      streamSource(
+        "Halton Hills / Milton Fire Department",
+        "https://broadcastify.cdnstream1.com/43263",
+        true,
+      ),
+    ],
   },
   {
     id: "haltonHills",
     name: "Halton Hills",
     center: { lat: 43.6475, lng: -79.9197 },
     enabled: true,
-    audio: {
-      enabled: true,
-      url: "https://broadcastify.cdnstream1.com/43263",
-      description: "Halton Hills / Milton Fire Department",
-    },
+    audioSources: [
+      streamSource(
+        "Halton Hills / Milton Fire Department",
+        "https://broadcastify.cdnstream1.com/43263",
+        true,
+      ),
+    ],
   },
   {
     id: "mississauga",
     name: "Mississauga",
     center: { lat: 43.589, lng: -79.6441 },
     enabled: true,
-    audio: {
-      enabled: false,
-      url: "",
-      description: "Peel Region Fire",
-    },
+    audioSources: [streamSource("Peel Region Fire", "", false)],
   },
   { id: "torontoCore", name: "Toronto (Core)", center: { lat: 43.6532, lng: -79.3832 } },
   { id: "etobicoke", name: "Etobicoke", center: { lat: 43.6205, lng: -79.5132 } },

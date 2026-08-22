@@ -34,7 +34,7 @@ export class DataAggregatorEngine {
       logger.warn("Twilio credentials unset — SMS alerts will not send until configured");
     }
     this.waze.start();
-    logger.info("[FIRE SCANNER] starting London Fire listener");
+    logger.info("[FIRE SCANNER] starting zone audio orchestrator (stream + calls sources)");
     this.radio.start();
     this.googleMaps.start();
     logger.info("Data aggregator engine running (BlocksInside + fire dispatch + OpenWebNinja Google Maps)");
