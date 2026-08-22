@@ -1,9 +1,5 @@
 import { config } from "./config";
-import {
-  zoneIdForCoordinates,
-  zonePushTag,
-  ZONE_ALL_PUSH_TAG,
-} from "./engine/coverageZones";
+import { zoneIdForCoordinates, zonePushTag } from "./engine/coverageZones";
 import { logger } from "./logger";
 import type { Incident, PushPayload } from "./types/incident";
 
@@ -12,10 +8,8 @@ const TITLE_MAX = 50;
 const BODY_MAX = 100;
 
 /**
- * Broadcast to every Progressier-subscribed device. Tag targeting
- * (`{ tags: "tow-not" }`) returns HTTP 200 with a yellow check when no
- * device has that tag — the API "succeeds" and nothing is delivered.
- * Prefer zone tags for live incident pushes.
+ * Broadcast to every Progressier-subscribed device. Used only for test /
+ * unscoped admin pushes. Live incidents always target a single city tag.
  */
 export const PROGRESSIER_RECIPIENTS = { users: "all" } as const;
 
@@ -62,9 +56,9 @@ export function resolvePushDestination(payload: PushPayload): string {
   return absoluteUrl("/desk");
 }
 
-/** Recipients for a zone-scoped incident: current-city subscribers + all-cities. */
-export function recipientsForIncidentZone(zoneId: string): Record<string, string>[] {
-  return [{ tags: zonePushTag(zoneId) }, { tags: ZONE_ALL_PUSH_TAG }];
+/** Single-city recipients — only devices tagged for this zone. */
+export function recipientsForIncidentZone(zoneId: string): Record<string, string> {
+  return { tags: zonePushTag(zoneId) };
 }
 
 export function buildProgressierPayload(
@@ -160,8 +154,8 @@ async function postProgressier(
 }
 
 /**
- * Zone-aware Progressier send. Live incidents target `zone-<id>` (Only Current City)
- * and `zone-all` (All Enabled Cities). Test / unscoped payloads still broadcast to all.
+ * Strict single-city Progressier send. Live incidents target only `zone-<id>`.
+ * Incidents outside known boxes are skipped. Test pushes still broadcast.
  */
 export async function sendProgressierPush(payload: PushPayload): Promise<void> {
   const apiKey = (process.env.PROGRESSIER_API_KEY ?? config.progressierApiKey).trim();
@@ -169,36 +163,19 @@ export async function sendProgressierPush(payload: PushPayload): Promise<void> {
     throw new Error("PROGRESSIER_API_KEY is not configured");
   }
 
-  const recipientSets = (() => {
-    const zoneId = payload.zoneId?.trim();
-    if (zoneId) return recipientsForIncidentZone(zoneId);
-    // Live incident outside known boxes: only "All Enabled Cities" subscribers.
-    if (payload.incidentId) return [{ tags: ZONE_ALL_PUSH_TAG }];
-    // Test / unscoped admin pushes still broadcast.
-    return [{ ...PROGRESSIER_RECIPIENTS }];
-  })();
-
-  const results = await Promise.allSettled(
-    recipientSets.map((recipients) =>
-      postProgressier(apiKey, buildProgressierPayload(payload, recipients), payload.incidentId),
-    ),
-  );
-
-  const failures = results.filter((r) => r.status === "rejected");
-  if (failures.length === results.length) {
-    const first = failures[0] as PromiseRejectedResult;
-    throw first.reason instanceof Error
-      ? first.reason
-      : new Error(String(first.reason));
-  }
-  if (failures.length > 0) {
-    logger.warn("Partial Progressier zone push failure", {
+  const zoneId = payload.zoneId?.trim();
+  if (payload.incidentId && !zoneId) {
+    logger.info("Skipping push — incident outside any single coverage zone", {
       incidentId: payload.incidentId,
-      zoneId: payload.zoneId,
-      failed: failures.length,
-      total: results.length,
     });
+    return;
   }
+
+  const recipients = zoneId
+    ? recipientsForIncidentZone(zoneId)
+    : { ...PROGRESSIER_RECIPIENTS };
+
+  await postProgressier(apiKey, buildProgressierPayload(payload, recipients), payload.incidentId);
 }
 
 function truncate(value: string, max: number): string {

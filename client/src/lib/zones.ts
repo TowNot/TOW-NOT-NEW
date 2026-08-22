@@ -48,32 +48,23 @@ export const COVERAGE_ZONES: CoverageZone[] = [
 
 export const DEFAULT_ZONE_ID: ZoneId = "london";
 export const ZONE_STORAGE_KEY = "alertnav-selected-zone-id";
-export const PUSH_ZONE_MODE_STORAGE_KEY = "alertnav-push-zone-mode";
-
-/** Only Current City (default) vs All Enabled Cities for push targeting. */
-export type PushZoneMode = "current" | "all";
-export const DEFAULT_PUSH_ZONE_MODE: PushZoneMode = "current";
-
-export function isPushZoneMode(value: unknown): value is PushZoneMode {
-  return value === "current" || value === "all";
-}
 
 export function zonePushTag(zoneId: ZoneId): string {
   return `zone-${zoneId}`;
 }
 
-export const ZONE_ALL_PUSH_TAG = "zone-all";
-
-/** Tags Progressier uses to match server-side zone-filtered pushes. */
-export function progressierTagsForPush(zoneId: ZoneId, mode: PushZoneMode): string[] {
-  if (mode === "all") return ["tow-not", ZONE_ALL_PUSH_TAG];
+/**
+ * Progressier tags for the active city only.
+ * Passed as an array so Progressier overwrites prior tags (drops the previous city).
+ */
+export function progressierTagsForPush(zoneId: ZoneId): string[] {
   return ["tow-not", zonePushTag(zoneId)];
 }
 
-export function syncProgressierPushTags(zoneId: ZoneId, mode: PushZoneMode): void {
+/** Instantly re-tag this device for `zoneId` only — previous city tags are cleared. */
+export function syncProgressierPushTags(zoneId: ZoneId): void {
   try {
-    // Comma-separated string overwrites device tags with the active zone scope.
-    window.progressier?.add?.({ tags: progressierTagsForPush(zoneId, mode).join(", ") });
+    window.progressier?.add?.({ tags: progressierTagsForPush(zoneId) });
   } catch {
     // Progressier may not be loaded yet.
   }
@@ -120,23 +111,6 @@ export function readLocalZoneId(): ZoneId | null {
 export function writeLocalZoneId(id: ZoneId): void {
   try {
     window.localStorage.setItem(ZONE_STORAGE_KEY, id);
-  } catch {
-    // Private browsing / quota.
-  }
-}
-
-export function readLocalPushZoneMode(): PushZoneMode | null {
-  try {
-    const raw = window.localStorage.getItem(PUSH_ZONE_MODE_STORAGE_KEY);
-    return isPushZoneMode(raw) ? raw : null;
-  } catch {
-    return null;
-  }
-}
-
-export function writeLocalPushZoneMode(mode: PushZoneMode): void {
-  try {
-    window.localStorage.setItem(PUSH_ZONE_MODE_STORAGE_KEY, mode);
   } catch {
     // Private browsing / quota.
   }

@@ -1,7 +1,6 @@
 import type { HealthStatus } from "../types";
-import type { PushZoneMode, ZoneId } from "../lib/zones";
+import type { ZoneId } from "../lib/zones";
 import { AuthControls } from "./AuthControls";
-import { PushZoneModeSwitcher } from "./PushZoneModeSwitcher";
 import { ZoneSwitcher } from "./ZoneSwitcher";
 
 interface HeaderProps {
@@ -9,18 +8,9 @@ interface HeaderProps {
   health: HealthStatus | null;
   zoneId: ZoneId;
   onZoneChange: (id: ZoneId) => void;
-  pushZoneMode: PushZoneMode;
-  onPushZoneModeChange: (mode: PushZoneMode) => void;
 }
 
-export function Header({
-  connected,
-  health,
-  zoneId,
-  onZoneChange,
-  pushZoneMode,
-  onPushZoneModeChange,
-}: HeaderProps) {
+export function Header({ connected, health, zoneId, onZoneChange }: HeaderProps) {
   return (
     <header className="border-b border-line bg-panel">
       <div className="mx-auto flex max-w-6xl flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between">
@@ -37,7 +27,6 @@ export function Header({
 
         <nav className="flex flex-wrap items-center gap-2" aria-label="Status">
           <ZoneSwitcher value={zoneId} onChange={onZoneChange} />
-          <PushZoneModeSwitcher value={pushZoneMode} onChange={onPushZoneModeChange} />
           <StatusChip
             live={connected && health?.status === "ok"}
             label={connected ? "feed live" : "feed offline"}

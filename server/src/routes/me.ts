@@ -3,7 +3,6 @@ import { Router } from "express";
 import { logger } from "../logger";
 
 const ZONE_IDS = new Set(["london", "hamilton", "mississauga", "brampton", "toronto"]);
-const PUSH_ZONE_MODES = new Set(["current", "all"]);
 
 export function createMeRouter(): Router {
   const router = Router();
@@ -16,57 +15,24 @@ export function createMeRouter(): Router {
         return;
       }
 
-      const selectedZoneIdRaw =
+      const selectedZoneId =
         typeof req.body?.selectedZoneId === "string" ? req.body.selectedZoneId.trim() : "";
-      const pushZoneModeRaw =
-        typeof req.body?.pushZoneMode === "string" ? req.body.pushZoneMode.trim() : "";
-
-      const publicMetadata: Record<string, string> = {};
-
-      if (selectedZoneIdRaw) {
-        if (!ZONE_IDS.has(selectedZoneIdRaw)) {
-          res.status(400).json({ error: "Unknown zone" });
-          return;
-        }
-        publicMetadata.selectedZoneId = selectedZoneIdRaw;
-      }
-
-      if (pushZoneModeRaw) {
-        if (!PUSH_ZONE_MODES.has(pushZoneModeRaw)) {
-          res.status(400).json({ error: "Unknown push zone mode" });
-          return;
-        }
-        publicMetadata.pushZoneMode = pushZoneModeRaw;
-      }
-
-      if (Object.keys(publicMetadata).length === 0) {
-        res.status(400).json({ error: "Provide selectedZoneId and/or pushZoneMode" });
+      if (!ZONE_IDS.has(selectedZoneId)) {
+        res.status(400).json({ error: "Unknown zone" });
         return;
       }
 
       const existing = await clerkClient.users.getUser(auth.userId);
+      const nextMeta = { ...(existing.publicMetadata ?? {}), selectedZoneId };
+      delete (nextMeta as Record<string, unknown>).pushZoneMode;
+
       await clerkClient.users.updateUser(auth.userId, {
-        publicMetadata: {
-          ...(existing.publicMetadata ?? {}),
-          ...publicMetadata,
-        },
+        publicMetadata: nextMeta,
       });
 
-      res.json({
-        ok: true,
-        selectedZoneId:
-          publicMetadata.selectedZoneId ??
-          (typeof existing.publicMetadata?.selectedZoneId === "string"
-            ? existing.publicMetadata.selectedZoneId
-            : undefined),
-        pushZoneMode:
-          publicMetadata.pushZoneMode ??
-          (typeof existing.publicMetadata?.pushZoneMode === "string"
-            ? existing.publicMetadata.pushZoneMode
-            : undefined),
-      });
+      res.json({ ok: true, selectedZoneId });
     } catch (error) {
-      logger.warn("Failed to persist zone prefs on Clerk publicMetadata", {
+      logger.warn("Failed to persist selectedZoneId on Clerk publicMetadata", {
         error: error instanceof Error ? error.message : String(error),
       });
       next(error);

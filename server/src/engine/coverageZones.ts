@@ -88,6 +88,3 @@ export function zoneIdForCoordinates(lat: number, lng: number): string | null {
 export function zonePushTag(zoneId: string): string {
   return `zone-${zoneId}`;
 }
-
-/** Progressier tag for devices opted into every enabled city. */
-export const ZONE_ALL_PUSH_TAG = "zone-all";

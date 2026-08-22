@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  DEFAULT_PUSH_ZONE_MODE,
   DEFAULT_ZONE_ID,
-  readLocalPushZoneMode,
   readLocalZoneId,
   syncProgressierPushTags,
 } from "../lib/zones";
@@ -46,9 +44,7 @@ async function getSubscription(): Promise<PushSubscription | null> {
 }
 
 function syncZoneTags(): void {
-  const zoneId = readLocalZoneId() ?? DEFAULT_ZONE_ID;
-  const mode = readLocalPushZoneMode() ?? DEFAULT_PUSH_ZONE_MODE;
-  syncProgressierPushTags(zoneId, mode);
+  syncProgressierPushTags(readLocalZoneId() ?? DEFAULT_ZONE_ID);
 }
 
 export function useProgressier() {
