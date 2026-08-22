@@ -33,6 +33,8 @@ export interface PushPayload {
   severity?: IncidentSeverity;
   incidentId?: string;
   url?: string;
+  /** When set, Progressier targets zone-<id> + zone-all tags instead of all users. */
+  zoneId?: string;
 }
 
 export interface PushReceipt {

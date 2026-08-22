@@ -67,3 +67,27 @@ export function zoneCenter(zone: CoverageZoneDef): { lat: number; lng: number } 
     lng: (zone.bounds.southWest.lng + zone.bounds.northEast.lng) / 2,
   };
 }
+
+/** Resolve which enabled coverage zone contains a coordinate, if any. */
+export function zoneIdForCoordinates(lat: number, lng: number): string | null {
+  for (const zone of enabledCoverageZones()) {
+    const { southWest, northEast } = zone.bounds;
+    if (
+      lat >= southWest.lat &&
+      lat <= northEast.lat &&
+      lng >= southWest.lng &&
+      lng <= northEast.lng
+    ) {
+      return zone.id;
+    }
+  }
+  return null;
+}
+
+/** Progressier tag for devices watching a single city. */
+export function zonePushTag(zoneId: string): string {
+  return `zone-${zoneId}`;
+}
+
+/** Progressier tag for devices opted into every enabled city. */
+export const ZONE_ALL_PUSH_TAG = "zone-all";

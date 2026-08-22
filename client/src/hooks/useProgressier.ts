@@ -1,4 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
+import {
+  DEFAULT_PUSH_ZONE_MODE,
+  DEFAULT_ZONE_ID,
+  readLocalPushZoneMode,
+  readLocalZoneId,
+  syncProgressierPushTags,
+} from "../lib/zones";
 
 const LOAD_TIMEOUT_MS = 8_000;
 const SUBSCRIBE_SETTLE_MS = 500;
@@ -38,6 +45,12 @@ async function getSubscription(): Promise<PushSubscription | null> {
   return registration.pushManager.getSubscription();
 }
 
+function syncZoneTags(): void {
+  const zoneId = readLocalZoneId() ?? DEFAULT_ZONE_ID;
+  const mode = readLocalPushZoneMode() ?? DEFAULT_PUSH_ZONE_MODE;
+  syncProgressierPushTags(zoneId, mode);
+}
+
 export function useProgressier() {
   const [busy, setBusy] = useState(false);
   const [enabled, setEnabled] = useState(false);
@@ -57,7 +70,7 @@ export function useProgressier() {
       const subscription = await getSubscription();
       setEnabled(Boolean(subscription));
       if (subscription && window.progressier) {
-        window.progressier.add?.({ tags: "tow-not" });
+        syncZoneTags();
       }
     } catch {
       setEnabled(false);
@@ -93,7 +106,7 @@ export function useProgressier() {
       // subscribe() resolves before the subscription is registered, so settle
       // briefly and then confirm against the PushManager rather than assuming.
       await new Promise((resolve) => setTimeout(resolve, SUBSCRIBE_SETTLE_MS));
-      progressier.add?.({ tags: "tow-not" });
+      syncZoneTags();
       const subscription = await getSubscription();
       if (!subscription) {
         throw new Error("Push subscription was not created — check notification permissions");
