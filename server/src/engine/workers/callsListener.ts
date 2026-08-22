@@ -6,7 +6,30 @@ import { createFireDispatchProcessor } from "./fireDispatchPipeline";
 
 const POLL_INTERVAL_MS = 3_000;
 const UA =
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36";
+const BROADCASTIFY_REFERER = "https://www.broadcastify.com";
+
+const BROWSER_HEADERS = {
+  "User-Agent": UA,
+  Referer: BROADCASTIFY_REFERER,
+  Accept: "application/json, text/plain, */*",
+} as const;
+
+async function probeHttpStatus(url: string): Promise<number | null> {
+  for (const method of ["HEAD", "GET"] as const) {
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: BROWSER_HEADERS,
+        signal: AbortSignal.timeout(10_000),
+      });
+      return res.status;
+    } catch {
+      // try GET if HEAD is unsupported
+    }
+  }
+  return null;
+}
 
 interface LiveCallRow {
   ts?: number;
@@ -50,14 +73,18 @@ async function fetchLiveCalls(
   const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${apiKey}`,
-      Accept: "application/json",
-      "User-Agent": UA,
+      ...BROWSER_HEADERS,
     },
     signal: AbortSignal.timeout(12_000),
   });
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
+    logger.warn("[fire-dispatch] calls API request failed", {
+      httpStatus: res.status,
+      nodeId,
+      url,
+    });
     throw new Error(`Broadcastify Calls live fetch ${res.status}: ${body.slice(0, 300)}`);
   }
 
@@ -81,6 +108,8 @@ function downloadCallAudio(url: string): Promise<Buffer> {
       "error",
       "-user_agent",
       UA,
+      "-headers",
+      `Referer: ${BROADCASTIFY_REFERER}\r\n`,
       "-i",
       url,
       "-ac",
@@ -152,8 +181,20 @@ async function processNewCall(
     return;
   }
 
-  const wav = await downloadCallAudio(audioUrl);
-  await processor.processWav(wav);
+  try {
+    const wav = await downloadCallAudio(audioUrl);
+    await processor.processWav(wav);
+  } catch (err) {
+    const httpStatus = await probeHttpStatus(audioUrl);
+    logger.warn("[fire-dispatch] calls audio download failed", {
+      err,
+      nodeId,
+      ts,
+      tg,
+      audioUrl,
+      httpStatus,
+    });
+  }
 }
 
 /**
@@ -204,21 +245,31 @@ export function startCallsListener(zoneId: string, source: ZoneCallsAudioSource)
 
   const timer = setInterval(() => {
     if (stopped) return;
-    void tick().catch((err) => {
+    void tick().catch(async (err) => {
+      const httpStatus =
+        err instanceof Error && /fetch (\d{3})/.test(err.message)
+          ? Number(err.message.match(/fetch (\d{3})/)?.[1])
+          : null;
       logger.warn("[fire-dispatch] calls poll failed — will retry", {
         err,
         nodeId: source.nodeId,
+        httpStatus,
       });
     });
   }, POLL_INTERVAL_MS);
   timer.unref();
 
-  void tick().catch((err) =>
+  void tick().catch(async (err) => {
+    const httpStatus =
+      err instanceof Error && /fetch (\d{3})/.test(err.message)
+        ? Number(err.message.match(/fetch (\d{3})/)?.[1])
+        : null;
     logger.warn("[fire-dispatch] initial calls poll failed", {
       err,
       nodeId: source.nodeId,
-    }),
-  );
+      httpStatus,
+    });
+  });
 
   return () => {
     stopped = true;

@@ -1212,42 +1212,40 @@ async function fetchBlocksInside(
     "BlocksInside 4-tile poll",
   );
 
-  const settled = await Promise.allSettled(
-    jobs.map(async ({ zone, box }) => {
-      const alerts = await fetchBlocksInsideBox(box);
-      logger.info(
-        `[waze-poller] Polled zone: ${zone.name} | Tiles: ${tilesPerZone} | Alerts found: ${alerts.length}`,
-      );
-      return alerts;
-    }),
-  );
-
   const merged: WazeAlert[] = [];
   const seenIds = new Set<string>();
   let failedCities = 0;
 
-  settled.forEach((result, i) => {
-    const zoneName = jobs[i]!.zone.name;
-    if (result.status === "rejected") {
+  for (let i = 0; i < jobs.length; i++) {
+    const { zone, box } = jobs[i]!;
+    try {
+      const alerts = await fetchBlocksInsideBox(box);
+      logger.info(
+        `[waze-poller] Polled zone: ${zone.name} | Tiles: ${tilesPerZone} | Alerts found: ${alerts.length}`,
+      );
+      for (const alert of alerts) {
+        if (seenIds.has(alert.alertId)) continue;
+        seenIds.add(alert.alertId);
+        merged.push(alert);
+      }
+    } catch (err) {
       failedCities += 1;
       logger.warn(
         {
-          zone: zoneName,
-          error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+          zone: zone.name,
+          error: err instanceof Error ? err.message : String(err),
         },
         "BlocksInside city fetch failed",
       );
       logger.info(
-        `[waze-poller] Polled zone: ${zoneName} | Tiles: ${tilesPerZone} | Alerts found: 0`,
+        `[waze-poller] Polled zone: ${zone.name} | Tiles: ${tilesPerZone} | Alerts found: 0`,
       );
-      return;
     }
-    for (const alert of result.value) {
-      if (seenIds.has(alert.alertId)) continue;
-      seenIds.add(alert.alertId);
-      merged.push(alert);
+
+    if (i < jobs.length - 1) {
+      await sleep(1000);
     }
-  });
+  }
 
   if (failedCities === jobs.length) {
     throw new Error("blocksinside all tile fetches failed");

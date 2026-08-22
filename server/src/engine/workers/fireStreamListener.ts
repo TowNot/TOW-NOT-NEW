@@ -6,8 +6,29 @@ import { createFireDispatchProcessor } from "./fireDispatchPipeline";
 const BUFFER_TARGET_SECONDS = 10;
 const DIRECT_CAPTURE_GRACE_MS = 25_000;
 const UA =
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-const STREAM_REFERER = "https://www.broadcastify.com/";
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36";
+const STREAM_REFERER = "https://www.broadcastify.com";
+
+const BROWSER_HEADERS = {
+  "User-Agent": UA,
+  Referer: STREAM_REFERER,
+} as const;
+
+async function probeHttpStatus(url: string): Promise<number | null> {
+  for (const method of ["HEAD", "GET"] as const) {
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: BROWSER_HEADERS,
+        signal: AbortSignal.timeout(10_000),
+      });
+      return res.status;
+    } catch {
+      // try GET if HEAD is unsupported
+    }
+  }
+  return null;
+}
 
 function captureDirectStream(url: string): Promise<Buffer> {
   return new Promise((resolve, reject) => {
@@ -115,12 +136,13 @@ export function startZoneStreamListener(
         return processor.processWav(wav);
       })
       .then(() => schedule(250))
-      .catch((err) => {
+      .catch(async (err) => {
         consecutiveFailures += 1;
         const backoffMs = Math.min(30_000, 2_000 * consecutiveFailures);
+        const httpStatus = await probeHttpStatus(source.url);
         logger.warn(
           `[fire-dispatch] stream capture failed — retrying in ${backoffMs / 1000}s`,
-          { err, zoneId, url: source.url, consecutiveFailures },
+          { err, zoneId, url: source.url, consecutiveFailures, httpStatus },
         );
         schedule(backoffMs);
       });
