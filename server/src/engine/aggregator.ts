@@ -1,5 +1,6 @@
 import { config } from "../config";
 import { logger } from "../logger";
+import { enabledCoverageZones } from "./coverageZones";
 import { GoogleMapsTrafficPoller } from "./pollers/googleMapsPoller";
 import { WazeTrafficPoller } from "./pollers/wazePoller";
 import { RadioIngestionWorker } from "./workers/radioIngestionWorker";
@@ -12,6 +13,7 @@ export class DataAggregatorEngine {
   ) {}
 
   start(): void {
+    const enabled = enabledCoverageZones();
     logger.info("[WAZE API] starting BlocksInside 4-tile Waze scraper", {
       wazeApi: Boolean(config.wazeApiKey),
       twilio: Boolean(config.twilioAccountSid && config.twilioAuthToken),
@@ -19,9 +21,11 @@ export class DataAggregatorEngine {
       filter: '["ACCIDENT"]',
       country: config.wazeApiCountry,
       tilesPerCity: 4,
-      cities: ["london", "brampton"],
-      londonBox: `${config.wazeBottomLeft} .. ${config.wazeTopRight}`,
-      bramptonBox: "43.5933, -79.8897 .. 43.7733, -79.6437",
+      cities: enabled.map((zone) => zone.id),
+      zones: enabled.map((zone) => ({
+        id: zone.id,
+        box: `${zone.bounds.southWest.lat}, ${zone.bounds.southWest.lng} .. ${zone.bounds.northEast.lat}, ${zone.bounds.northEast.lng}`,
+      })),
     });
     if (!config.wazeApiKey) {
       logger.warn("WAZEAPI_KEY is unset — BlocksInside poll will be skipped");

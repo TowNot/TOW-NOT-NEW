@@ -1,8 +1,9 @@
 import { clerkClient, getAuth } from "@clerk/express";
 import { Router } from "express";
+import { COVERAGE_ZONE_IDS } from "../engine/coverageZones";
 import { logger } from "../logger";
 
-const ZONE_IDS = new Set(["london", "hamilton", "mississauga", "brampton", "toronto"]);
+const ZONE_IDS = new Set(COVERAGE_ZONE_IDS);
 
 export function createMeRouter(): Router {
   const router = Router();

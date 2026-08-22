@@ -2,6 +2,7 @@ import { config } from "../../config";
 import { logger } from "../../logger";
 import { IncidentStore } from "../../store/incidentStore";
 import type { Incident, IncidentSeverity, IncidentSource } from "../../types/incident";
+import { enabledCoverageZones } from "../coverageZones";
 import { distanceKm } from "../geo";
 import {
   fetchLiveWazeProviders,
@@ -70,6 +71,7 @@ export class WazeTrafficPoller {
 
   start(): void {
     if (this.timer) return;
+    const enabled = enabledCoverageZones();
     logger.info("Live traffic aggregator started", {
       intervalMs: config.pollIntervalMs,
       providers: LIVE_WAZE_PROVIDERS.filter((p) => p === "blocksinside" && config.wazeApiKey),
@@ -77,9 +79,7 @@ export class WazeTrafficPoller {
       filter: '["ACCIDENT"]',
       country: config.wazeApiCountry,
       tiles: 4,
-      cities: ["london", "brampton"],
-      bottomLeft: config.wazeBottomLeft,
-      topRight: config.wazeTopRight,
+      cities: enabled.map((zone) => zone.id),
     });
     void this.poll();
     this.timer = setInterval(() => void this.poll(), config.pollIntervalMs);
