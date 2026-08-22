@@ -26,18 +26,21 @@ const ZONE_SEEDS = [
     id: "kitchener",
     name: "Kitchener",
     center: { lat: 43.4587, lng: -80.5129 },
+    hasEmsFeed: true,
     scannedAgencies: ["Fire", "EMS"],
   },
   {
     id: "waterloo",
     name: "Waterloo",
     center: { lat: 43.4643, lng: -80.5204 },
+    hasEmsFeed: true,
     scannedAgencies: ["Fire", "EMS"],
   },
   {
     id: "cambridge",
     name: "Cambridge",
     center: { lat: 43.3972, lng: -80.3114 },
+    hasEmsFeed: true,
     scannedAgencies: ["Fire", "EMS"],
   },
   {
@@ -236,6 +239,8 @@ export interface CoverageZone {
   region: string;
   /** Agencies monitored on this city's radio feed (empty = not configured yet). */
   scannedAgencies: string[];
+  /** True when this city's radio stream includes EMS (CYKF Waterloo Region). */
+  hasEmsFeed: boolean;
   /** south-west → north-east, used to filter incidents. */
   box: {
     south: number;
@@ -250,6 +255,7 @@ interface ZoneSeed {
   name: string;
   center: { lat: number; lng: number };
   scannedAgencies: readonly string[];
+  hasEmsFeed?: boolean;
 }
 
 function boxFromCenter(center: { lat: number; lng: number }): CoverageZone["box"] {
@@ -267,6 +273,7 @@ function buildClientZone(seed: ZoneSeed): CoverageZone {
     name: seed.name,
     region: "Ontario",
     scannedAgencies: [...seed.scannedAgencies],
+    hasEmsFeed: seed.hasEmsFeed === true,
     box: boxFromCenter(seed.center),
   };
 }

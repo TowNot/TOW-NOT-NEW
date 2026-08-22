@@ -9,12 +9,13 @@ import {
 import {
   classifyPriority,
   findCrashKeywords,
+  findEmsKeywords,
   findNegativeKeywords,
   type DispatchPriority,
 } from "../dispatchKeywords";
 import { speechToText } from "../deepgramClient";
 import { getCoverageZone } from "../zones.config";
-import type { Incident } from "../../types/incident";
+import type { Incident, IncidentSource } from "../../types/incident";
 import type { IncidentStore } from "../../store/incidentStore";
 import {
   noteFireDispatchPosted,
@@ -179,8 +180,16 @@ export class FireDispatchProcessor {
       return;
     }
 
-    const keywords = findCrashKeywords(transcript);
-    if (keywords.length === 0) {
+    // Fire crash path first (unchanged). EMS only when no crash hit and the
+    // zone's stream includes EMS (CYKF Waterloo Region).
+    const crashKeywords = findCrashKeywords(transcript);
+    const zone = getCoverageZone(this.ctx.zoneId);
+    const emsKeywords =
+      crashKeywords.length === 0 && zone?.hasEmsFeed
+        ? findEmsKeywords(transcript)
+        : [];
+
+    if (crashKeywords.length === 0 && emsKeywords.length === 0) {
       const blocked = findNegativeKeywords(transcript);
       if (blocked.length > 0) {
         noteFireDispatchSkip(`negative_keyword:${blocked.join(",")}`);
@@ -193,7 +202,10 @@ export class FireDispatchProcessor {
       return;
     }
 
-    const priority = classifyPriority(transcript);
+    const agency: "fire" | "ems" = crashKeywords.length > 0 ? "fire" : "ems";
+    const keywords = agency === "fire" ? crashKeywords : emsKeywords;
+    const priority =
+      agency === "fire" ? classifyPriority(transcript) : "high";
     const heard = extractDispatchLocation(transcript);
     let location = heard ? applyPhoneticFixes(heard) : null;
     let coords: { lat: number; lng: number } | null = null;
@@ -216,6 +228,7 @@ export class FireDispatchProcessor {
     }
 
     await this.saveAndNotify(
+      agency,
       location ?? "Location unverified (heard on radio)",
       coords,
       keywords,
@@ -227,6 +240,7 @@ export class FireDispatchProcessor {
   }
 
   private async saveAndNotify(
+    agency: "fire" | "ems",
     location: string,
     coords: { lat: number; lng: number },
     keywords: string[],
@@ -243,9 +257,12 @@ export class FireDispatchProcessor {
     const now = new Date();
     const timeBucket = Math.floor(now.getTime() / (30 * 60 * 1000));
     const slug = locationSlug(location, timeBucket);
+    const source: IncidentSource = agency === "ems" ? "ems" : "fire_dispatch";
+    const idPrefix = agency === "ems" ? "ems" : "fire-dispatch";
+    const providerSuffix = agency === "ems" ? "ems" : "fire_dispatch";
     const id = unverifiedAddress
-      ? `fire-dispatch-${this.ctx.zoneId}-unverified-${slug}`
-      : `fire-dispatch-${this.ctx.zoneId}-${coords.lat.toFixed(3)},${coords.lng.toFixed(3)}-${timeBucket}`;
+      ? `${idPrefix}-${this.ctx.zoneId}-unverified-${slug}`
+      : `${idPrefix}-${this.ctx.zoneId}-${coords.lat.toFixed(3)},${coords.lng.toFixed(3)}-${timeBucket}`;
 
     if (!this.incidentStore.getById(id) && this.seenRecently(id, this.recentAlertIds)) {
       logger.info(
@@ -265,14 +282,16 @@ export class FireDispatchProcessor {
 
     const zoneName = getCoverageZone(this.ctx.zoneId)?.name ?? "Ontario";
     const existing = this.incidentStore.getById(id);
+    const titlePrefix = agency === "ems" ? "EMS" : "Fire dispatch";
+    const typeLabel = agency === "ems" ? "EMS" : "Fire dispatch";
     const incident: Incident = {
       id,
-      source: "fire_dispatch",
-      type: "ACCIDENT",
-      subtype: "ACCIDENT_MAJOR",
-      title: keywords[0] ? `Fire dispatch · ${keywords[0]}` : "Fire dispatch",
+      source,
+      type: agency === "ems" ? "EMS" : "ACCIDENT",
+      subtype: agency === "ems" ? "EMS_CALL" : "ACCIDENT_MAJOR",
+      title: keywords[0] ? `${titlePrefix} · ${keywords[0]}` : titlePrefix,
       description:
-        `Fire dispatch (${keywords.join(", ")})` +
+        `${typeLabel} (${keywords.join(", ")})` +
         (unverifiedAddress ? ` [UNVERIFIED ADDRESS — heard: "${location}"]` : "") +
         `: ${transcript.slice(0, 800)}`,
       coordinates: { latitude: coords.lat, longitude: coords.lng },
@@ -280,7 +299,7 @@ export class FireDispatchProcessor {
       severity: severityFromPriority(priority),
       timestamp: existing?.timestamp ?? now.toISOString(),
       expiresAt: new Date(now.getTime() + config.incidentTtlMs).toISOString(),
-      provider: `${this.ctx.zoneId}_fire_dispatch`,
+      provider: `${this.ctx.zoneId}_${providerSuffix}`,
       unverifiedAddress,
       audioUrl,
     };
@@ -294,7 +313,7 @@ export class FireDispatchProcessor {
       );
     } else {
       logger.info(
-        `[fire-dispatch] ${this.ctx.label} SAVED crash dispatch at "${location}" (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)})`,
+        `[fire-dispatch] ${this.ctx.label} SAVED ${agency} dispatch at "${location}" (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)})`,
       );
     }
   }

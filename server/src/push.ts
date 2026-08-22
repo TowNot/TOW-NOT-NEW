@@ -28,6 +28,7 @@ const SOURCE_LABELS: Record<Incident["source"], string> = {
   waze: "Waze",
   google_maps: "Google Maps",
   fire_dispatch: "Fire dispatch",
+  ems: "EMS",
 };
 
 function absoluteUrl(pathOrUrl: string): string {
@@ -49,10 +50,15 @@ function labelForIncident(incident: Incident): string {
   if (incident.provider) {
     const known = PROVIDER_LABELS[incident.provider];
     if (known) return known;
-    const m = incident.provider.match(/^([a-zA-Z]+)_fire_dispatch(?:_(hls|stream))?$/);
-    if (m) {
-      const zone = getCoverageZone(m[1]);
+    const fireM = incident.provider.match(/^([a-zA-Z]+)_fire_dispatch(?:_(hls|stream))?$/);
+    if (fireM) {
+      const zone = getCoverageZone(fireM[1]);
       return zone ? `Fire dispatch · ${zone.name}` : "Fire dispatch";
+    }
+    const emsM = incident.provider.match(/^([a-zA-Z]+)_ems$/);
+    if (emsM) {
+      const zone = getCoverageZone(emsM[1]);
+      return zone ? `EMS · ${zone.name}` : "EMS";
     }
     return incident.provider;
   }
@@ -87,8 +93,8 @@ export function buildProgressierPayload(
 }
 
 export function resolveIncidentZoneId(incident: Incident): string | null {
-  if (incident.source === "fire_dispatch") {
-    const m = incident.provider?.match(/^([a-zA-Z]+)_fire_dispatch(?:_(hls|stream))?$/);
+  if (incident.source === "fire_dispatch" || incident.source === "ems") {
+    const m = incident.provider?.match(/^([a-zA-Z]+)_(?:fire_dispatch(?:_(?:hls|stream))?|ems)$/);
     if (m) return m[1];
   }
   return zoneIdForCoordinates(

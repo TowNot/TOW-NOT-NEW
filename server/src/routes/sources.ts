@@ -50,6 +50,15 @@ export function createSourcesRouter(store: IncidentStore): Router {
     });
   });
 
+  router.get("/ems", (_req, res) => {
+    res.json({
+      source: "ems",
+      region: "Waterloo Region, ON",
+      scrapedAt: new Date().toISOString(),
+      incidents: bySource("ems"),
+    });
+  });
+
   // Operational readiness snapshot: which credentials are present, which
   // upstream feeds answered last, and how many incidents each has produced.
   router.get("/status", (_req, res) => {
@@ -115,6 +124,7 @@ export function createSourcesRouter(store: IncidentStore): Router {
         waze: bySource("waze").length,
         googleMaps: bySource("google_maps").length,
         fireDispatch: bySource("fire_dispatch").length,
+        ems: bySource("ems").length,
       },
     });
   });

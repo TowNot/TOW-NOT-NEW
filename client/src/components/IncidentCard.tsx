@@ -70,7 +70,10 @@ function formatProvider(provider: string): string {
     openwebninja_google_maps: "OpenWebNinja · Google Maps",
     london_fire_dispatch: "Fire dispatch",
   };
-  return labels[provider] ?? provider;
+  if (labels[provider]) return labels[provider];
+  const ems = provider.match(/^([a-zA-Z]+)_ems$/);
+  if (ems) return `EMS · ${ems[1]}`;
+  return provider;
 }
 
 function SourceBadge({ source }: { source: IncidentSource }) {
@@ -78,11 +81,13 @@ function SourceBadge({ source }: { source: IncidentSource }) {
     waze: "border-sky-200 bg-sky-50 text-waze",
     google_maps: "border-emerald-200 bg-emerald-50 text-maps",
     fire_dispatch: "border-orange-200 bg-orange-50 text-fire",
+    ems: "border-rose-200 bg-rose-50 text-rose-800",
   };
   const labels: Record<IncidentSource, string> = {
     waze: "Waze",
     google_maps: "Google Maps",
     fire_dispatch: "Fire dispatch",
+    ems: "EMS",
   };
   return (
     <span className={`inline-flex rounded border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] ${styles[source]}`}>

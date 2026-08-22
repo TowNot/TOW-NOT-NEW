@@ -33,6 +33,8 @@ export interface CoverageZoneDef {
   audio: ZoneAudio | null;
   /** Agencies audible on this zone's radio feed (for UI transparency). */
   scannedAgencies: string[];
+  /** True when the zone audio stream includes EMS (CYKF Waterloo Region). */
+  hasEmsFeed: boolean;
 }
 
 interface ZoneSeed {
@@ -42,6 +44,7 @@ interface ZoneSeed {
   enabled?: boolean;
   audio?: ZoneAudio | null;
   scannedAgencies?: string[];
+  hasEmsFeed?: boolean;
 }
 
 /** Pending HLS — feed TBD. Zone can still be enabled for Waze without starting audio. */
@@ -75,6 +78,7 @@ function buildZone(seed: ZoneSeed): CoverageZoneDef {
     bounds: boundsFromCenter(seed.center),
     audio: seed.audio ?? null,
     scannedAgencies: seed.scannedAgencies ?? [],
+    hasEmsFeed: seed.hasEmsFeed === true,
   };
 }
 
@@ -136,6 +140,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
       url: "http://cykf.net:8000/scanner",
       description: "Waterloo Region (CYKF)",
     },
+    hasEmsFeed: true,
     scannedAgencies: ["Fire", "EMS"],
   },
   {
@@ -149,6 +154,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
       url: "http://cykf.net:8000/scanner",
       description: "Waterloo Region (CYKF)",
     },
+    hasEmsFeed: true,
     scannedAgencies: ["Fire", "EMS"],
   },
   {
@@ -162,6 +168,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
       url: "http://cykf.net:8000/scanner",
       description: "Waterloo Region (CYKF)",
     },
+    hasEmsFeed: true,
     scannedAgencies: ["Fire", "EMS"],
   },
   {
@@ -480,6 +487,7 @@ export function zonePublicSummaries(): Array<{
   name: string;
   enabled: boolean;
   scannedAgencies: string[];
+  hasEmsFeed: boolean;
   audio:
     | { type: "hls"; feedId: number | null; description: string; enabled: boolean }
     | { type: "stream"; url: string; description: string; enabled: boolean }
@@ -490,6 +498,7 @@ export function zonePublicSummaries(): Array<{
     name: zone.name,
     enabled: zone.enabled,
     scannedAgencies: [...zone.scannedAgencies],
+    hasEmsFeed: zone.hasEmsFeed,
     audio: zone.audio
       ? zone.audio.type === "hls"
         ? {

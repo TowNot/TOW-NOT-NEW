@@ -175,3 +175,36 @@ export function classifyPriority(transcript: string): DispatchPriority {
   if (CODE3_RE.test(transcript)) return "normal";
   return "normal";
 }
+
+/**
+ * EMS / ambulance language on shared Fire+EMS streams (CYKF Waterloo Region).
+ * Checked only for zones with hasEmsFeed — London Fire blacklists many of
+ * these same phrases so they never post as fire_dispatch.
+ */
+const EMS_PATTERNS: { label: string; re: RegExp }[] = [
+  { label: "ambulance", re: /\bambulances?\b/i },
+  { label: "EMS", re: /\bEMS\b/ },
+  { label: "paramedic", re: /\bparamedics?\b/i },
+  { label: "medic", re: /\bmedics?\b/i },
+  { label: "medical emergency", re: /\bmedical\s+emergenc(?:y|ies)\b/i },
+  { label: "medical call", re: /\bmedical\s+calls?\b/i },
+  { label: "medical assist", re: /\bmedical\s+assist(?:ance)?\b/i },
+  { label: "chest pain", re: /\bchest\s+pains?\b/i },
+  { label: "cardiac", re: /\bcardiac\b/i },
+  { label: "unconscious", re: /\bunconscious\b/i },
+  { label: "overdose", re: /\boverdoses?\b/i },
+  { label: "difficulty breathing", re: /\bdifficult(?:y|ies)\s+(?:breathing|breath)\b/i },
+  { label: "stroke", re: /\bstroke\b/i },
+  { label: "seizure", re: /\bseizures?\b/i },
+  { label: "CPR", re: /\bCPR\b/ },
+  { label: "vital signs absent", re: /\bvital\s+signs?\s+absent\b/i },
+  { label: "VSA", re: /\bVSA\b/ },
+];
+
+export function findEmsKeywords(transcript: string): string[] {
+  const hits: string[] = [];
+  for (const { label, re } of EMS_PATTERNS) {
+    if (re.test(transcript) && !hits.includes(label)) hits.push(label);
+  }
+  return hits;
+}

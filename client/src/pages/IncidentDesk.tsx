@@ -36,7 +36,7 @@ export function IncidentDesk({ user }: { user?: ZoneUser | null }) {
       <div className="mx-auto w-full max-w-6xl px-5 pt-6">
         <SmsSettings />
       </div>
-      <IncidentFeed incidents={zoneIncidents} />
+      <IncidentFeed incidents={zoneIncidents} hasEmsFeed={activeZone.hasEmsFeed} />
     </div>
   );
 }

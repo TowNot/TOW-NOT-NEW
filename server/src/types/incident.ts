@@ -1,4 +1,4 @@
-export type IncidentSource = "waze" | "google_maps" | "fire_dispatch";
+export type IncidentSource = "waze" | "google_maps" | "fire_dispatch" | "ems";
 
 export type IncidentSeverity = "low" | "medium" | "high" | "critical";
 
