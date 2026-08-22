@@ -2,22 +2,23 @@
 export const ZONE_LAT_HALF = 0.09;
 export const ZONE_LNG_HALF = 0.123;
 
-export interface ZoneStreamAudioSource {
+/** Broadcastify HLS playlist feed (stable public origin). */
+export interface ZoneHlsAudio {
   enabled: boolean;
-  type: "stream";
+  type: "hls";
+  feedId: number;
+  description: string;
+}
+
+/** Continuous Icecast/MP3 stream (e.g. CYKF Waterloo). */
+export interface ZoneIcecastAudio {
+  enabled: boolean;
+  type: "icecast";
   url: string;
   description: string;
 }
 
-export interface ZoneCallsAudioSource {
-  enabled: boolean;
-  type: "calls";
-  nodeId: number;
-  talkgroups: number[];
-  description: string;
-}
-
-export type ZoneAudioSource = ZoneStreamAudioSource | ZoneCallsAudioSource;
+export type ZoneAudio = ZoneHlsAudio | ZoneIcecastAudio;
 
 export interface CoverageZoneDef {
   id: string;
@@ -27,7 +28,8 @@ export interface CoverageZoneDef {
     southWest: { lat: number; lng: number };
     northEast: { lat: number; lng: number };
   };
-  audioSources: ZoneAudioSource[];
+  /** Single stable audio source for this zone, if any. */
+  audio: ZoneAudio | null;
 }
 
 interface ZoneSeed {
@@ -35,7 +37,7 @@ interface ZoneSeed {
   name: string;
   center: { lat: number; lng: number };
   enabled?: boolean;
-  audioSources?: ZoneAudioSource[];
+  audio?: ZoneAudio | null;
 }
 
 function boundsFromCenter(center: { lat: number; lng: number }): CoverageZoneDef["bounds"] {
@@ -57,7 +59,7 @@ function buildZone(seed: ZoneSeed): CoverageZoneDef {
     name: seed.name,
     enabled: seed.enabled === true,
     bounds: boundsFromCenter(seed.center),
-    audioSources: seed.audioSources ?? [],
+    audio: seed.audio ?? null,
   };
 }
 
@@ -68,114 +70,83 @@ const ZONE_SEEDS: ZoneSeed[] = [
     name: "London",
     center: { lat: 42.9849, lng: -81.2453 },
     enabled: true,
-    audioSources: [
-      {
-        enabled: true,
-        type: "stream",
-        url: "https://broadcastify.cdnstream1.com/34296",
-        description: "London Stream",
-      },
-      {
-        enabled: false,
-        type: "calls",
-        nodeId: 6294,
-        talkgroups: [],
-        description: "London Calls",
-      },
-    ],
+    audio: {
+      enabled: true,
+      type: "hls",
+      feedId: 34296,
+      description: "London Fire",
+    },
   },
   {
     id: "woodstock",
     name: "Woodstock",
     center: { lat: 43.1306, lng: -80.7467 },
     enabled: false,
-    audioSources: [
-      {
-        enabled: false,
-        type: "calls",
-        nodeId: 6293,
-        talkgroups: [],
-        description: "Oxford County Calls",
-      },
-    ],
+    audio: null,
   },
   {
     id: "kitchener",
     name: "Kitchener / Waterloo",
     center: { lat: 43.4587, lng: -80.5129 },
-    enabled: false,
-    audioSources: [
-      {
-        enabled: false,
-        type: "stream",
-        url: "http://cykf.net:8000/scanner",
-        description: "Waterloo Region Stream",
-      },
-    ],
+    enabled: true,
+    audio: {
+      enabled: true,
+      type: "icecast",
+      url: "http://cykf.net:8000/scanner",
+      description: "Waterloo Region (CYKF)",
+    },
   },
   {
     id: "guelph",
     name: "Guelph",
     center: { lat: 43.5448, lng: -80.2482 },
     enabled: false,
-    audioSources: [],
+    audio: null,
   },
   {
     id: "cambridge",
     name: "Cambridge",
     center: { lat: 43.3972, lng: -80.3114 },
-    enabled: false,
-    audioSources: [
-      {
-        enabled: false,
-        type: "stream",
-        url: "http://cykf.net:8000/scanner",
-        description: "Waterloo Region Stream",
-      },
-    ],
+    enabled: true,
+    // Same CYKF feed as Kitchener — orchestrator dedupes by URL.
+    audio: {
+      enabled: true,
+      type: "icecast",
+      url: "http://cykf.net:8000/scanner",
+      description: "Waterloo Region (CYKF)",
+    },
   },
   {
     id: "milton",
     name: "Milton",
     center: { lat: 43.5167, lng: -79.8833 },
-    enabled: false,
-    audioSources: [
-      {
-        enabled: false,
-        type: "stream",
-        url: "https://broadcastify.cdnstream1.com/43263",
-        description: "Halton Hills / Milton Stream",
-      },
-    ],
+    enabled: true,
+    audio: {
+      enabled: true,
+      type: "hls",
+      feedId: 43263,
+      description: "Halton Hills / Milton Fire",
+    },
   },
   {
     id: "haltonHills",
     name: "Halton Hills",
     center: { lat: 43.6475, lng: -79.9197 },
-    enabled: false,
-    audioSources: [
-      {
-        enabled: false,
-        type: "stream",
-        url: "https://broadcastify.cdnstream1.com/43263",
-        description: "Halton Hills / Milton Stream",
-      },
-    ],
+    enabled: true,
+    // Same Broadcastify feed as Milton — orchestrator dedupes by feedId.
+    audio: {
+      enabled: true,
+      type: "hls",
+      feedId: 43263,
+      description: "Halton Hills / Milton Fire",
+    },
   },
   {
     id: "mississauga",
     name: "Mississauga",
     center: { lat: 43.589, lng: -79.6441 },
     enabled: false,
-    audioSources: [
-      {
-        enabled: false,
-        type: "calls",
-        nodeId: 4158,
-        talkgroups: [],
-        description: "Peel Region Calls",
-      },
-    ],
+    audio: null,
   },
   { id: "torontoCore", name: "Toronto (Core)", center: { lat: 43.6532, lng: -79.3832 } },
   { id: "etobicoke", name: "Etobicoke", center: { lat: 43.6205, lng: -79.5132 } },
@@ -209,15 +180,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     name: "Brampton",
     center: { lat: 43.6833, lng: -79.7667 },
     enabled: false,
-    audioSources: [
-      {
-        enabled: false,
-        type: "calls",
-        nodeId: 4158,
-        talkgroups: [],
-        description: "Peel Region Calls",
-      },
-    ],
+    audio: null,
   },
 ];
 

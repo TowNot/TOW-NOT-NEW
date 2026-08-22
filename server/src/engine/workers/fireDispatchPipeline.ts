@@ -16,17 +16,18 @@ import { speechToText } from "../deepgramClient";
 import { getCoverageZone } from "../zones.config";
 import type { Incident } from "../../types/incident";
 import type { IncidentStore } from "../../store/incidentStore";
+import {
+  noteFireDispatchPosted,
+  noteFireDispatchSkip,
+  noteFireDispatchTranscript,
+} from "./fireDispatchRuntime";
 
-export type FireAudioSourceType = "stream" | "calls";
+export type FireAudioSourceType = "hls" | "icecast";
 
 export interface FireDispatchContext {
   zoneId: string;
   sourceType: FireAudioSourceType;
   label: string;
-}
-
-export function sourceTagLabel(sourceType: FireAudioSourceType): string {
-  return sourceType === "stream" ? "[Stream]" : "[Calls]";
 }
 
 const SILENCE_RMS_DBFS = -50;
@@ -41,12 +42,6 @@ function zoneCenter(zoneId: string): { lat: number; lng: number } {
     lng: (southWest.lng + northEast.lng) / 2,
   };
 }
-
-/** Cross-source A/B latency benchmark keyed by dispatch location slug. */
-const crossSourceArrivals = new Map<
-  string,
-  Partial<Record<FireAudioSourceType, number>>
->();
 
 function locationSlug(location: string, timeBucket: number): string {
   const normTokens = location
@@ -63,30 +58,6 @@ function locationSlug(location: string, timeBucket: number): string {
   return (
     (normTokens.length > 0 ? normTokens.join("-").slice(0, 50) : "no-location") +
     `-${timeBucket}`
-  );
-}
-
-function recordCrossSourceLatency(
-  slug: string,
-  sourceType: FireAudioSourceType,
-  atMs: number,
-): void {
-  const entry = crossSourceArrivals.get(slug) ?? {};
-  const prior = entry[sourceType];
-  if (prior && atMs - prior < DEDUP_TTL_MS) return;
-  entry[sourceType] = atMs;
-  crossSourceArrivals.set(slug, entry);
-
-  const other: FireAudioSourceType = sourceType === "stream" ? "calls" : "stream";
-  const otherAt = entry[other];
-  if (!otherAt) return;
-
-  const deltaMs = Math.abs(atMs - otherAt);
-  const deltaSec = (deltaMs / 1000).toFixed(2);
-  const first = atMs < otherAt ? sourceType : other;
-  const second = first === "stream" ? "calls" : "stream";
-  logger.info(
-    `[fire-dispatch] A/B latency: ${first} arrived ${deltaSec}s before ${second} for "${slug.replace(/-\d+$/, "")}"`,
   );
 }
 
@@ -169,6 +140,7 @@ export class FireDispatchProcessor {
   async processWav(wav: Buffer): Promise<void> {
     const level = wavRmsDbfs(wav);
     if (level < SILENCE_RMS_DBFS) {
+      noteFireDispatchSkip(`dead_air:${level.toFixed(1)}dBFS`);
       logger.debug(
         `[fire-dispatch] ${this.ctx.label} STT skipped: dead air (${level.toFixed(1)} dBFS)`,
       );
@@ -177,6 +149,7 @@ export class FireDispatchProcessor {
 
     const startedAt = Date.now();
     const transcript = (await speechToText(wav)).trim();
+    noteFireDispatchTranscript(transcript);
     logger.debug(
       {
         source: this.ctx.sourceType,
@@ -193,12 +166,15 @@ export class FireDispatchProcessor {
   }
 
   async processTranscript(transcript: string, wav?: Buffer): Promise<void> {
-    if (transcript.length < 5) return;
+    if (transcript.length < 5) {
+      noteFireDispatchSkip("empty_transcript");
+      return;
+    }
 
-    const sigKey = `${this.ctx.sourceType}:${transcriptSignature(transcript)}`;
+    const sigKey = `${this.ctx.zoneId}:${transcriptSignature(transcript)}`;
     if (this.seenRecently(sigKey, this.recentTranscriptSignatures)) {
       logger.info(
-        `[fire-dispatch] ${this.ctx.label} DEDUPED: overlapping transcript within same source`,
+        `[fire-dispatch] ${this.ctx.label} DEDUPED: overlapping transcript`,
       );
       return;
     }
@@ -207,9 +183,12 @@ export class FireDispatchProcessor {
     if (keywords.length === 0) {
       const blocked = findNegativeKeywords(transcript);
       if (blocked.length > 0) {
+        noteFireDispatchSkip(`negative_keyword:${blocked.join(",")}`);
         logger.debug(
           `[fire-dispatch] ${this.ctx.label} DROPPED: blacklist hit [${blocked.join(", ")}]`,
         );
+      } else {
+        noteFireDispatchSkip("no_keyword");
       }
       return;
     }
@@ -264,10 +243,9 @@ export class FireDispatchProcessor {
     const now = new Date();
     const timeBucket = Math.floor(now.getTime() / (30 * 60 * 1000));
     const slug = locationSlug(location, timeBucket);
-    const sourceTag = sourceTagLabel(this.ctx.sourceType);
     const id = unverifiedAddress
-      ? `fire-dispatch-${this.ctx.sourceType}-unverified-${slug}`
-      : `fire-dispatch-${this.ctx.sourceType}-${coords.lat.toFixed(3)},${coords.lng.toFixed(3)}-${timeBucket}`;
+      ? `fire-dispatch-${this.ctx.zoneId}-unverified-${slug}`
+      : `fire-dispatch-${this.ctx.zoneId}-${coords.lat.toFixed(3)},${coords.lng.toFixed(3)}-${timeBucket}`;
 
     if (!this.incidentStore.getById(id) && this.seenRecently(id, this.recentAlertIds)) {
       logger.info(
@@ -276,14 +254,12 @@ export class FireDispatchProcessor {
       return;
     }
 
-    recordCrossSourceLatency(slug, this.ctx.sourceType, now.getTime());
-
     let audioUrl = this.incidentStore.getById(id)?.audioUrl;
     if (wav && wav.length > 44 && !audioUrl) {
       try {
         audioUrl = await saveFireDispatchAudio(wav, id);
       } catch (err) {
-      logger.warn({ err, id }, "[fire-dispatch] failed to persist dispatch audio clip");
+        logger.warn({ err, id }, "[fire-dispatch] failed to persist dispatch audio clip");
       }
     }
 
@@ -294,9 +270,9 @@ export class FireDispatchProcessor {
       source: "fire_dispatch",
       type: "ACCIDENT",
       subtype: "ACCIDENT_MAJOR",
-      title: `${sourceTag} ${keywords[0] ? `Fire dispatch · ${keywords[0]}` : "Fire dispatch"}`,
+      title: keywords[0] ? `Fire dispatch · ${keywords[0]}` : "Fire dispatch",
       description:
-        `${sourceTag} Fire dispatch (${keywords.join(", ")})` +
+        `Fire dispatch (${keywords.join(", ")})` +
         (unverifiedAddress ? ` [UNVERIFIED ADDRESS — heard: "${location}"]` : "") +
         `: ${transcript.slice(0, 800)}`,
       coordinates: { latitude: coords.lat, longitude: coords.lng },
@@ -304,12 +280,13 @@ export class FireDispatchProcessor {
       severity: severityFromPriority(priority),
       timestamp: existing?.timestamp ?? now.toISOString(),
       expiresAt: new Date(now.getTime() + config.incidentTtlMs).toISOString(),
-      provider: `${this.ctx.zoneId}_fire_dispatch_${this.ctx.sourceType}`,
+      provider: `${this.ctx.zoneId}_fire_dispatch`,
       unverifiedAddress,
       audioUrl,
     };
 
     this.incidentStore.upsert(incident);
+    noteFireDispatchPosted();
 
     if (existing) {
       logger.info(

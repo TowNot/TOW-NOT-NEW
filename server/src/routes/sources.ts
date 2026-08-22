@@ -3,7 +3,7 @@ import { config } from "../config";
 import { getProviderRuntimeStats } from "../engine/wazeAggregator";
 import { enabledCoverageZones } from "../engine/coverageZones";
 import { getOpenWebNinjaGoogleMapsRuntime } from "../engine/googleMaps/openWebNinjaGoogleMapsScraper";
-import { getFireDispatchRuntime } from "../engine/workers/londonFireListener";
+import { getFireDispatchRuntime } from "../engine/workers/fireDispatchRuntime";
 import type { IncidentStore } from "../store/incidentStore";
 import { subscriptionStoreStats } from "../store/subscriptionStore";
 import type { IncidentSource } from "../types/incident";

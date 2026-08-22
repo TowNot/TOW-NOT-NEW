@@ -51,11 +51,10 @@ function labelForIncident(incident: Incident): string {
   if (incident.provider) {
     const known = PROVIDER_LABELS[incident.provider];
     if (known) return known;
-    const m = incident.provider.match(/^([a-zA-Z]+)_fire_dispatch_(stream|calls)$/);
+    const m = incident.provider.match(/^([a-zA-Z]+)_fire_dispatch(?:_(hls|icecast|stream|calls))?$/);
     if (m) {
       const zone = getCoverageZone(m[1]);
-      const source = m[2] === "stream" ? "Stream" : "Calls";
-      return zone ? `Fire dispatch (${source}) · ${zone.name}` : `Fire dispatch (${source})`;
+      return zone ? `Fire dispatch · ${zone.name}` : "Fire dispatch";
     }
     return incident.provider;
   }
@@ -91,7 +90,7 @@ export function buildProgressierPayload(
 
 export function resolveIncidentZoneId(incident: Incident): string | null {
   if (incident.source === "fire_dispatch") {
-    const m = incident.provider?.match(/^([a-zA-Z]+)_fire_dispatch_(stream|calls)$/);
+    const m = incident.provider?.match(/^([a-zA-Z]+)_fire_dispatch(?:_(hls|icecast|stream|calls))?$/);
     if (m) return m[1];
   }
   return zoneIdForCoordinates(

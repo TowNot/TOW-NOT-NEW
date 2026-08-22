@@ -105,12 +105,12 @@ export const config = {
   pollRadiusKm: Number(process.env.POLL_RADIUS_KM ?? 15),
   /** OpenWebNinja Google Maps traffic alerts (separate from BlocksInside). */
   openWebNinjaApiKey: process.env.OPENWEBNINJA_API_KEY?.trim() || "",
-  /** Broadcastify Calls Client API (London A/B vs standard stream). */
+  /** @deprecated Broadcastify Calls abandoned — kept for env compatibility. */
   broadcastifyCallsApiKey: process.env.BROADCASTIFY_CALLS_API_KEY?.trim() || "",
   broadcastifyCallsApiBase:
-    process.env.BROADCASTIFY_CALLS_API_BASE?.trim() || "https://api.broadcastify.com",
+    process.env.BROADCASTIFY_CALLS_API_BASE?.trim() || "https://api.bcfy.io",
   broadcastifyCallsAudioBase:
-    process.env.BROADCASTIFY_CALLS_AUDIO_BASE?.trim() || "https://api.broadcastify.com",
+    process.env.BROADCASTIFY_CALLS_AUDIO_BASE?.trim() || "https://api.bcfy.io",
   googleMapsPollIntervalMs: (() => {
     const raw = Number(process.env.GOOGLE_MAPS_POLL_INTERVAL_MS ?? 30_000);
     if (!Number.isFinite(raw) || raw < 10_000) return 30_000;

@@ -5,7 +5,7 @@ import {
   readyToFlush,
   shedOldestSegments,
   takeFlushChunk,
-} from "../src/engine/workers/londonFireListener";
+} from "../src/engine/workers/audioBuffer";
 
 const SEGMENT_SECONDS = 4.023; // Broadcastify feed 34296 segment length
 const BUFFER_TARGET_SECONDS = 10;

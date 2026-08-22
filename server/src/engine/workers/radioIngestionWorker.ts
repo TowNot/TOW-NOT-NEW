@@ -1,21 +1,16 @@
 import { logger } from "../../logger";
 import { IncidentStore } from "../../store/incidentStore";
-import {
-  attachFireIncidentStore,
-  startLondonFireListener,
-  stopLondonFireListener,
-} from "./londonFireListener";
+import { startRadioOrchestrator, stopRadioOrchestrator } from "./radioOrchestrator";
 
 export class RadioIngestionWorker {
   constructor(private readonly store: IncidentStore) {}
 
   start(): void {
-    attachFireIncidentStore(this.store);
-    logger.info("London Fire dispatch listener starting");
-    startLondonFireListener();
+    logger.info("Fire dispatch radio orchestrator starting");
+    startRadioOrchestrator(this.store);
   }
 
   stop(): void {
-    stopLondonFireListener();
+    stopRadioOrchestrator();
   }
 }
