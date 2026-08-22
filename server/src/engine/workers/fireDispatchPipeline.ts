@@ -13,6 +13,7 @@ import {
   type DispatchPriority,
 } from "../dispatchKeywords";
 import { speechToText } from "../deepgramClient";
+import { getCoverageZone } from "../zones.config";
 import type { Incident } from "../../types/incident";
 import type { IncidentStore } from "../../store/incidentStore";
 
@@ -25,12 +26,21 @@ export interface FireDispatchContext {
 }
 
 export function sourceTagLabel(sourceType: FireAudioSourceType): string {
-  return sourceType === "stream" ? "[Source: Stream]" : "[Source: Calls]";
+  return sourceType === "stream" ? "[Stream]" : "[Calls]";
 }
 
-const LONDON_FALLBACK_COORDS = { lat: 42.9837, lng: -81.2497 };
 const SILENCE_RMS_DBFS = -50;
 const DEDUP_TTL_MS = 30 * 60 * 1000;
+
+function zoneCenter(zoneId: string): { lat: number; lng: number } {
+  const zone = getCoverageZone(zoneId);
+  if (!zone) return { lat: 43.65, lng: -79.38 };
+  const { southWest, northEast } = zone.bounds;
+  return {
+    lat: (southWest.lat + northEast.lat) / 2,
+    lng: (southWest.lng + northEast.lng) / 2,
+  };
+}
 
 /** Cross-source A/B latency benchmark keyed by dispatch location slug. */
 const crossSourceArrivals = new Map<
@@ -116,8 +126,13 @@ function severityFromPriority(priority: DispatchPriority): Incident["severity"] 
   return "medium";
 }
 
-async function geocodeLondon(location: string): Promise<{ lat: number; lng: number } | null> {
-  const q = encodeURIComponent(`${location}, London, Ontario, Canada`);
+async function geocodeZoneLocation(
+  zoneId: string,
+  location: string,
+): Promise<{ lat: number; lng: number } | null> {
+  const zone = getCoverageZone(zoneId);
+  const city = zone?.name ?? "Ontario";
+  const q = encodeURIComponent(`${location}, ${city}, Ontario, Canada`);
   const res = await fetch(
     `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`,
     { headers: { "User-Agent": "AlertNav-FireDispatch/1.0" } },
@@ -206,18 +221,18 @@ export class FireDispatchProcessor {
     let unverifiedAddress = false;
 
     if (location) {
-      coords = await geocodeLondon(location).catch(() => null);
+      coords = await geocodeZoneLocation(this.ctx.zoneId, location).catch(() => null);
       if (!coords) {
         const corrected = fuzzyCorrectStreets(location);
         if (corrected !== location) {
-          coords = await geocodeLondon(corrected).catch(() => null);
+          coords = await geocodeZoneLocation(this.ctx.zoneId, corrected).catch(() => null);
           if (coords) location = corrected;
         }
       }
     }
 
     if (!coords) {
-      coords = { ...LONDON_FALLBACK_COORDS };
+      coords = { ...zoneCenter(this.ctx.zoneId) };
       unverifiedAddress = true;
     }
 
@@ -272,6 +287,7 @@ export class FireDispatchProcessor {
       }
     }
 
+    const zoneName = getCoverageZone(this.ctx.zoneId)?.name ?? "Ontario";
     const existing = this.incidentStore.getById(id);
     const incident: Incident = {
       id,
@@ -284,7 +300,7 @@ export class FireDispatchProcessor {
         (unverifiedAddress ? ` [UNVERIFIED ADDRESS — heard: "${location}"]` : "") +
         `: ${transcript.slice(0, 800)}`,
       coordinates: { latitude: coords.lat, longitude: coords.lng },
-      locationLabel: `${location}, London, ON`,
+      locationLabel: `${location}, ${zoneName}, ON`,
       severity: severityFromPriority(priority),
       timestamp: existing?.timestamp ?? now.toISOString(),
       expiresAt: new Date(now.getTime() + config.incidentTtlMs).toISOString(),

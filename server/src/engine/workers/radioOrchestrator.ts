@@ -1,7 +1,7 @@
 import { logger } from "../../logger";
 import { IncidentStore } from "../../store/incidentStore";
 import { COVERAGE_ZONES } from "../zones.config";
-import { startBroadcastifyCallsListener } from "./broadcastifyCallsListener";
+import { startCallsListener } from "./callsListener";
 import { attachFireDispatchStore } from "./fireDispatchPipeline";
 import { startZoneStreamListener } from "./fireStreamListener";
 
@@ -22,7 +22,7 @@ export function startRadioOrchestrator(store: IncidentStore): void {
       }
 
       if (source.type === "calls") {
-        stopFns.push(startBroadcastifyCallsListener(zone.id, source));
+        stopFns.push(startCallsListener(zone.id, source));
       }
     }
   }

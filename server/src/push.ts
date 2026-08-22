@@ -1,5 +1,6 @@
 import { config } from "./config";
 import { zoneIdForCoordinates, zonePushTag } from "./engine/coverageZones";
+import { getCoverageZone } from "./engine/zones.config";
 import { logger } from "./logger";
 import type { Incident, PushPayload } from "./types/incident";
 
@@ -48,7 +49,15 @@ const PROVIDER_LABELS: Record<string, string> = {
 
 function labelForIncident(incident: Incident): string {
   if (incident.provider) {
-    return PROVIDER_LABELS[incident.provider] ?? incident.provider;
+    const known = PROVIDER_LABELS[incident.provider];
+    if (known) return known;
+    const m = incident.provider.match(/^([a-zA-Z]+)_fire_dispatch_(stream|calls)$/);
+    if (m) {
+      const zone = getCoverageZone(m[1]);
+      const source = m[2] === "stream" ? "Stream" : "Calls";
+      return zone ? `Fire dispatch (${source}) · ${zone.name}` : `Fire dispatch (${source})`;
+    }
+    return incident.provider;
   }
   return SOURCE_LABELS[incident.source];
 }
@@ -81,7 +90,10 @@ export function buildProgressierPayload(
 }
 
 export function resolveIncidentZoneId(incident: Incident): string | null {
-  if (incident.source === "fire_dispatch") return "london";
+  if (incident.source === "fire_dispatch") {
+    const m = incident.provider?.match(/^([a-zA-Z]+)_fire_dispatch_(stream|calls)$/);
+    if (m) return m[1];
+  }
   return zoneIdForCoordinates(
     incident.coordinates.latitude,
     incident.coordinates.longitude,

@@ -13,7 +13,7 @@ export interface ZoneCallsAudioSource {
   enabled: boolean;
   type: "calls";
   nodeId: number;
-  talkgroups?: number[];
+  talkgroups: number[];
   description: string;
 }
 
@@ -61,14 +61,6 @@ function buildZone(seed: ZoneSeed): CoverageZoneDef {
   };
 }
 
-function streamSource(
-  description: string,
-  url: string,
-  enabled: boolean,
-): ZoneStreamAudioSource {
-  return { enabled, type: "stream", url, description };
-}
-
 /** Southern Ontario expansion list — enable zones individually for Waze + audio. */
 const ZONE_SEEDS: ZoneSeed[] = [
   {
@@ -87,7 +79,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
         enabled: true,
         type: "calls",
         nodeId: 6294,
-        talkgroups: [432, 433],
+        talkgroups: [],
         description: "London Calls",
       },
     ],
@@ -98,7 +90,13 @@ const ZONE_SEEDS: ZoneSeed[] = [
     center: { lat: 43.1306, lng: -80.7467 },
     enabled: true,
     audioSources: [
-      streamSource("Oxford County Fire (Calls Node)", "", false),
+      {
+        enabled: true,
+        type: "calls",
+        nodeId: 6293,
+        talkgroups: [],
+        description: "Oxford County Calls",
+      },
     ],
   },
   {
@@ -107,11 +105,12 @@ const ZONE_SEEDS: ZoneSeed[] = [
     center: { lat: 43.4587, lng: -80.5129 },
     enabled: true,
     audioSources: [
-      streamSource(
-        "Waterloo Region Fire (CYKF Feed)",
-        "http://cykf.net:8000/scanner",
-        true,
-      ),
+      {
+        enabled: true,
+        type: "stream",
+        url: "http://cykf.net:8000/scanner",
+        description: "Waterloo Region Stream",
+      },
     ],
   },
   {
@@ -119,7 +118,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     name: "Guelph",
     center: { lat: 43.5448, lng: -80.2482 },
     enabled: false,
-    audioSources: [streamSource("Guelph Fire (Encrypted)", "", false)],
+    audioSources: [],
   },
   {
     id: "cambridge",
@@ -127,11 +126,12 @@ const ZONE_SEEDS: ZoneSeed[] = [
     center: { lat: 43.3972, lng: -80.3114 },
     enabled: true,
     audioSources: [
-      streamSource(
-        "Waterloo Region Fire (CYKF Feed)",
-        "http://cykf.net:8000/scanner",
-        true,
-      ),
+      {
+        enabled: true,
+        type: "stream",
+        url: "http://cykf.net:8000/scanner",
+        description: "Waterloo Region Stream",
+      },
     ],
   },
   {
@@ -140,11 +140,12 @@ const ZONE_SEEDS: ZoneSeed[] = [
     center: { lat: 43.5167, lng: -79.8833 },
     enabled: true,
     audioSources: [
-      streamSource(
-        "Halton Hills / Milton Fire Department",
-        "https://broadcastify.cdnstream1.com/43263",
-        true,
-      ),
+      {
+        enabled: true,
+        type: "stream",
+        url: "https://broadcastify.cdnstream1.com/43263",
+        description: "Halton Hills / Milton Stream",
+      },
     ],
   },
   {
@@ -153,11 +154,12 @@ const ZONE_SEEDS: ZoneSeed[] = [
     center: { lat: 43.6475, lng: -79.9197 },
     enabled: true,
     audioSources: [
-      streamSource(
-        "Halton Hills / Milton Fire Department",
-        "https://broadcastify.cdnstream1.com/43263",
-        true,
-      ),
+      {
+        enabled: true,
+        type: "stream",
+        url: "https://broadcastify.cdnstream1.com/43263",
+        description: "Halton Hills / Milton Stream",
+      },
     ],
   },
   {
@@ -165,7 +167,15 @@ const ZONE_SEEDS: ZoneSeed[] = [
     name: "Mississauga",
     center: { lat: 43.589, lng: -79.6441 },
     enabled: true,
-    audioSources: [streamSource("Peel Region Fire", "", false)],
+    audioSources: [
+      {
+        enabled: true,
+        type: "calls",
+        nodeId: 4158,
+        talkgroups: [],
+        description: "Peel Region Calls",
+      },
+    ],
   },
   { id: "torontoCore", name: "Toronto (Core)", center: { lat: 43.6532, lng: -79.3832 } },
   { id: "etobicoke", name: "Etobicoke", center: { lat: 43.6205, lng: -79.5132 } },
@@ -194,9 +204,27 @@ const ZONE_SEEDS: ZoneSeed[] = [
   { id: "barrie", name: "Barrie", center: { lat: 44.3894, lng: -79.6903 } },
   { id: "windsor", name: "Windsor", center: { lat: 42.3149, lng: -83.0364 } },
   { id: "chatham", name: "Chatham-Kent", center: { lat: 42.4048, lng: -82.191 } },
-  { id: "brampton", name: "Brampton", center: { lat: 43.6833, lng: -79.7667 } },
+  {
+    id: "brampton",
+    name: "Brampton",
+    center: { lat: 43.6833, lng: -79.7667 },
+    enabled: true,
+    audioSources: [
+      {
+        enabled: true,
+        type: "calls",
+        nodeId: 4158,
+        talkgroups: [],
+        description: "Peel Region Calls",
+      },
+    ],
+  },
 ];
 
 export const COVERAGE_ZONES: CoverageZoneDef[] = ZONE_SEEDS.map(buildZone);
 
 export const COVERAGE_ZONE_IDS = COVERAGE_ZONES.map((zone) => zone.id);
+
+export function getCoverageZone(id: string): CoverageZoneDef | undefined {
+  return COVERAGE_ZONES.find((zone) => zone.id === id);
+}

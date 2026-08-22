@@ -124,11 +124,43 @@ function downloadCallAudio(url: string): Promise<Buffer> {
   });
 }
 
-/** Poll Broadcastify Calls live API for a node and transcribe each new call. */
-export function startBroadcastifyCallsListener(
-  zoneId: string,
-  source: ZoneCallsAudioSource,
-): () => void {
+async function processNewCall(
+  processor: ReturnType<typeof createFireDispatchProcessor>,
+  call: LiveCallRow,
+  nodeId: number,
+  talkgroupFilter: Set<number> | null,
+  seenTs: Set<number>,
+): Promise<void> {
+  const ts = callTimestamp(call);
+  if (!ts || seenTs.has(ts)) return;
+  seenTs.add(ts);
+  if (seenTs.size > 500) {
+    const oldest = [...seenTs].slice(0, 100);
+    oldest.forEach((v) => seenTs.delete(v));
+  }
+
+  const tg = callTalkgroup(call);
+  if (talkgroupFilter && tg !== null && !talkgroupFilter.has(tg)) return;
+
+  const audioUrl = callAudioUrl(call);
+  if (!audioUrl) {
+    logger.debug("[fire-dispatch] calls row missing audio URL — skipped", {
+      nodeId,
+      ts,
+      tg,
+    });
+    return;
+  }
+
+  const wav = await downloadCallAudio(audioUrl);
+  await processor.processWav(wav);
+}
+
+/**
+ * Broadcastify Calls listener — polls the live Calls API for a node, downloads
+ * each finished M4A/MP3 transmission, and feeds it into the STT pipeline.
+ */
+export function startCallsListener(zoneId: string, source: ZoneCallsAudioSource): () => void {
   const processor = createFireDispatchProcessor({
     zoneId,
     sourceType: "calls",
@@ -146,45 +178,21 @@ export function startBroadcastifyCallsListener(
   let pos = 0;
   const seenTs = new Set<number>();
   const talkgroupFilter =
-    source.talkgroups && source.talkgroups.length > 0
-      ? new Set(source.talkgroups)
-      : null;
+    source.talkgroups.length > 0 ? new Set(source.talkgroups) : null;
 
   const tick = async (): Promise<void> => {
     const { calls, pos: nextPos } = await fetchLiveCalls(source.nodeId, pos);
     pos = nextPos;
 
     for (const call of calls) {
-      const ts = callTimestamp(call);
-      if (!ts || seenTs.has(ts)) continue;
-      seenTs.add(ts);
-      if (seenTs.size > 500) {
-        const oldest = [...seenTs].slice(0, 100);
-        oldest.forEach((v) => seenTs.delete(v));
-      }
-
-      const tg = callTalkgroup(call);
-      if (talkgroupFilter && tg !== null && !talkgroupFilter.has(tg)) continue;
-
-      const audioUrl = callAudioUrl(call);
-      if (!audioUrl) {
-        logger.debug(
-          "[fire-dispatch] calls row missing audio URL — skipped",
-          { nodeId: source.nodeId, ts, tg },
-        );
-        continue;
-      }
-
       try {
-        const wav = await downloadCallAudio(audioUrl);
-        await processor.processWav(wav);
+        await processNewCall(processor, call, source.nodeId, talkgroupFilter, seenTs);
       } catch (err) {
         logger.warn("[fire-dispatch] calls audio processing failed", {
           err,
           nodeId: source.nodeId,
-          ts,
-          tg,
-          audioUrl,
+          ts: callTimestamp(call),
+          tg: callTalkgroup(call),
         });
       }
     }
@@ -217,3 +225,6 @@ export function startBroadcastifyCallsListener(
     clearInterval(timer);
   };
 }
+
+/** @deprecated Use startCallsListener */
+export const startBroadcastifyCallsListener = startCallsListener;
