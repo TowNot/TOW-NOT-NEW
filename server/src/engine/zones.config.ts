@@ -76,7 +76,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
         description: "London Stream",
       },
       {
-        enabled: true,
+        enabled: false,
         type: "calls",
         nodeId: 6294,
         talkgroups: [],
