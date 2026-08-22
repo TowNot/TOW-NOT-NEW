@@ -1,5 +1,10 @@
 import { config } from "../../config";
 import { boundingBox, distanceKm, type BoundingBox } from "../geo";
+import {
+  enabledCoverageZones,
+  zoneCenter,
+  zoneToBoundingBox,
+} from "../coverageZones";
 import { logger } from "../../logger";
 import type { Incident, IncidentSeverity } from "../../types/incident";
 
@@ -20,34 +25,23 @@ export interface GoogleMapsCity {
   box?: BoundingBox;
 }
 
-function parseCoordPair(raw: string): { lat: number; lng: number } | null {
-  const [latRaw, lngRaw] = raw.split(",").map((part) => part.trim());
-  const lat = Number(latRaw);
-  const lng = Number(lngRaw);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-  return { lat, lng };
-}
+/** OpenWebNinja Google Maps is London-only, even if other zones are enabled. */
+const GOOGLE_MAPS_ZONE_IDS = new Set(["london"]);
 
-function londonCoverageBox(): BoundingBox {
-  const bottomLeft = parseCoordPair(config.wazeBottomLeft);
-  const topRight = parseCoordPair(config.wazeTopRight);
-  if (bottomLeft && topRight) {
-    return { bottomLeft, topRight };
-  }
-  return boundingBox(config.londonLat, config.londonLng, config.pollRadiusKm);
-}
-
-/** City registry — London, ON first; add more cities later without touching Waze/Fire. */
-export const GOOGLE_MAPS_CITIES: GoogleMapsCity[] = [
-  {
-    id: "london_on",
-    name: "London, ON",
-    lat: config.londonLat,
-    lng: config.londonLng,
-    radiusKm: config.pollRadiusKm,
-    box: londonCoverageBox(),
-  },
-];
+export const GOOGLE_MAPS_CITIES: GoogleMapsCity[] = enabledCoverageZones()
+  .filter((zone) => GOOGLE_MAPS_ZONE_IDS.has(zone.id))
+  .map((zone) => {
+    const box = zoneToBoundingBox(zone);
+    const center = zoneCenter(zone);
+    return {
+      id: zone.id,
+      name: `${zone.name}, ON`,
+      lat: center.lat,
+      lng: center.lng,
+      radiusKm: config.pollRadiusKm,
+      box,
+    };
+  });
 
 export interface OpenWebNinjaGoogleMapsRuntime {
   lastFetchAt: string | null;

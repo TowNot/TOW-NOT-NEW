@@ -28,7 +28,7 @@ export function LandingPage() {
           <nav className="flex items-center gap-3 sm:gap-4" aria-label="Primary">
             {/* TEMP: remove after launch — quick access to Waze + Fire desk */}
             <a
-              href="/desk"
+              href="/dashboard"
               className="rounded-md border border-cobalt/30 bg-white px-3 py-2 text-xs font-semibold text-cobalt no-underline hover:bg-ink"
             >
               Live desk

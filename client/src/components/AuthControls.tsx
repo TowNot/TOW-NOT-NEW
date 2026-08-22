@@ -9,7 +9,7 @@ export function AuthControls() {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <SignedOut>
-        <SignInButton mode="modal">
+        <SignInButton mode="modal" forceRedirectUrl="/welcome">
           <button
             type="button"
             className="rounded-md border border-line bg-white px-3 py-2 text-xs font-semibold tracking-wide text-cobalt hover:bg-ink"
@@ -17,7 +17,7 @@ export function AuthControls() {
             Sign in
           </button>
         </SignInButton>
-        <SignUpButton mode="modal">
+        <SignUpButton mode="modal" forceRedirectUrl="/welcome">
           <button
             type="button"
             className="rounded-md bg-cobalt px-3 py-2 text-xs font-semibold tracking-wide text-white hover:brightness-110"

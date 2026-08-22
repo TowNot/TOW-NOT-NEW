@@ -1,6 +1,7 @@
 import { ProxyAgent, fetch as undiciFetch } from "undici";
 import { config } from "../config";
 import { boundingBox, distanceKm, splitBoundingBox, type BoundingBox } from "./geo";
+import { enabledCoverageZones, zoneToBoundingBox } from "./coverageZones";
 import { logger } from "./pinoCompat";
 
 /** Every provider the aggregator can pull live accidents from. */
@@ -1114,12 +1115,6 @@ function parseCoordPair(raw: string): { lat: number; lng: number } {
   return { lat, lng };
 }
 
-function londonBlocksInsideBox(): BoundingBox {
-  const bottomLeft = parseCoordPair(config.wazeBottomLeft);
-  const topRight = parseCoordPair(config.wazeTopRight);
-  return { bottomLeft, topRight };
-}
-
 async function fetchBlocksInsideTile(tile: BoundingBox): Promise<WazeAlert[]> {
   const params = new URLSearchParams({
     "bottom-left": blocksInsideCoordPair(tile.bottomLeft.lat, tile.bottomLeft.lng),
@@ -1157,21 +1152,20 @@ async function fetchBlocksInsideTile(tile: BoundingBox): Promise<WazeAlert[]> {
   return parseRawAlerts(rawAlerts, "blocksinside");
 }
 
-async function fetchBlocksInside(
-  _lat: number,
-  _lng: number,
-  _radiusKm: number,
-): Promise<WazeAlert[]> {
-  const tiles = splitBoundingBox(londonBlocksInsideBox(), BLOCKSINSIDE_TILE_DIVISIONS);
-  logger.debug(
-    {
-      tiles: tiles.length,
-      country: config.wazeApiCountry,
-      filter: '["ACCIDENT"]',
-    },
-    "BlocksInside 4-tile poll",
-  );
+function londonBlocksInsideBox(): BoundingBox {
+  const bottomLeft = parseCoordPair(config.wazeBottomLeft);
+  const topRight = parseCoordPair(config.wazeTopRight);
+  return { bottomLeft, topRight };
+}
 
+function blocksInsideZoneBoxes(): BoundingBox[] {
+  const zones = enabledCoverageZones();
+  if (zones.length === 0) return [londonBlocksInsideBox()];
+  return zones.map(zoneToBoundingBox);
+}
+
+async function fetchBlocksInsideBox(box: BoundingBox): Promise<WazeAlert[]> {
+  const tiles = splitBoundingBox(box, BLOCKSINSIDE_TILE_DIVISIONS);
   const settled = await Promise.allSettled(tiles.map((tile) => fetchBlocksInsideTile(tile)));
   const merged: WazeAlert[] = [];
   const seenIds = new Set<string>();
@@ -1194,13 +1188,61 @@ async function fetchBlocksInside(
   }
 
   if (failedTiles === tiles.length) {
+    throw new Error(
+      `blocksinside all tile fetches failed for box ${blocksInsideCoordPair(box.bottomLeft.lat, box.bottomLeft.lng)}`,
+    );
+  }
+
+  return merged;
+}
+
+async function fetchBlocksInside(
+  _lat: number,
+  _lng: number,
+  _radiusKm: number,
+): Promise<WazeAlert[]> {
+  const boxes = blocksInsideZoneBoxes();
+  logger.debug(
+    {
+      cities: enabledCoverageZones().map((z) => z.id),
+      tilesPerCity: BLOCKSINSIDE_TILE_DIVISIONS ** 2,
+      country: config.wazeApiCountry,
+      filter: '["ACCIDENT"]',
+    },
+    "BlocksInside 4-tile poll",
+  );
+
+  const settled = await Promise.allSettled(boxes.map((box) => fetchBlocksInsideBox(box)));
+  const merged: WazeAlert[] = [];
+  const seenIds = new Set<string>();
+  let failedCities = 0;
+
+  for (const result of settled) {
+    if (result.status === "rejected") {
+      failedCities += 1;
+      logger.warn(
+        { error: result.reason instanceof Error ? result.reason.message : String(result.reason) },
+        "BlocksInside city fetch failed",
+      );
+      continue;
+    }
+    for (const alert of result.value) {
+      if (seenIds.has(alert.alertId)) continue;
+      seenIds.add(alert.alertId);
+      merged.push(alert);
+    }
+  }
+
+  if (failedCities === boxes.length) {
     throw new Error("blocksinside all tile fetches failed");
   }
 
   const stats = statFor("blocksinside");
   stats.lastReceived = merged.length;
   stats.lastRetained = merged.length;
-  logger.debug(`[WAZE API] BlocksInside merged ${merged.length} accidents from ${tiles.length - failedTiles}/${tiles.length} tiles`);
+  logger.debug(
+    `[WAZE API] BlocksInside merged ${merged.length} accidents from ${boxes.length - failedCities}/${boxes.length} cities`,
+  );
   return merged;
 }
 

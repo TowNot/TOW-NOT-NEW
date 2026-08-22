@@ -21,7 +21,12 @@ if (!publishableKey) {
 createRoot(root).render(
   <StrictMode>
     {publishableKey ? (
-      <ClerkProvider publishableKey={publishableKey} afterSignOutUrl="/">
+      <ClerkProvider
+      publishableKey={publishableKey}
+      afterSignOutUrl="/"
+      signInFallbackRedirectUrl="/welcome"
+      signUpFallbackRedirectUrl="/welcome"
+    >
         <App />
       </ClerkProvider>
     ) : (

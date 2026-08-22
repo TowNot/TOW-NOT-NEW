@@ -15,6 +15,7 @@ import { createPushRouter } from "./routes/push";
 import { createSmsRouter } from "./routes/sms";
 import { createSourcesRouter } from "./routes/sources";
 import { createSubscriptionsRouter } from "./routes/subscriptions";
+import { createMeRouter } from "./routes/me";
 import { stripeWebhookHandler } from "./routes/stripeWebhook";
 import type { IncidentStore } from "./store/incidentStore";
 
@@ -48,7 +49,7 @@ export function createApp(store: IncidentStore, dispatcher: PushDispatcher): exp
   app.use(
     cors({
       origin: [config.clientOrigin, "http://127.0.0.1:5173"],
-      methods: ["GET", "POST", "DELETE", "OPTIONS"],
+      methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
       credentials: true,
     }),
   );
@@ -86,6 +87,7 @@ export function createApp(store: IncidentStore, dispatcher: PushDispatcher): exp
   app.use("/api/push", requireClerkAuth, createPushRouter(dispatcher));
   app.use("/api/sms", requireClerkAuth, createSmsRouter());
   app.use("/api/subscriptions", requireClerkAuth, createSubscriptionsRouter());
+  app.use("/api/me", requireClerkAuth, createMeRouter());
 
   return app;
 }

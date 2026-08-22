@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { config } from "../config";
 import { getProviderRuntimeStats } from "../engine/wazeAggregator";
+import { enabledCoverageZones } from "../engine/coverageZones";
 import { getOpenWebNinjaGoogleMapsRuntime } from "../engine/googleMaps/openWebNinjaGoogleMapsScraper";
 import { getFireDispatchRuntime } from "../engine/workers/londonFireListener";
 import type { IncidentStore } from "../store/incidentStore";
@@ -60,6 +61,7 @@ export function createSourcesRouter(store: IncidentStore): Router {
         limit: "",
         tiles: 4,
         tileDivisions: 2,
+        cities: enabledCoverageZones().map((zone) => zone.id),
         "bottom-left": config.wazeBottomLeft,
         "top-right": config.wazeTopRight,
         country: config.wazeApiCountry,

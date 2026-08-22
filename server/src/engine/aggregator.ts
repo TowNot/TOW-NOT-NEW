@@ -18,8 +18,10 @@ export class DataAggregatorEngine {
       publicUrl: config.publicUrl,
       filter: '["ACCIDENT"]',
       country: config.wazeApiCountry,
-      tiles: 4,
-      box: `${config.wazeBottomLeft} .. ${config.wazeTopRight}`,
+      tilesPerCity: 4,
+      cities: ["london", "brampton"],
+      londonBox: `${config.wazeBottomLeft} .. ${config.wazeTopRight}`,
+      bramptonBox: "43.5933, -79.8897 .. 43.7733, -79.6437",
     });
     if (!config.wazeApiKey) {
       logger.warn("WAZEAPI_KEY is unset — BlocksInside poll will be skipped");

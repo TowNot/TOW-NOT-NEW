@@ -77,6 +77,7 @@ export class WazeTrafficPoller {
       filter: '["ACCIDENT"]',
       country: config.wazeApiCountry,
       tiles: 4,
+      cities: ["london", "brampton"],
       bottomLeft: config.wazeBottomLeft,
       topRight: config.wazeTopRight,
     });

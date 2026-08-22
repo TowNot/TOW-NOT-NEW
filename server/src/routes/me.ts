@@ -1,0 +1,39 @@
+import { clerkClient, getAuth } from "@clerk/express";
+import { Router } from "express";
+import { logger } from "../logger";
+
+const ZONE_IDS = new Set(["london", "hamilton", "mississauga", "brampton", "toronto"]);
+
+export function createMeRouter(): Router {
+  const router = Router();
+
+  router.patch("/zone", async (req, res, next) => {
+    try {
+      const auth = getAuth(req);
+      if (!auth.isAuthenticated || !auth.userId) {
+        res.status(401).json({ error: "Unauthorized — sign in required" });
+        return;
+      }
+
+      const selectedZoneId =
+        typeof req.body?.selectedZoneId === "string" ? req.body.selectedZoneId.trim() : "";
+      if (!ZONE_IDS.has(selectedZoneId)) {
+        res.status(400).json({ error: "Unknown zone" });
+        return;
+      }
+
+      await clerkClient.users.updateUser(auth.userId, {
+        publicMetadata: { selectedZoneId },
+      });
+
+      res.json({ ok: true, selectedZoneId });
+    } catch (error) {
+      logger.warn("Failed to persist selectedZoneId on Clerk publicMetadata", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      next(error);
+    }
+  });
+
+  return router;
+}
