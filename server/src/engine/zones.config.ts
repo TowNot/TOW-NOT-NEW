@@ -6,12 +6,12 @@ export const ZONE_LNG_HALF = 0.123;
 export interface ZoneHlsAudio {
   enabled: boolean;
   type: "hls";
-  /** Null = placeholder until a Broadcastify feed ID is assigned. */
+  /** Null = pending / locked-down — orchestrator skips audio, Waze still polls. */
   feedId: number | null;
   description: string;
 }
 
-/** Continuous Icecast/MP3 stream (e.g. CYKF Waterloo). */
+/** Continuous Icecast/MP3 stream (e.g. CYKF Waterloo Region). */
 export interface ZoneStreamAudio {
   enabled: boolean;
   type: "stream";
@@ -44,7 +44,7 @@ interface ZoneSeed {
   scannedAgencies?: string[];
 }
 
-/** Placeholder HLS entry — fill in feedId later; never starts the listener. */
+/** Pending HLS — feed TBD. Zone can still be enabled for Waze without starting audio. */
 function hlsPending(description: string): ZoneHlsAudio {
   return {
     enabled: false,
@@ -79,10 +79,13 @@ function buildZone(seed: ZoneSeed): CoverageZoneDef {
 }
 
 /**
- * Southern Ontario expansion list — enable zones individually for Waze + audio.
- * Centers / half-spans for existing cities must not be changed casually.
+ * Southern Ontario coverage catalog.
+ * Phase 1: Fire HLS / CYKF stream where feed IDs are known.
+ * Pending regions keep feedId null so Waze can poll without crashing audio.
+ * Do not casually change existing city centers / half-spans.
  */
 const ZONE_SEEDS: ZoneSeed[] = [
+  // ── Active Fire / CYKF audio ──────────────────────────────────────────
   {
     id: "london",
     name: "London",
@@ -95,49 +98,6 @@ const ZONE_SEEDS: ZoneSeed[] = [
       description: "London Fire",
     },
     scannedAgencies: ["Fire", "Public Works"],
-  },
-  {
-    id: "woodstock",
-    name: "Woodstock",
-    center: { lat: 43.1306, lng: -80.7467 },
-    enabled: false,
-    audio: hlsPending("Woodstock Fire (feed TBD)"),
-    scannedAgencies: [],
-  },
-  {
-    id: "kitchener",
-    name: "Kitchener / Waterloo",
-    center: { lat: 43.4587, lng: -80.5129 },
-    enabled: true,
-    audio: {
-      enabled: true,
-      type: "stream",
-      url: "http://cykf.net:8000/scanner",
-      description: "Waterloo Region (CYKF)",
-    },
-    scannedAgencies: ["Fire", "EMS"],
-  },
-  {
-    id: "guelph",
-    name: "Guelph",
-    center: { lat: 43.5448, lng: -80.2482 },
-    enabled: false,
-    audio: hlsPending("Guelph Fire (feed TBD)"),
-    scannedAgencies: [],
-  },
-  {
-    id: "cambridge",
-    name: "Cambridge",
-    center: { lat: 43.3972, lng: -80.3114 },
-    enabled: true,
-    // Same CYKF feed as Kitchener — orchestrator dedupes by URL.
-    audio: {
-      enabled: true,
-      type: "stream",
-      url: "http://cykf.net:8000/scanner",
-      description: "Waterloo Region (CYKF)",
-    },
-    scannedAgencies: ["Fire", "EMS"],
   },
   {
     id: "milton",
@@ -157,7 +117,6 @@ const ZONE_SEEDS: ZoneSeed[] = [
     name: "Halton Hills",
     center: { lat: 43.6475, lng: -79.9197 },
     enabled: true,
-    // Same Broadcastify feed as Milton — orchestrator dedupes by feedId.
     audio: {
       enabled: true,
       type: "hls",
@@ -167,17 +126,49 @@ const ZONE_SEEDS: ZoneSeed[] = [
     scannedAgencies: ["Fire"],
   },
   {
-    id: "mississauga",
-    name: "Mississauga",
-    center: { lat: 43.589, lng: -79.6441 },
-    enabled: false,
-    audio: hlsPending("Mississauga Fire (feed TBD)"),
-    scannedAgencies: [],
+    id: "kitchener",
+    name: "Kitchener",
+    center: { lat: 43.4587, lng: -80.5129 },
+    enabled: true,
+    audio: {
+      enabled: true,
+      type: "stream",
+      url: "http://cykf.net:8000/scanner",
+      description: "Waterloo Region (CYKF)",
+    },
+    scannedAgencies: ["Fire", "EMS"],
+  },
+  {
+    id: "waterloo",
+    name: "Waterloo",
+    center: { lat: 43.4643, lng: -80.5204 },
+    enabled: true,
+    audio: {
+      enabled: true,
+      type: "stream",
+      url: "http://cykf.net:8000/scanner",
+      description: "Waterloo Region (CYKF)",
+    },
+    scannedAgencies: ["Fire", "EMS"],
+  },
+  {
+    id: "cambridge",
+    name: "Cambridge",
+    center: { lat: 43.3972, lng: -80.3114 },
+    enabled: true,
+    audio: {
+      enabled: true,
+      type: "stream",
+      url: "http://cykf.net:8000/scanner",
+      description: "Waterloo Region (CYKF)",
+    },
+    scannedAgencies: ["Fire", "EMS"],
   },
   {
     id: "torontoCore",
     name: "Toronto (Core)",
     center: { lat: 43.6532, lng: -79.3832 },
+    enabled: true,
     audio: {
       enabled: true,
       type: "hls",
@@ -190,6 +181,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "etobicoke",
     name: "Etobicoke",
     center: { lat: 43.6205, lng: -79.5132 },
+    enabled: true,
     audio: {
       enabled: true,
       type: "hls",
@@ -202,6 +194,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "northYork",
     name: "North York",
     center: { lat: 43.7615, lng: -79.4111 },
+    enabled: true,
     audio: {
       enabled: true,
       type: "hls",
@@ -214,6 +207,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "scarborough",
     name: "Scarborough",
     center: { lat: 43.7731, lng: -79.2577 },
+    enabled: true,
     audio: {
       enabled: true,
       type: "hls",
@@ -223,33 +217,10 @@ const ZONE_SEEDS: ZoneSeed[] = [
     scannedAgencies: ["Fire"],
   },
   {
-    id: "pickering",
-    name: "Pickering",
-    center: { lat: 43.8384, lng: -79.0868 },
-    audio: hlsPending("Pickering Fire (feed TBD)"),
-  },
-  {
-    id: "ajax",
-    name: "Ajax",
-    center: { lat: 43.8509, lng: -79.0204 },
-    audio: hlsPending("Ajax Fire (feed TBD)"),
-  },
-  {
-    id: "whitby",
-    name: "Whitby",
-    center: { lat: 43.8971, lng: -78.9422 },
-    audio: hlsPending("Whitby Fire (feed TBD)"),
-  },
-  {
-    id: "oshawa",
-    name: "Oshawa",
-    center: { lat: 43.8971, lng: -78.8658 },
-    audio: hlsPending("Oshawa Fire (feed TBD)"),
-  },
-  {
     id: "hamilton",
     name: "Hamilton",
     center: { lat: 43.2557, lng: -79.8711 },
+    enabled: true,
     audio: {
       enabled: true,
       type: "hls",
@@ -262,6 +233,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "burlington",
     name: "Burlington",
     center: { lat: 43.3255, lng: -79.799 },
+    enabled: true,
     audio: {
       enabled: true,
       type: "hls",
@@ -271,51 +243,10 @@ const ZONE_SEEDS: ZoneSeed[] = [
     scannedAgencies: ["Fire"],
   },
   {
-    id: "oakville",
-    name: "Oakville",
-    center: { lat: 43.4675, lng: -79.6877 },
-    audio: hlsPending("Oakville Fire (feed TBD)"),
-  },
-  {
-    id: "grimsby",
-    name: "Grimsby",
-    center: { lat: 43.1945, lng: -79.5601 },
-    audio: hlsPending("Grimsby Fire (feed TBD)"),
-  },
-  {
-    id: "lincoln",
-    name: "Lincoln / Beamsville",
-    center: { lat: 43.161, lng: -79.4795 },
-    audio: hlsPending("Lincoln / Beamsville Fire (feed TBD)"),
-  },
-  {
-    id: "stCatharines",
-    name: "St. Catharines",
-    center: { lat: 43.1594, lng: -79.2469 },
-    audio: hlsPending("St. Catharines Fire (feed TBD)"),
-  },
-  {
-    id: "niagaraOnTheLake",
-    name: "Niagara-on-the-Lake",
-    center: { lat: 43.255, lng: -79.0773 },
-    audio: hlsPending("Niagara-on-the-Lake Fire (feed TBD)"),
-  },
-  {
-    id: "niagaraFalls",
-    name: "Niagara Falls",
-    center: { lat: 43.0896, lng: -79.0849 },
-    audio: hlsPending("Niagara Falls Fire (feed TBD)"),
-  },
-  {
-    id: "fortErie",
-    name: "Fort Erie",
-    center: { lat: 42.9022, lng: -78.9185 },
-    audio: hlsPending("Fort Erie Fire (feed TBD)"),
-  },
-  {
     id: "brantford",
     name: "Brantford",
     center: { lat: 43.1408, lng: -80.2632 },
+    enabled: true,
     audio: {
       enabled: true,
       type: "hls",
@@ -325,45 +256,10 @@ const ZONE_SEEDS: ZoneSeed[] = [
     scannedAgencies: ["Fire"],
   },
   {
-    id: "vaughan",
-    name: "Vaughan",
-    center: { lat: 43.8361, lng: -79.4983 },
-    audio: hlsPending("Vaughan Fire (feed TBD)"),
-  },
-  {
-    id: "richmondHill",
-    name: "Richmond Hill",
-    center: { lat: 43.8828, lng: -79.4403 },
-    audio: hlsPending("Richmond Hill Fire (feed TBD)"),
-  },
-  {
-    id: "newmarket",
-    name: "Newmarket / Aurora",
-    center: { lat: 44.0592, lng: -79.4613 },
-    audio: hlsPending("Newmarket / Aurora Fire (feed TBD)"),
-  },
-  {
-    id: "markham",
-    name: "Markham",
-    center: { lat: 43.8561, lng: -79.337 },
-    audio: hlsPending("Markham Fire (feed TBD)"),
-  },
-  {
-    id: "caledon",
-    name: "Caledon",
-    center: { lat: 43.8643, lng: -79.9984 },
-    audio: hlsPending("Caledon Fire (feed TBD)"),
-  },
-  {
-    id: "bowmanville",
-    name: "Bowmanville / Clarington",
-    center: { lat: 43.9103, lng: -78.6874 },
-    audio: hlsPending("Bowmanville / Clarington Fire (feed TBD)"),
-  },
-  {
     id: "barrie",
     name: "Barrie",
     center: { lat: 44.3894, lng: -79.6903 },
+    enabled: true,
     audio: {
       enabled: true,
       type: "hls",
@@ -376,6 +272,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "windsor",
     name: "Windsor",
     center: { lat: 42.3149, lng: -83.0364 },
+    enabled: true,
     audio: {
       enabled: true,
       type: "hls",
@@ -388,14 +285,184 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "chatham",
     name: "Chatham-Kent",
     center: { lat: 42.4048, lng: -82.191 },
-    audio: hlsPending("Chatham-Kent Fire (feed TBD)"),
+    enabled: true,
+    audio: {
+      enabled: true,
+      type: "hls",
+      feedId: 33309,
+      description: "Chatham-Kent Fire",
+    },
+    scannedAgencies: ["Fire"],
+  },
+
+  // ── Pending audio (feedId null) — Waze-enabled, no fire listener ──────
+  {
+    id: "mississauga",
+    name: "Mississauga",
+    center: { lat: 43.589, lng: -79.6441 },
+    enabled: true,
+    audio: hlsPending("Mississauga Fire (feed TBD)"),
+    scannedAgencies: [],
   },
   {
     id: "brampton",
     name: "Brampton",
     center: { lat: 43.6833, lng: -79.7667 },
-    enabled: false,
+    enabled: true,
     audio: hlsPending("Brampton Fire (feed TBD)"),
+    scannedAgencies: [],
+  },
+  {
+    id: "caledon",
+    name: "Caledon",
+    center: { lat: 43.8643, lng: -79.9984 },
+    enabled: true,
+    audio: hlsPending("Caledon Fire (feed TBD)"),
+    scannedAgencies: [],
+  },
+  {
+    id: "vaughan",
+    name: "Vaughan",
+    center: { lat: 43.8361, lng: -79.4983 },
+    enabled: true,
+    audio: hlsPending("Vaughan Fire (feed TBD)"),
+    scannedAgencies: [],
+  },
+  {
+    id: "richmondHill",
+    name: "Richmond Hill",
+    center: { lat: 43.8828, lng: -79.4403 },
+    enabled: true,
+    audio: hlsPending("Richmond Hill Fire (feed TBD)"),
+    scannedAgencies: [],
+  },
+  {
+    id: "newmarket",
+    name: "Newmarket / Aurora",
+    center: { lat: 44.0592, lng: -79.4613 },
+    enabled: true,
+    audio: hlsPending("Newmarket / Aurora Fire (feed TBD)"),
+    scannedAgencies: [],
+  },
+  {
+    id: "markham",
+    name: "Markham",
+    center: { lat: 43.8561, lng: -79.337 },
+    enabled: true,
+    audio: hlsPending("Markham Fire (feed TBD)"),
+    scannedAgencies: [],
+  },
+  {
+    id: "pickering",
+    name: "Pickering",
+    center: { lat: 43.8384, lng: -79.0868 },
+    enabled: true,
+    audio: hlsPending("Pickering Fire (feed TBD)"),
+    scannedAgencies: [],
+  },
+  {
+    id: "ajax",
+    name: "Ajax",
+    center: { lat: 43.8509, lng: -79.0204 },
+    enabled: true,
+    audio: hlsPending("Ajax Fire (feed TBD)"),
+    scannedAgencies: [],
+  },
+  {
+    id: "whitby",
+    name: "Whitby",
+    center: { lat: 43.8971, lng: -78.9422 },
+    enabled: true,
+    audio: hlsPending("Whitby Fire (feed TBD)"),
+    scannedAgencies: [],
+  },
+  {
+    id: "oshawa",
+    name: "Oshawa",
+    center: { lat: 43.8971, lng: -78.8658 },
+    enabled: true,
+    audio: hlsPending("Oshawa Fire (feed TBD)"),
+    scannedAgencies: [],
+  },
+  {
+    id: "bowmanville",
+    name: "Bowmanville / Clarington",
+    center: { lat: 43.9103, lng: -78.6874 },
+    enabled: true,
+    audio: hlsPending("Bowmanville / Clarington Fire (feed TBD)"),
+    scannedAgencies: [],
+  },
+  {
+    id: "stCatharines",
+    name: "St. Catharines",
+    center: { lat: 43.1594, lng: -79.2469 },
+    enabled: true,
+    audio: hlsPending("St. Catharines Fire (feed TBD)"),
+    scannedAgencies: [],
+  },
+  {
+    id: "niagaraFalls",
+    name: "Niagara Falls",
+    center: { lat: 43.0896, lng: -79.0849 },
+    enabled: true,
+    audio: hlsPending("Niagara Falls Fire (feed TBD)"),
+    scannedAgencies: [],
+  },
+  {
+    id: "fortErie",
+    name: "Fort Erie",
+    center: { lat: 42.9022, lng: -78.9185 },
+    enabled: true,
+    audio: hlsPending("Fort Erie Fire (feed TBD)"),
+    scannedAgencies: [],
+  },
+  {
+    id: "grimsby",
+    name: "Grimsby",
+    center: { lat: 43.1945, lng: -79.5601 },
+    enabled: true,
+    audio: hlsPending("Grimsby Fire (feed TBD)"),
+    scannedAgencies: [],
+  },
+  {
+    id: "lincoln",
+    name: "Lincoln / Beamsville",
+    center: { lat: 43.161, lng: -79.4795 },
+    enabled: true,
+    audio: hlsPending("Lincoln / Beamsville Fire (feed TBD)"),
+    scannedAgencies: [],
+  },
+  {
+    id: "niagaraOnTheLake",
+    name: "Niagara-on-the-Lake",
+    center: { lat: 43.255, lng: -79.0773 },
+    enabled: true,
+    audio: hlsPending("Niagara-on-the-Lake Fire (feed TBD)"),
+    scannedAgencies: [],
+  },
+  {
+    id: "oakville",
+    name: "Oakville",
+    center: { lat: 43.4675, lng: -79.6877 },
+    enabled: true,
+    audio: hlsPending("Oakville Fire (feed TBD)"),
+    scannedAgencies: [],
+  },
+  {
+    id: "woodstock",
+    name: "Woodstock",
+    center: { lat: 43.1306, lng: -80.7467 },
+    enabled: true,
+    audio: hlsPending("Woodstock Fire (feed TBD)"),
+    scannedAgencies: [],
+  },
+  {
+    id: "guelph",
+    name: "Guelph",
+    center: { lat: 43.5448, lng: -80.2482 },
+    enabled: true,
+    audio: hlsPending("Guelph Fire (feed TBD)"),
+    scannedAgencies: [],
   },
 ];
 
