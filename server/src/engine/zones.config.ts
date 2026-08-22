@@ -21,10 +21,8 @@ interface ZoneSeed {
   id: string;
   name: string;
   center: { lat: number; lng: number };
-  /** Only London is enabled for live polling. */
   enabled?: boolean;
-  /** Only London runs the fire-dispatch audio listener. */
-  audioEnabled?: boolean;
+  audio?: CoverageZoneDef["audio"];
 }
 
 function boundsFromCenter(center: { lat: number; lng: number }): CoverageZoneDef["bounds"] {
@@ -42,30 +40,109 @@ function boundsFromCenter(center: { lat: number; lng: number }): CoverageZoneDef
 
 function buildZone(seed: ZoneSeed): CoverageZoneDef {
   const enabled = seed.enabled === true;
-  const audioEnabled = seed.audioEnabled === true;
   return {
     id: seed.id,
     name: seed.name,
     enabled,
     bounds: boundsFromCenter(seed.center),
-    audio: {
-      enabled: audioEnabled,
+    audio: seed.audio ?? {
+      enabled: false,
       url: "",
       description: `${seed.name} Fire`,
     },
   };
 }
 
-/** Southern Ontario expansion list — London is the sole active zone today. */
+/** Southern Ontario expansion list — enable zones individually for Waze + audio. */
 const ZONE_SEEDS: ZoneSeed[] = [
-  { id: "london", name: "London", center: { lat: 42.9849, lng: -81.2453 }, enabled: true, audioEnabled: true },
-  { id: "woodstock", name: "Woodstock", center: { lat: 43.1306, lng: -80.7467 } },
-  { id: "kitchener", name: "Kitchener / Waterloo", center: { lat: 43.4587, lng: -80.5129 } },
-  { id: "guelph", name: "Guelph", center: { lat: 43.5448, lng: -80.2482 } },
-  { id: "cambridge", name: "Cambridge", center: { lat: 43.3972, lng: -80.3114 } },
-  { id: "milton", name: "Milton", center: { lat: 43.5167, lng: -79.8833 } },
-  { id: "haltonHills", name: "Halton Hills", center: { lat: 43.6475, lng: -79.9197 } },
-  { id: "mississauga", name: "Mississauga", center: { lat: 43.589, lng: -79.6441 } },
+  {
+    id: "london",
+    name: "London",
+    center: { lat: 42.9849, lng: -81.2453 },
+    enabled: true,
+    audio: {
+      enabled: true,
+      url: "https://broadcastify.cdnstream1.com/34296",
+      description: "London Fire and Public Works",
+    },
+  },
+  {
+    id: "woodstock",
+    name: "Woodstock",
+    center: { lat: 43.1306, lng: -80.7467 },
+    enabled: true,
+    audio: {
+      enabled: false,
+      url: "",
+      description: "Oxford County Fire (Calls Node)",
+    },
+  },
+  {
+    id: "kitchener",
+    name: "Kitchener / Waterloo",
+    center: { lat: 43.4587, lng: -80.5129 },
+    enabled: true,
+    audio: {
+      enabled: true,
+      url: "http://cykf.net:8000/scanner",
+      description: "Waterloo Region Fire (CYKF Feed)",
+    },
+  },
+  {
+    id: "guelph",
+    name: "Guelph",
+    center: { lat: 43.5448, lng: -80.2482 },
+    enabled: false,
+    audio: {
+      enabled: false,
+      url: "",
+      description: "Guelph Fire (Encrypted)",
+    },
+  },
+  {
+    id: "cambridge",
+    name: "Cambridge",
+    center: { lat: 43.3972, lng: -80.3114 },
+    enabled: true,
+    audio: {
+      enabled: true,
+      url: "http://cykf.net:8000/scanner",
+      description: "Waterloo Region Fire (CYKF Feed)",
+    },
+  },
+  {
+    id: "milton",
+    name: "Milton",
+    center: { lat: 43.5167, lng: -79.8833 },
+    enabled: true,
+    audio: {
+      enabled: true,
+      url: "https://broadcastify.cdnstream1.com/43263",
+      description: "Halton Hills / Milton Fire Department",
+    },
+  },
+  {
+    id: "haltonHills",
+    name: "Halton Hills",
+    center: { lat: 43.6475, lng: -79.9197 },
+    enabled: true,
+    audio: {
+      enabled: true,
+      url: "https://broadcastify.cdnstream1.com/43263",
+      description: "Halton Hills / Milton Fire Department",
+    },
+  },
+  {
+    id: "mississauga",
+    name: "Mississauga",
+    center: { lat: 43.589, lng: -79.6441 },
+    enabled: true,
+    audio: {
+      enabled: false,
+      url: "",
+      description: "Peel Region Fire",
+    },
+  },
   { id: "torontoCore", name: "Toronto (Core)", center: { lat: 43.6532, lng: -79.3832 } },
   { id: "etobicoke", name: "Etobicoke", center: { lat: 43.6205, lng: -79.5132 } },
   { id: "northYork", name: "North York", center: { lat: 43.7615, lng: -79.4111 } },
