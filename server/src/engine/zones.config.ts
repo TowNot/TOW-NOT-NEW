@@ -80,12 +80,12 @@ function buildZone(seed: ZoneSeed): CoverageZoneDef {
 
 /**
  * Southern Ontario coverage catalog.
- * Phase 1: Fire HLS / CYKF stream where feed IDs are known.
- * Pending regions keep feedId null so Waze can poll without crashing audio.
+ * Testing: only London is enabled (Waze + Google Maps + Fire HLS 34296).
+ * Other cities keep feed IDs / stream URLs but zone.enabled=false until scale-up.
  * Do not casually change existing city centers / half-spans.
  */
 const ZONE_SEEDS: ZoneSeed[] = [
-  // ── Active Fire / CYKF audio ──────────────────────────────────────────
+  // ── Fire / CYKF audio (London-only enabled for testing) ─────────────
   {
     id: "london",
     name: "London",
@@ -103,7 +103,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "milton",
     name: "Milton",
     center: { lat: 43.5167, lng: -79.8833 },
-    enabled: true,
+    enabled: false,
     audio: {
       enabled: true,
       type: "hls",
@@ -116,7 +116,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "haltonHills",
     name: "Halton Hills",
     center: { lat: 43.6475, lng: -79.9197 },
-    enabled: true,
+    enabled: false,
     audio: {
       enabled: true,
       type: "hls",
@@ -129,7 +129,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "kitchener",
     name: "Kitchener",
     center: { lat: 43.4587, lng: -80.5129 },
-    enabled: true,
+    enabled: false,
     audio: {
       enabled: true,
       type: "stream",
@@ -142,7 +142,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "waterloo",
     name: "Waterloo",
     center: { lat: 43.4643, lng: -80.5204 },
-    enabled: true,
+    enabled: false,
     audio: {
       enabled: true,
       type: "stream",
@@ -155,7 +155,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "cambridge",
     name: "Cambridge",
     center: { lat: 43.3972, lng: -80.3114 },
-    enabled: true,
+    enabled: false,
     audio: {
       enabled: true,
       type: "stream",
@@ -168,7 +168,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "torontoCore",
     name: "Toronto (Core)",
     center: { lat: 43.6532, lng: -79.3832 },
-    enabled: true,
+    enabled: false,
     audio: {
       enabled: true,
       type: "hls",
@@ -181,7 +181,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "etobicoke",
     name: "Etobicoke",
     center: { lat: 43.6205, lng: -79.5132 },
-    enabled: true,
+    enabled: false,
     audio: {
       enabled: true,
       type: "hls",
@@ -194,7 +194,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "northYork",
     name: "North York",
     center: { lat: 43.7615, lng: -79.4111 },
-    enabled: true,
+    enabled: false,
     audio: {
       enabled: true,
       type: "hls",
@@ -207,7 +207,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "scarborough",
     name: "Scarborough",
     center: { lat: 43.7731, lng: -79.2577 },
-    enabled: true,
+    enabled: false,
     audio: {
       enabled: true,
       type: "hls",
@@ -220,7 +220,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "hamilton",
     name: "Hamilton",
     center: { lat: 43.2557, lng: -79.8711 },
-    enabled: true,
+    enabled: false,
     audio: {
       enabled: true,
       type: "hls",
@@ -233,7 +233,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "burlington",
     name: "Burlington",
     center: { lat: 43.3255, lng: -79.799 },
-    enabled: true,
+    enabled: false,
     audio: {
       enabled: true,
       type: "hls",
@@ -246,7 +246,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "brantford",
     name: "Brantford",
     center: { lat: 43.1408, lng: -80.2632 },
-    enabled: true,
+    enabled: false,
     audio: {
       enabled: true,
       type: "hls",
@@ -259,7 +259,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "barrie",
     name: "Barrie",
     center: { lat: 44.3894, lng: -79.6903 },
-    enabled: true,
+    enabled: false,
     audio: {
       enabled: true,
       type: "hls",
@@ -272,7 +272,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "windsor",
     name: "Windsor",
     center: { lat: 42.3149, lng: -83.0364 },
-    enabled: true,
+    enabled: false,
     audio: {
       enabled: true,
       type: "hls",
@@ -285,7 +285,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "chatham",
     name: "Chatham-Kent",
     center: { lat: 42.4048, lng: -82.191 },
-    enabled: true,
+    enabled: false,
     audio: {
       enabled: true,
       type: "hls",
@@ -295,12 +295,12 @@ const ZONE_SEEDS: ZoneSeed[] = [
     scannedAgencies: ["Fire"],
   },
 
-  // ── Pending audio (feedId null) — Waze-enabled, no fire listener ──────
+  // ── Pending audio (feedId null) — paused with other non-London zones ─
   {
     id: "mississauga",
     name: "Mississauga",
     center: { lat: 43.589, lng: -79.6441 },
-    enabled: true,
+    enabled: false,
     audio: hlsPending("Mississauga Fire (feed TBD)"),
     scannedAgencies: [],
   },
@@ -308,7 +308,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "brampton",
     name: "Brampton",
     center: { lat: 43.6833, lng: -79.7667 },
-    enabled: true,
+    enabled: false,
     audio: hlsPending("Brampton Fire (feed TBD)"),
     scannedAgencies: [],
   },
@@ -316,7 +316,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "caledon",
     name: "Caledon",
     center: { lat: 43.8643, lng: -79.9984 },
-    enabled: true,
+    enabled: false,
     audio: hlsPending("Caledon Fire (feed TBD)"),
     scannedAgencies: [],
   },
@@ -324,7 +324,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "vaughan",
     name: "Vaughan",
     center: { lat: 43.8361, lng: -79.4983 },
-    enabled: true,
+    enabled: false,
     audio: hlsPending("Vaughan Fire (feed TBD)"),
     scannedAgencies: [],
   },
@@ -332,7 +332,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "richmondHill",
     name: "Richmond Hill",
     center: { lat: 43.8828, lng: -79.4403 },
-    enabled: true,
+    enabled: false,
     audio: hlsPending("Richmond Hill Fire (feed TBD)"),
     scannedAgencies: [],
   },
@@ -340,7 +340,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "newmarket",
     name: "Newmarket / Aurora",
     center: { lat: 44.0592, lng: -79.4613 },
-    enabled: true,
+    enabled: false,
     audio: hlsPending("Newmarket / Aurora Fire (feed TBD)"),
     scannedAgencies: [],
   },
@@ -348,7 +348,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "markham",
     name: "Markham",
     center: { lat: 43.8561, lng: -79.337 },
-    enabled: true,
+    enabled: false,
     audio: hlsPending("Markham Fire (feed TBD)"),
     scannedAgencies: [],
   },
@@ -356,7 +356,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "pickering",
     name: "Pickering",
     center: { lat: 43.8384, lng: -79.0868 },
-    enabled: true,
+    enabled: false,
     audio: hlsPending("Pickering Fire (feed TBD)"),
     scannedAgencies: [],
   },
@@ -364,7 +364,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "ajax",
     name: "Ajax",
     center: { lat: 43.8509, lng: -79.0204 },
-    enabled: true,
+    enabled: false,
     audio: hlsPending("Ajax Fire (feed TBD)"),
     scannedAgencies: [],
   },
@@ -372,7 +372,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "whitby",
     name: "Whitby",
     center: { lat: 43.8971, lng: -78.9422 },
-    enabled: true,
+    enabled: false,
     audio: hlsPending("Whitby Fire (feed TBD)"),
     scannedAgencies: [],
   },
@@ -380,7 +380,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "oshawa",
     name: "Oshawa",
     center: { lat: 43.8971, lng: -78.8658 },
-    enabled: true,
+    enabled: false,
     audio: hlsPending("Oshawa Fire (feed TBD)"),
     scannedAgencies: [],
   },
@@ -388,7 +388,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "bowmanville",
     name: "Bowmanville / Clarington",
     center: { lat: 43.9103, lng: -78.6874 },
-    enabled: true,
+    enabled: false,
     audio: hlsPending("Bowmanville / Clarington Fire (feed TBD)"),
     scannedAgencies: [],
   },
@@ -396,7 +396,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "stCatharines",
     name: "St. Catharines",
     center: { lat: 43.1594, lng: -79.2469 },
-    enabled: true,
+    enabled: false,
     audio: hlsPending("St. Catharines Fire (feed TBD)"),
     scannedAgencies: [],
   },
@@ -404,7 +404,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "niagaraFalls",
     name: "Niagara Falls",
     center: { lat: 43.0896, lng: -79.0849 },
-    enabled: true,
+    enabled: false,
     audio: hlsPending("Niagara Falls Fire (feed TBD)"),
     scannedAgencies: [],
   },
@@ -412,7 +412,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "fortErie",
     name: "Fort Erie",
     center: { lat: 42.9022, lng: -78.9185 },
-    enabled: true,
+    enabled: false,
     audio: hlsPending("Fort Erie Fire (feed TBD)"),
     scannedAgencies: [],
   },
@@ -420,7 +420,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "grimsby",
     name: "Grimsby",
     center: { lat: 43.1945, lng: -79.5601 },
-    enabled: true,
+    enabled: false,
     audio: hlsPending("Grimsby Fire (feed TBD)"),
     scannedAgencies: [],
   },
@@ -428,7 +428,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "lincoln",
     name: "Lincoln / Beamsville",
     center: { lat: 43.161, lng: -79.4795 },
-    enabled: true,
+    enabled: false,
     audio: hlsPending("Lincoln / Beamsville Fire (feed TBD)"),
     scannedAgencies: [],
   },
@@ -436,7 +436,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "niagaraOnTheLake",
     name: "Niagara-on-the-Lake",
     center: { lat: 43.255, lng: -79.0773 },
-    enabled: true,
+    enabled: false,
     audio: hlsPending("Niagara-on-the-Lake Fire (feed TBD)"),
     scannedAgencies: [],
   },
@@ -444,7 +444,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "oakville",
     name: "Oakville",
     center: { lat: 43.4675, lng: -79.6877 },
-    enabled: true,
+    enabled: false,
     audio: hlsPending("Oakville Fire (feed TBD)"),
     scannedAgencies: [],
   },
@@ -452,7 +452,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "woodstock",
     name: "Woodstock",
     center: { lat: 43.1306, lng: -80.7467 },
-    enabled: true,
+    enabled: false,
     audio: hlsPending("Woodstock Fire (feed TBD)"),
     scannedAgencies: [],
   },
@@ -460,7 +460,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "guelph",
     name: "Guelph",
     center: { lat: 43.5448, lng: -80.2482 },
-    enabled: true,
+    enabled: false,
     audio: hlsPending("Guelph Fire (feed TBD)"),
     scannedAgencies: [],
   },
