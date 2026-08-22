@@ -88,10 +88,10 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "woodstock",
     name: "Woodstock",
     center: { lat: 43.1306, lng: -80.7467 },
-    enabled: true,
+    enabled: false,
     audioSources: [
       {
-        enabled: true,
+        enabled: false,
         type: "calls",
         nodeId: 6293,
         talkgroups: [],
@@ -103,10 +103,10 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "kitchener",
     name: "Kitchener / Waterloo",
     center: { lat: 43.4587, lng: -80.5129 },
-    enabled: true,
+    enabled: false,
     audioSources: [
       {
-        enabled: true,
+        enabled: false,
         type: "stream",
         url: "http://cykf.net:8000/scanner",
         description: "Waterloo Region Stream",
@@ -124,10 +124,10 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "cambridge",
     name: "Cambridge",
     center: { lat: 43.3972, lng: -80.3114 },
-    enabled: true,
+    enabled: false,
     audioSources: [
       {
-        enabled: true,
+        enabled: false,
         type: "stream",
         url: "http://cykf.net:8000/scanner",
         description: "Waterloo Region Stream",
@@ -138,10 +138,10 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "milton",
     name: "Milton",
     center: { lat: 43.5167, lng: -79.8833 },
-    enabled: true,
+    enabled: false,
     audioSources: [
       {
-        enabled: true,
+        enabled: false,
         type: "stream",
         url: "https://broadcastify.cdnstream1.com/43263",
         description: "Halton Hills / Milton Stream",
@@ -152,10 +152,10 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "haltonHills",
     name: "Halton Hills",
     center: { lat: 43.6475, lng: -79.9197 },
-    enabled: true,
+    enabled: false,
     audioSources: [
       {
-        enabled: true,
+        enabled: false,
         type: "stream",
         url: "https://broadcastify.cdnstream1.com/43263",
         description: "Halton Hills / Milton Stream",
@@ -166,10 +166,10 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "mississauga",
     name: "Mississauga",
     center: { lat: 43.589, lng: -79.6441 },
-    enabled: true,
+    enabled: false,
     audioSources: [
       {
-        enabled: true,
+        enabled: false,
         type: "calls",
         nodeId: 4158,
         talkgroups: [],
@@ -208,10 +208,10 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "brampton",
     name: "Brampton",
     center: { lat: 43.6833, lng: -79.7667 },
-    enabled: true,
+    enabled: false,
     audioSources: [
       {
-        enabled: true,
+        enabled: false,
         type: "calls",
         nodeId: 4158,
         talkgroups: [],
