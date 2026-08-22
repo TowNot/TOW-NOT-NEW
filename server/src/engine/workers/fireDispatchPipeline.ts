@@ -22,7 +22,7 @@ import {
   noteFireDispatchTranscript,
 } from "./fireDispatchRuntime";
 
-export type FireAudioSourceType = "hls" | "icecast";
+export type FireAudioSourceType = "hls" | "stream";
 
 export interface FireDispatchContext {
   zoneId: string;

@@ -43,15 +43,13 @@ const PROVIDER_LABELS: Record<string, string> = {
   openwebninja_google_maps: "Google Maps",
   google_maps: "Google Maps",
   london_fire_dispatch: "Fire dispatch",
-  london_fire_dispatch_stream: "Fire dispatch (Stream)",
-  london_fire_dispatch_calls: "Fire dispatch (Calls)",
 };
 
 function labelForIncident(incident: Incident): string {
   if (incident.provider) {
     const known = PROVIDER_LABELS[incident.provider];
     if (known) return known;
-    const m = incident.provider.match(/^([a-zA-Z]+)_fire_dispatch(?:_(hls|icecast|stream|calls))?$/);
+    const m = incident.provider.match(/^([a-zA-Z]+)_fire_dispatch(?:_(hls|stream))?$/);
     if (m) {
       const zone = getCoverageZone(m[1]);
       return zone ? `Fire dispatch · ${zone.name}` : "Fire dispatch";
@@ -90,7 +88,7 @@ export function buildProgressierPayload(
 
 export function resolveIncidentZoneId(incident: Incident): string | null {
   if (incident.source === "fire_dispatch") {
-    const m = incident.provider?.match(/^([a-zA-Z]+)_fire_dispatch(?:_(hls|icecast|stream|calls))?$/);
+    const m = incident.provider?.match(/^([a-zA-Z]+)_fire_dispatch(?:_(hls|stream))?$/);
     if (m) return m[1];
   }
   return zoneIdForCoordinates(

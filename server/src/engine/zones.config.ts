@@ -6,19 +6,20 @@ export const ZONE_LNG_HALF = 0.123;
 export interface ZoneHlsAudio {
   enabled: boolean;
   type: "hls";
-  feedId: number;
+  /** Null = placeholder until a Broadcastify feed ID is assigned. */
+  feedId: number | null;
   description: string;
 }
 
 /** Continuous Icecast/MP3 stream (e.g. CYKF Waterloo). */
-export interface ZoneIcecastAudio {
+export interface ZoneStreamAudio {
   enabled: boolean;
-  type: "icecast";
+  type: "stream";
   url: string;
   description: string;
 }
 
-export type ZoneAudio = ZoneHlsAudio | ZoneIcecastAudio;
+export type ZoneAudio = ZoneHlsAudio | ZoneStreamAudio;
 
 export interface CoverageZoneDef {
   id: string;
@@ -38,6 +39,16 @@ interface ZoneSeed {
   center: { lat: number; lng: number };
   enabled?: boolean;
   audio?: ZoneAudio | null;
+}
+
+/** Placeholder HLS entry — fill in feedId later; never starts the listener. */
+function hlsPending(description: string): ZoneHlsAudio {
+  return {
+    enabled: false,
+    type: "hls",
+    feedId: null,
+    description,
+  };
 }
 
 function boundsFromCenter(center: { lat: number; lng: number }): CoverageZoneDef["bounds"] {
@@ -63,7 +74,10 @@ function buildZone(seed: ZoneSeed): CoverageZoneDef {
   };
 }
 
-/** Southern Ontario expansion list — enable zones individually for Waze + audio. */
+/**
+ * Southern Ontario expansion list — enable zones individually for Waze + audio.
+ * Centers / half-spans for existing cities must not be changed casually.
+ */
 const ZONE_SEEDS: ZoneSeed[] = [
   {
     id: "london",
@@ -82,7 +96,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     name: "Woodstock",
     center: { lat: 43.1306, lng: -80.7467 },
     enabled: false,
-    audio: null,
+    audio: hlsPending("Woodstock Fire (feed TBD)"),
   },
   {
     id: "kitchener",
@@ -91,7 +105,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     enabled: true,
     audio: {
       enabled: true,
-      type: "icecast",
+      type: "stream",
       url: "http://cykf.net:8000/scanner",
       description: "Waterloo Region (CYKF)",
     },
@@ -101,7 +115,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     name: "Guelph",
     center: { lat: 43.5448, lng: -80.2482 },
     enabled: false,
-    audio: null,
+    audio: hlsPending("Guelph Fire (feed TBD)"),
   },
   {
     id: "cambridge",
@@ -111,7 +125,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     // Same CYKF feed as Kitchener — orchestrator dedupes by URL.
     audio: {
       enabled: true,
-      type: "icecast",
+      type: "stream",
       url: "http://cykf.net:8000/scanner",
       description: "Waterloo Region (CYKF)",
     },
@@ -146,41 +160,176 @@ const ZONE_SEEDS: ZoneSeed[] = [
     name: "Mississauga",
     center: { lat: 43.589, lng: -79.6441 },
     enabled: false,
-    audio: null,
+    audio: hlsPending("Mississauga Fire (feed TBD)"),
   },
-  { id: "torontoCore", name: "Toronto (Core)", center: { lat: 43.6532, lng: -79.3832 } },
-  { id: "etobicoke", name: "Etobicoke", center: { lat: 43.6205, lng: -79.5132 } },
-  { id: "northYork", name: "North York", center: { lat: 43.7615, lng: -79.4111 } },
-  { id: "scarborough", name: "Scarborough", center: { lat: 43.7731, lng: -79.2577 } },
-  { id: "pickering", name: "Pickering", center: { lat: 43.8384, lng: -79.0868 } },
-  { id: "ajax", name: "Ajax", center: { lat: 43.8509, lng: -79.0204 } },
-  { id: "whitby", name: "Whitby", center: { lat: 43.8971, lng: -78.9422 } },
-  { id: "oshawa", name: "Oshawa", center: { lat: 43.8971, lng: -78.8658 } },
-  { id: "hamilton", name: "Hamilton", center: { lat: 43.2557, lng: -79.8711 } },
-  { id: "burlington", name: "Burlington", center: { lat: 43.3255, lng: -79.799 } },
-  { id: "oakville", name: "Oakville", center: { lat: 43.4675, lng: -79.6877 } },
-  { id: "grimsby", name: "Grimsby", center: { lat: 43.1945, lng: -79.5601 } },
-  { id: "lincoln", name: "Lincoln / Beamsville", center: { lat: 43.161, lng: -79.4795 } },
-  { id: "stCatharines", name: "St. Catharines", center: { lat: 43.1594, lng: -79.2469 } },
-  { id: "niagaraOnTheLake", name: "Niagara-on-the-Lake", center: { lat: 43.255, lng: -79.0773 } },
-  { id: "niagaraFalls", name: "Niagara Falls", center: { lat: 43.0896, lng: -79.0849 } },
-  { id: "fortErie", name: "Fort Erie", center: { lat: 42.9022, lng: -78.9185 } },
-  { id: "brantford", name: "Brantford", center: { lat: 43.1408, lng: -80.2632 } },
-  { id: "vaughan", name: "Vaughan", center: { lat: 43.8361, lng: -79.4983 } },
-  { id: "richmondHill", name: "Richmond Hill", center: { lat: 43.8828, lng: -79.4403 } },
-  { id: "newmarket", name: "Newmarket / Aurora", center: { lat: 44.0592, lng: -79.4613 } },
-  { id: "markham", name: "Markham", center: { lat: 43.8561, lng: -79.337 } },
-  { id: "caledon", name: "Caledon", center: { lat: 43.8643, lng: -79.9984 } },
-  { id: "bowmanville", name: "Bowmanville / Clarington", center: { lat: 43.9103, lng: -78.6874 } },
-  { id: "barrie", name: "Barrie", center: { lat: 44.3894, lng: -79.6903 } },
-  { id: "windsor", name: "Windsor", center: { lat: 42.3149, lng: -83.0364 } },
-  { id: "chatham", name: "Chatham-Kent", center: { lat: 42.4048, lng: -82.191 } },
+  {
+    id: "torontoCore",
+    name: "Toronto (Core)",
+    center: { lat: 43.6532, lng: -79.3832 },
+    audio: hlsPending("Toronto Core Fire (feed TBD)"),
+  },
+  {
+    id: "etobicoke",
+    name: "Etobicoke",
+    center: { lat: 43.6205, lng: -79.5132 },
+    audio: hlsPending("Etobicoke Fire (feed TBD)"),
+  },
+  {
+    id: "northYork",
+    name: "North York",
+    center: { lat: 43.7615, lng: -79.4111 },
+    audio: hlsPending("North York Fire (feed TBD)"),
+  },
+  {
+    id: "scarborough",
+    name: "Scarborough",
+    center: { lat: 43.7731, lng: -79.2577 },
+    audio: hlsPending("Scarborough Fire (feed TBD)"),
+  },
+  {
+    id: "pickering",
+    name: "Pickering",
+    center: { lat: 43.8384, lng: -79.0868 },
+    audio: hlsPending("Pickering Fire (feed TBD)"),
+  },
+  {
+    id: "ajax",
+    name: "Ajax",
+    center: { lat: 43.8509, lng: -79.0204 },
+    audio: hlsPending("Ajax Fire (feed TBD)"),
+  },
+  {
+    id: "whitby",
+    name: "Whitby",
+    center: { lat: 43.8971, lng: -78.9422 },
+    audio: hlsPending("Whitby Fire (feed TBD)"),
+  },
+  {
+    id: "oshawa",
+    name: "Oshawa",
+    center: { lat: 43.8971, lng: -78.8658 },
+    audio: hlsPending("Oshawa Fire (feed TBD)"),
+  },
+  {
+    id: "hamilton",
+    name: "Hamilton",
+    center: { lat: 43.2557, lng: -79.8711 },
+    audio: hlsPending("Hamilton Fire (feed TBD)"),
+  },
+  {
+    id: "burlington",
+    name: "Burlington",
+    center: { lat: 43.3255, lng: -79.799 },
+    audio: hlsPending("Burlington Fire (feed TBD)"),
+  },
+  {
+    id: "oakville",
+    name: "Oakville",
+    center: { lat: 43.4675, lng: -79.6877 },
+    audio: hlsPending("Oakville Fire (feed TBD)"),
+  },
+  {
+    id: "grimsby",
+    name: "Grimsby",
+    center: { lat: 43.1945, lng: -79.5601 },
+    audio: hlsPending("Grimsby Fire (feed TBD)"),
+  },
+  {
+    id: "lincoln",
+    name: "Lincoln / Beamsville",
+    center: { lat: 43.161, lng: -79.4795 },
+    audio: hlsPending("Lincoln / Beamsville Fire (feed TBD)"),
+  },
+  {
+    id: "stCatharines",
+    name: "St. Catharines",
+    center: { lat: 43.1594, lng: -79.2469 },
+    audio: hlsPending("St. Catharines Fire (feed TBD)"),
+  },
+  {
+    id: "niagaraOnTheLake",
+    name: "Niagara-on-the-Lake",
+    center: { lat: 43.255, lng: -79.0773 },
+    audio: hlsPending("Niagara-on-the-Lake Fire (feed TBD)"),
+  },
+  {
+    id: "niagaraFalls",
+    name: "Niagara Falls",
+    center: { lat: 43.0896, lng: -79.0849 },
+    audio: hlsPending("Niagara Falls Fire (feed TBD)"),
+  },
+  {
+    id: "fortErie",
+    name: "Fort Erie",
+    center: { lat: 42.9022, lng: -78.9185 },
+    audio: hlsPending("Fort Erie Fire (feed TBD)"),
+  },
+  {
+    id: "brantford",
+    name: "Brantford",
+    center: { lat: 43.1408, lng: -80.2632 },
+    audio: hlsPending("Brantford Fire (feed TBD)"),
+  },
+  {
+    id: "vaughan",
+    name: "Vaughan",
+    center: { lat: 43.8361, lng: -79.4983 },
+    audio: hlsPending("Vaughan Fire (feed TBD)"),
+  },
+  {
+    id: "richmondHill",
+    name: "Richmond Hill",
+    center: { lat: 43.8828, lng: -79.4403 },
+    audio: hlsPending("Richmond Hill Fire (feed TBD)"),
+  },
+  {
+    id: "newmarket",
+    name: "Newmarket / Aurora",
+    center: { lat: 44.0592, lng: -79.4613 },
+    audio: hlsPending("Newmarket / Aurora Fire (feed TBD)"),
+  },
+  {
+    id: "markham",
+    name: "Markham",
+    center: { lat: 43.8561, lng: -79.337 },
+    audio: hlsPending("Markham Fire (feed TBD)"),
+  },
+  {
+    id: "caledon",
+    name: "Caledon",
+    center: { lat: 43.8643, lng: -79.9984 },
+    audio: hlsPending("Caledon Fire (feed TBD)"),
+  },
+  {
+    id: "bowmanville",
+    name: "Bowmanville / Clarington",
+    center: { lat: 43.9103, lng: -78.6874 },
+    audio: hlsPending("Bowmanville / Clarington Fire (feed TBD)"),
+  },
+  {
+    id: "barrie",
+    name: "Barrie",
+    center: { lat: 44.3894, lng: -79.6903 },
+    audio: hlsPending("Barrie Fire (feed TBD)"),
+  },
+  {
+    id: "windsor",
+    name: "Windsor",
+    center: { lat: 42.3149, lng: -83.0364 },
+    audio: hlsPending("Windsor Fire (feed TBD)"),
+  },
+  {
+    id: "chatham",
+    name: "Chatham-Kent",
+    center: { lat: 42.4048, lng: -82.191 },
+    audio: hlsPending("Chatham-Kent Fire (feed TBD)"),
+  },
   {
     id: "brampton",
     name: "Brampton",
     center: { lat: 43.6833, lng: -79.7667 },
     enabled: false,
-    audio: null,
+    audio: hlsPending("Brampton Fire (feed TBD)"),
   },
 ];
 

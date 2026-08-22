@@ -7,12 +7,12 @@ import { startIcecastFireListener } from "./icecastFireListener";
 
 const stopFns: Array<() => void> = [];
 
-function streamKey(audio: { type: string; feedId?: number; url?: string }): string {
+function streamKey(audio: { type: string; feedId?: number | null; url?: string }): string {
   if (audio.type === "hls" && typeof audio.feedId === "number") {
     return `hls:${audio.feedId}`;
   }
-  if (audio.type === "icecast" && audio.url) {
-    return `icecast:${audio.url}`;
+  if (audio.type === "stream" && audio.url) {
+    return `stream:${audio.url}`;
   }
   return `${audio.type}:unknown`;
 }
@@ -26,6 +26,13 @@ export function startRadioOrchestrator(store: IncidentStore): void {
   for (const zone of COVERAGE_ZONES) {
     if (!zone.enabled || !zone.audio?.enabled) continue;
 
+    if (zone.audio.type === "hls" && zone.audio.feedId == null) {
+      logger.debug(
+        `[fire-dispatch] skipping ${zone.id} — HLS feedId not assigned yet`,
+      );
+      continue;
+    }
+
     const key = streamKey(zone.audio);
     if (startedStreams.has(key)) {
       logger.info(
@@ -35,7 +42,7 @@ export function startRadioOrchestrator(store: IncidentStore): void {
     }
     startedStreams.add(key);
 
-    if (zone.audio.type === "hls") {
+    if (zone.audio.type === "hls" && typeof zone.audio.feedId === "number") {
       stopFns.push(
         startHlsFireListener({
           zoneId: zone.id,
@@ -47,7 +54,7 @@ export function startRadioOrchestrator(store: IncidentStore): void {
       continue;
     }
 
-    if (zone.audio.type === "icecast") {
+    if (zone.audio.type === "stream") {
       stopFns.push(
         startIcecastFireListener({
           zoneId: zone.id,
@@ -55,7 +62,7 @@ export function startRadioOrchestrator(store: IncidentStore): void {
           description: zone.audio.description,
         }),
       );
-      active.push(`${zone.id}:icecast`);
+      active.push(`${zone.id}:stream`);
     }
   }
 

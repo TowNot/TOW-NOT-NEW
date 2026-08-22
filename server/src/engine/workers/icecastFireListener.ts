@@ -124,7 +124,7 @@ export function startIcecastFireListener(opts: IcecastFireListenerOptions): () =
 
   const processor = createFireDispatchProcessor({
     zoneId,
-    sourceType: "icecast",
+    sourceType: "stream",
     label,
   });
 
