@@ -31,6 +31,8 @@ export interface CoverageZoneDef {
   };
   /** Single stable audio source for this zone, if any. */
   audio: ZoneAudio | null;
+  /** Agencies audible on this zone's radio feed (for UI transparency). */
+  scannedAgencies: string[];
 }
 
 interface ZoneSeed {
@@ -39,6 +41,7 @@ interface ZoneSeed {
   center: { lat: number; lng: number };
   enabled?: boolean;
   audio?: ZoneAudio | null;
+  scannedAgencies?: string[];
 }
 
 /** Placeholder HLS entry — fill in feedId later; never starts the listener. */
@@ -71,6 +74,7 @@ function buildZone(seed: ZoneSeed): CoverageZoneDef {
     enabled: seed.enabled === true,
     bounds: boundsFromCenter(seed.center),
     audio: seed.audio ?? null,
+    scannedAgencies: seed.scannedAgencies ?? [],
   };
 }
 
@@ -90,6 +94,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
       feedId: 34296,
       description: "London Fire",
     },
+    scannedAgencies: ["Fire", "Public Works"],
   },
   {
     id: "woodstock",
@@ -97,6 +102,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     center: { lat: 43.1306, lng: -80.7467 },
     enabled: false,
     audio: hlsPending("Woodstock Fire (feed TBD)"),
+    scannedAgencies: [],
   },
   {
     id: "kitchener",
@@ -109,6 +115,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
       url: "http://cykf.net:8000/scanner",
       description: "Waterloo Region (CYKF)",
     },
+    scannedAgencies: ["Fire", "EMS"],
   },
   {
     id: "guelph",
@@ -116,6 +123,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     center: { lat: 43.5448, lng: -80.2482 },
     enabled: false,
     audio: hlsPending("Guelph Fire (feed TBD)"),
+    scannedAgencies: [],
   },
   {
     id: "cambridge",
@@ -129,6 +137,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
       url: "http://cykf.net:8000/scanner",
       description: "Waterloo Region (CYKF)",
     },
+    scannedAgencies: ["Fire", "EMS"],
   },
   {
     id: "milton",
@@ -141,6 +150,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
       feedId: 43263,
       description: "Halton Hills / Milton Fire",
     },
+    scannedAgencies: ["Fire"],
   },
   {
     id: "haltonHills",
@@ -154,6 +164,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
       feedId: 43263,
       description: "Halton Hills / Milton Fire",
     },
+    scannedAgencies: ["Fire"],
   },
   {
     id: "mississauga",
@@ -161,6 +172,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     center: { lat: 43.589, lng: -79.6441 },
     enabled: false,
     audio: hlsPending("Mississauga Fire (feed TBD)"),
+    scannedAgencies: [],
   },
   {
     id: "torontoCore",
@@ -339,4 +351,38 @@ export const COVERAGE_ZONE_IDS = COVERAGE_ZONES.map((zone) => zone.id);
 
 export function getCoverageZone(id: string): CoverageZoneDef | undefined {
   return COVERAGE_ZONES.find((zone) => zone.id === id);
+}
+
+/** Public zone summary for status / frontend (no secrets). */
+export function zonePublicSummaries(): Array<{
+  id: string;
+  name: string;
+  enabled: boolean;
+  scannedAgencies: string[];
+  audio:
+    | { type: "hls"; feedId: number | null; description: string; enabled: boolean }
+    | { type: "stream"; url: string; description: string; enabled: boolean }
+    | null;
+}> {
+  return COVERAGE_ZONES.map((zone) => ({
+    id: zone.id,
+    name: zone.name,
+    enabled: zone.enabled,
+    scannedAgencies: [...zone.scannedAgencies],
+    audio: zone.audio
+      ? zone.audio.type === "hls"
+        ? {
+            type: "hls" as const,
+            feedId: zone.audio.feedId,
+            description: zone.audio.description,
+            enabled: zone.audio.enabled,
+          }
+        : {
+            type: "stream" as const,
+            url: zone.audio.url,
+            description: zone.audio.description,
+            enabled: zone.audio.enabled,
+          }
+      : null,
+  }));
 }

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { config } from "../config";
 import { getProviderRuntimeStats } from "../engine/wazeAggregator";
 import { enabledCoverageZones } from "../engine/coverageZones";
+import { zonePublicSummaries } from "../engine/zones.config";
 import { getOpenWebNinjaGoogleMapsRuntime } from "../engine/googleMaps/openWebNinjaGoogleMapsScraper";
 import { getFireDispatchRuntime } from "../engine/workers/fireDispatchRuntime";
 import type { IncidentStore } from "../store/incidentStore";
@@ -13,6 +14,14 @@ export function createSourcesRouter(store: IncidentStore): Router {
 
   const bySource = (source: IncidentSource) =>
     store.getActive().filter((incident) => incident.source === source);
+
+  /** Zone catalog for the Live Desk — includes scannedAgencies for UI tags. */
+  router.get("/zones", (_req, res) => {
+    res.json({
+      checkedAt: new Date().toISOString(),
+      zones: zonePublicSummaries(),
+    });
+  });
 
   router.get("/waze", (_req, res) => {
     res.json({
@@ -98,6 +107,7 @@ export function createSourcesRouter(store: IncidentStore): Router {
         ...getFireDispatchRuntime(),
         streamOverride: Boolean(config.radioHlsUrl),
       },
+      zones: zonePublicSummaries(),
       providers,
       incidents: {
         total: active.length,
