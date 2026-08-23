@@ -103,13 +103,9 @@ export const config = {
   londonLat: Number(process.env.LONDON_LAT ?? 42.9849),
   londonLng: Number(process.env.LONDON_LNG ?? -81.2453),
   pollRadiusKm: Number(process.env.POLL_RADIUS_KM ?? 15),
-  /** OpenWebNinja Google Maps traffic alerts (separate from BlocksInside). */
+  /** OpenWebNinja Google Maps traffic alerts — field test: 30s (Waze stays pollIntervalMs @ 10s). */
   openWebNinjaApiKey: process.env.OPENWEBNINJA_API_KEY?.trim() || "",
-  googleMapsPollIntervalMs: (() => {
-    const raw = Number(process.env.GOOGLE_MAPS_POLL_INTERVAL_MS ?? 30_000);
-    if (!Number.isFinite(raw) || raw < 10_000) return 30_000;
-    return raw;
-  })(),
+  googleMapsPollIntervalMs: 30_000,
   logLevel: (process.env.LOG_LEVEL ?? "info") as "debug" | "info" | "warn" | "error",
   twilioAccountSid: process.env.TWILIO_ACCOUNT_SID?.trim() || "",
   twilioAuthToken: process.env.TWILIO_AUTH_TOKEN?.trim() || "",

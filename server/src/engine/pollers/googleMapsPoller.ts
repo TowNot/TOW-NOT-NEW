@@ -11,6 +11,9 @@ import {
 /** Match nearby store rows so zoom wobble does not create a second SSE event. */
 const STORE_DEDUP_RADIUS_KM = 0.075;
 
+/** OpenWebNinja field-test cadence (30s). Waze uses config.pollIntervalMs (10s). */
+const GOOGLE_MAPS_POLL_INTERVAL_MS = 30_000;
+
 /**
  * Standalone OpenWebNinja Google Maps poller.
  * Does not import or call BlocksInside / Fire code paths.
@@ -30,14 +33,14 @@ export class GoogleMapsTrafficPoller {
       return;
     }
     logger.info("[GOOGLE MAPS] starting OpenWebNinja city poller", {
-      intervalMs: config.googleMapsPollIntervalMs,
+      intervalMs: GOOGLE_MAPS_POLL_INTERVAL_MS,
       zooms: "11-14",
       tilesPerCity: 4,
       cities: GOOGLE_MAPS_CITIES.map((c) => c.id),
       endpoint: "https://api.openwebninja.com/google-maps-traffic-alerts/traffic-alerts",
     });
     void this.poll();
-    this.timer = setInterval(() => void this.poll(), config.googleMapsPollIntervalMs);
+    this.timer = setInterval(() => void this.poll(), GOOGLE_MAPS_POLL_INTERVAL_MS);
     this.timer.unref();
   }
 
