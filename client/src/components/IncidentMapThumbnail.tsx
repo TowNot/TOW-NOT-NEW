@@ -19,7 +19,7 @@ export function IncidentMapThumbnail({ lat, lng }: IncidentMapThumbnailProps) {
       style={{ width: MAP_THUMB_WIDTH, height: MAP_THUMB_HEIGHT }}
     >
       <div
-        className="absolute grid grid-cols-2 grid-rows-2 will-change-transform"
+        className="absolute grid grid-cols-2 grid-rows-2"
         style={{
           width: map.gridPixelSize,
           height: map.gridPixelSize,
@@ -35,7 +35,7 @@ export function IncidentMapThumbnail({ lat, lng }: IncidentMapThumbnailProps) {
             loading="lazy"
             decoding="async"
             draggable={false}
-            className="block h-full w-full"
+            className="block h-full w-full object-cover"
           />
         ))}
       </div>
