@@ -1,5 +1,5 @@
 import { config } from "../../config";
-import { boundingBox, distanceKm, type BoundingBox } from "../geo";
+import { boundingBox, distanceKm, splitBoundingBox, type BoundingBox } from "../geo";
 import {
   enabledCoverageZones,
   zoneCenter,
@@ -10,7 +10,9 @@ import type { Incident, IncidentSeverity } from "../../types/incident";
 
 const ENDPOINT = "https://api.openwebninja.com/google-maps-traffic-alerts/traffic-alerts";
 const ZOOM_MIN = 11;
-const ZOOM_MAX = 16;
+const ZOOM_MAX = 15;
+/** 2×2 quadrants over the city box (same grid pattern as BlocksInside Waze). */
+const GOOGLE_MAPS_TILE_DIVISIONS = 2;
 /** Cross-zoom pins often wobble slightly — treat within ~75 m as the same incident. */
 const DEDUP_RADIUS_KM = 0.075;
 const REQUEST_TIMEOUT_MS = 20_000;
@@ -115,11 +117,10 @@ const HARD_DROP_TYPES = new Set([
 ]);
 
 /**
- * OpenWebNinja types (per their docs):
- * - accident / crash / collision → real crashes (notify)
- * - incident → UNTRUSTED catch-all (Google often parks construction, delays,
- *   and unclassified pins here — Highbury ramp spam). Never notify.
- * - construction / road_closed → always drop
+ * OpenWebNinja types:
+ * - accident / crash / collision → real crashes
+ * - incident → retained as ACCIDENT (subtype GOOGLE_MAPS_INCIDENT); geographic
+ *   drop zones and HARD_DROP_TYPES still filter construction noise.
  */
 function classify(rawType: string): {
   type: string;
@@ -130,17 +131,15 @@ function classify(rawType: string): {
   const key = rawType.toLowerCase().trim();
   if (!key || HARD_DROP_TYPES.has(key)) return null;
 
-  if (ACCIDENT_TYPE_WHITELIST.has(key)) {
+  if (ACCIDENT_TYPE_WHITELIST.has(key) || key === "incident") {
     return {
       type: "ACCIDENT",
-      subtype: null,
-      title: "Traffic accident",
+      subtype: key === "incident" ? "GOOGLE_MAPS_INCIDENT" : null,
+      title: key === "incident" ? "Traffic Incident / Collision" : "Traffic accident",
       severity: "high",
     };
   }
 
-  // Do not promote generic "incident" — OpenWebNinja uses it for construction
-  // and delays as often as for crashes (Highbury Ave S ramp).
   return null;
 }
 
@@ -368,8 +367,8 @@ async function fetchZoom(
 }
 
 /**
- * Poll OpenWebNinja Google Maps traffic alerts for one city across zooms 11–16.
- * Completely independent of BlocksInside / Fire pipelines.
+ * Poll OpenWebNinja Google Maps traffic alerts for one city: 2×2 tile grid,
+ * zooms 11–15 per tile. Completely independent of BlocksInside / Fire pipelines.
  */
 export async function fetchOpenWebNinjaGoogleMapsForCity(
   city: GoogleMapsCity,
@@ -380,6 +379,7 @@ export async function fetchOpenWebNinjaGoogleMapsForCity(
   }
 
   const box = city.box ?? boundingBox(city.lat, city.lng, city.radiusKm);
+  const tiles = splitBoundingBox(box, GOOGLE_MAPS_TILE_DIVISIONS);
   const started = Date.now();
   runtime.lastFetchAt = new Date().toISOString();
   runtime.city = city.id;
@@ -391,8 +391,12 @@ export async function fetchOpenWebNinjaGoogleMapsForCity(
     (_, i) => ZOOM_MIN + i,
   );
 
+  const fetchJobs = tiles.flatMap((tile) =>
+    zoomLevels.map((zoom) => ({ tile, zoom })),
+  );
+
   const settled = await Promise.allSettled(
-    zoomLevels.map((zoom) => fetchZoom(box, zoom, apiKey)),
+    fetchJobs.map(({ tile, zoom }) => fetchZoom(tile, zoom, apiKey)),
   );
 
   const rawMerged: RawAlert[] = [];
@@ -402,7 +406,7 @@ export async function fetchOpenWebNinjaGoogleMapsForCity(
       zoomsOk += 1;
       rawMerged.push(...result.value);
     } else {
-      logger.warn("OpenWebNinja Google Maps zoom fetch failed", {
+      logger.warn("OpenWebNinja Google Maps tile/zoom fetch failed", {
         city: city.id,
         error: result.reason instanceof Error ? result.reason.message : String(result.reason),
       });
@@ -414,7 +418,7 @@ export async function fetchOpenWebNinjaGoogleMapsForCity(
   runtime.lastRawCount = rawMerged.length;
 
   if (zoomsOk === 0) {
-    const message = "OpenWebNinja Google Maps: all zoom fetches failed";
+    const message = "OpenWebNinja Google Maps: all tile/zoom fetches failed";
     runtime.lastError = message;
     throw new Error(message);
   }
@@ -438,8 +442,9 @@ export async function fetchOpenWebNinjaGoogleMapsForCity(
 
   logger.info("OpenWebNinja Google Maps poll complete", {
     city: city.id,
+    tiles: tiles.length,
     zoomsOk,
-    zoomsTotal: zoomLevels.length,
+    zoomsTotal: fetchJobs.length,
     raw: rawMerged.length,
     retainedAccidents: mapped.length,
     droppedNonAccidents: dropped,
