@@ -9,7 +9,7 @@ interface IncidentMapThumbnailProps {
   lng: number;
 }
 
-/** Non-interactive OSM static map — lazy img only, no map JS libraries. */
+/** Non-interactive OSM static map — lazy tile imgs only, no map JS libraries. */
 export function IncidentMapThumbnail({ lat, lng }: IncidentMapThumbnailProps) {
   const map = buildOsmMapThumbnail(lat, lng);
 
@@ -18,18 +18,29 @@ export function IncidentMapThumbnail({ lat, lng }: IncidentMapThumbnailProps) {
       className="relative shrink-0 overflow-hidden rounded-md border border-line"
       style={{ width: MAP_THUMB_WIDTH, height: MAP_THUMB_HEIGHT }}
     >
-      <img
-        src={map.src}
-        alt=""
-        width={MAP_THUMB_WIDTH}
-        height={MAP_THUMB_HEIGHT}
-        loading="lazy"
-        decoding="async"
-        className="block h-full w-full object-cover"
-        style={{ objectPosition: map.objectPosition }}
-      />
+      <div
+        className="absolute grid grid-cols-2 grid-rows-2"
+        style={{
+          width: map.gridPixelSize,
+          height: map.gridPixelSize,
+          left: map.offsetLeft,
+          top: map.offsetTop,
+        }}
+      >
+        {map.tiles.map((tile) => (
+          <img
+            key={tile.src}
+            src={tile.src}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            draggable={false}
+            className="block h-full w-full object-cover"
+          />
+        ))}
+      </div>
       <span
-        className="pointer-events-none absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-red-600 shadow-sm"
+        className="pointer-events-none absolute left-1/2 top-1/2 z-10 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-red-600 shadow-sm"
         aria-hidden="true"
       />
     </div>

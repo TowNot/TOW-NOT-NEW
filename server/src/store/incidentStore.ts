@@ -36,6 +36,7 @@ export class IncidentStore extends EventEmitter {
     const isNew = !existing;
     const withExpiry: Incident = {
       ...incident,
+      timestamp: existing?.timestamp ?? incident.timestamp,
       provider: existing?.provider ?? incident.provider,
       audioUrl: incident.audioUrl ?? existing?.audioUrl,
       expiresAt: incident.expiresAt || new Date(Date.now() + config.incidentTtlMs).toISOString(),
