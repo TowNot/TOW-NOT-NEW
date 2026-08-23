@@ -35,6 +35,28 @@ function latLngToWorldPixel(
   };
 }
 
+/** Minimum scale so a grid anchored on (pointX, pointY) covers the viewport. */
+function minCoverScale(
+  pointX: number,
+  pointY: number,
+  width: number,
+  height: number,
+  gridSize: number,
+): number {
+  const base = Math.max(width / gridSize, height / gridSize);
+  const safeX = Math.min(gridSize - 1, Math.max(1, pointX));
+  const safeY = Math.min(gridSize - 1, Math.max(1, pointY));
+  const scaleX = Math.max(
+    width / (2 * safeX),
+    width / (2 * (gridSize - safeX)),
+  );
+  const scaleY = Math.max(
+    height / (2 * safeY),
+    height / (2 * (gridSize - safeY)),
+  );
+  return Math.max(base, scaleX, scaleY);
+}
+
 /**
  * 2×2 OSM tile grid centered on coordinates, scaled to cover 300×150 with no
  * empty margins. Keeps lat/lng under the UI center pin.
@@ -62,7 +84,7 @@ export function buildOsmMapThumbnail(
     }
   }
 
-  const scale = Math.max(width / gridSize, height / gridSize);
+  const scale = minCoverScale(pointX, pointY, width, height, gridSize);
   const gridPixelSize = gridSize * scale;
 
   return {
