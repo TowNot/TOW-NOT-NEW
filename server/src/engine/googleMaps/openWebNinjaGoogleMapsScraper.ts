@@ -18,6 +18,8 @@ export const GOOGLE_MAPS_PUSH_DEDUP_RADIUS_KM = 0.35;
 /** Cross-zoom pins often wobble slightly — treat within ~75 m as the same incident. */
 const DEDUP_RADIUS_KM = 0.075;
 const REQUEST_TIMEOUT_MS = 20_000;
+/** Max parallel OpenWebNinja calls per poll (4 tiles × 4 zooms = 16 jobs, run in waves). */
+const FETCH_CONCURRENCY = 4;
 
 export interface GoogleMapsCity {
   id: string;
@@ -327,9 +329,25 @@ async function fetchZoom(
   return extractAlerts(json);
 }
 
+/** Run tile/zoom fetches in small parallel batches to avoid API timeouts. */
+async function fetchJobsWithConcurrency(
+  jobs: Array<{ tile: BoundingBox; zoom: number }>,
+  apiKey: string,
+): Promise<PromiseSettledResult<RawAlert[]>[]> {
+  const settled: PromiseSettledResult<RawAlert[]>[] = [];
+  for (let i = 0; i < jobs.length; i += FETCH_CONCURRENCY) {
+    const batch = jobs.slice(i, i + FETCH_CONCURRENCY);
+    const batchResults = await Promise.allSettled(
+      batch.map(({ tile, zoom }) => fetchZoom(tile, zoom, apiKey)),
+    );
+    settled.push(...batchResults);
+  }
+  return settled;
+}
+
 /**
  * Poll OpenWebNinja Google Maps traffic alerts for one city: 2×2 tile grid,
- * zooms 11–15 per tile. Completely independent of BlocksInside / Fire pipelines.
+ * zooms 11–14 per tile. Completely independent of BlocksInside / Fire pipelines.
  */
 export async function fetchOpenWebNinjaGoogleMapsForCity(
   city: GoogleMapsCity,
@@ -356,22 +374,30 @@ export async function fetchOpenWebNinjaGoogleMapsForCity(
     zoomLevels.map((zoom) => ({ tile, zoom })),
   );
 
-  const settled = await Promise.allSettled(
-    fetchJobs.map(({ tile, zoom }) => fetchZoom(tile, zoom, apiKey)),
-  );
+  const settled = await fetchJobsWithConcurrency(fetchJobs, apiKey);
 
   const rawMerged: RawAlert[] = [];
   let zoomsOk = 0;
+  const failureMessages: string[] = [];
   for (const result of settled) {
     if (result.status === "fulfilled") {
       zoomsOk += 1;
       rawMerged.push(...result.value);
     } else {
-      logger.warn("OpenWebNinja Google Maps tile/zoom fetch failed", {
-        city: city.id,
-        error: result.reason instanceof Error ? result.reason.message : String(result.reason),
-      });
+      const message =
+        result.reason instanceof Error ? result.reason.message : String(result.reason);
+      failureMessages.push(message);
     }
+  }
+
+  const zoomsFailed = failureMessages.length;
+  if (zoomsFailed > 0) {
+    logger.warn("OpenWebNinja Google Maps tile/zoom fetches failed", {
+      city: city.id,
+      failed: zoomsFailed,
+      total: fetchJobs.length,
+      sample: [...new Set(failureMessages)].slice(0, 2),
+    });
   }
 
   runtime.lastLatencyMs = Date.now() - started;
@@ -405,7 +431,9 @@ export async function fetchOpenWebNinjaGoogleMapsForCity(
     city: city.id,
     tiles: tiles.length,
     zoomsOk,
+    zoomsFailed,
     zoomsTotal: fetchJobs.length,
+    fetchConcurrency: FETCH_CONCURRENCY,
     raw: rawMerged.length,
     retainedAccidents: mapped.length,
     droppedNonAccidents: dropped,
