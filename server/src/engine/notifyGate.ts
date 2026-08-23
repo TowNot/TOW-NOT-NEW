@@ -10,6 +10,14 @@ const HAZARD_ALERT_MAX_AGE_MS = 60 * 60 * 1000;
  * pass ingestion for the map and feed but stay silent here.
  */
 export function shouldNotifyIncident(incident: Incident, store: IncidentStore): boolean {
+  // Google Maps ACCIDENT rows always push — no subtype blocklist or nearby dedup.
+  if (
+    incident.source === "google_maps" &&
+    incident.type.toUpperCase().startsWith("ACCIDENT")
+  ) {
+    return true;
+  }
+
   if (!isNotifiableCrash(incident.type, incident.subtype ?? null)) return false;
 
   const isAccident = incident.type.toUpperCase().startsWith("ACCIDENT");

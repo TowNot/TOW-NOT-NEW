@@ -31,7 +31,7 @@ export class GoogleMapsTrafficPoller {
     }
     logger.info("[GOOGLE MAPS] starting OpenWebNinja city poller", {
       intervalMs: config.googleMapsPollIntervalMs,
-      zooms: "11-15",
+      zooms: "11-14",
       tilesPerCity: 4,
       cities: GOOGLE_MAPS_CITIES.map((c) => c.id),
       endpoint: "https://api.openwebninja.com/google-maps-traffic-alerts/traffic-alerts",

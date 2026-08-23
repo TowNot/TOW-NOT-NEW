@@ -10,7 +10,7 @@ import type { Incident, IncidentSeverity } from "../../types/incident";
 
 const ENDPOINT = "https://api.openwebninja.com/google-maps-traffic-alerts/traffic-alerts";
 const ZOOM_MIN = 11;
-const ZOOM_MAX = 15;
+const ZOOM_MAX = 14;
 /** 2×2 quadrants over the city box (same grid pattern as BlocksInside Waze). */
 const GOOGLE_MAPS_TILE_DIVISIONS = 2;
 /** Cross-zoom pins often wobble slightly — treat within ~75 m as the same incident. */
