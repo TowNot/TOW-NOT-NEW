@@ -119,8 +119,8 @@ const HARD_DROP_TYPES = new Set([
 /**
  * OpenWebNinja types:
  * - accident / crash / collision → real crashes
- * - incident → retained as ACCIDENT (subtype GOOGLE_MAPS_INCIDENT); geographic
- *   drop zones and HARD_DROP_TYPES still filter construction noise.
+ * - incident → retained as ACCIDENT (subtype GOOGLE_MAPS_INCIDENT); HARD_DROP_TYPES
+ *   still filter construction/closure noise.
  */
 function classify(rawType: string): {
   type: string;
@@ -140,36 +140,6 @@ function classify(rawType: string): {
     };
   }
 
-  return null;
-}
-
-/**
- * Chronic Google Maps false-positive corridors in London (construction shown
- * as generic pins). Any OpenWebNinja pin inside these boxes is dropped.
- */
-const GOOGLE_MAPS_DROP_ZONES: Array<{ name: string; box: BoundingBox }> = [
-  {
-    // Highbury Ave S ↔ Highway 401 interchange / south ramp construction
-    name: "highbury_401",
-    box: {
-      bottomLeft: { lat: 42.972, lng: -81.228 },
-      topRight: { lat: 43.008, lng: -81.182 },
-    },
-  },
-];
-
-function dropZoneFor(lat: number, lng: number): string | null {
-  for (const zone of GOOGLE_MAPS_DROP_ZONES) {
-    const { bottomLeft, topRight } = zone.box;
-    if (
-      lat >= bottomLeft.lat &&
-      lat <= topRight.lat &&
-      lng >= bottomLeft.lng &&
-      lng <= topRight.lng
-    ) {
-      return zone.name;
-    }
-  }
   return null;
 }
 
@@ -273,17 +243,6 @@ function toIncident(
   const lat = asNumber(raw.latitude) ?? asNumber(raw.lat);
   const lng = asNumber(raw.longitude) ?? asNumber(raw.lng);
   if (lat == null || lng == null) return null;
-
-  const zone = dropZoneFor(lat, lng);
-  if (zone) {
-    logger.debug("OpenWebNinja Google Maps dropped known construction corridor pin", {
-      zone,
-      lat,
-      lng,
-      rawType: asString(raw.type),
-    });
-    return null;
-  }
 
   const rawType = asString(raw.type) ?? "";
   const mapped = classify(rawType);
