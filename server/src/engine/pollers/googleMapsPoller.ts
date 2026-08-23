@@ -6,13 +6,18 @@ import { distanceKm } from "../geo";
 import {
   fetchAllOpenWebNinjaGoogleMapsCities,
   GOOGLE_MAPS_CITIES,
+  GOOGLE_MAPS_PUSH_DEDUP_RADIUS_KM,
 } from "../googleMaps/openWebNinjaGoogleMapsScraper";
-
-/** Match nearby store rows so zoom wobble does not create a second SSE event. */
-const STORE_DEDUP_RADIUS_KM = 0.075;
 
 /** OpenWebNinja field-test cadence (30s). Waze uses config.pollIntervalMs (10s). */
 const GOOGLE_MAPS_POLL_INTERVAL_MS = 30_000;
+
+function isGoogleMapsAccident(incident: Incident): boolean {
+  return (
+    incident.source === "google_maps" &&
+    incident.type.toUpperCase().startsWith("ACCIDENT")
+  );
+}
 
 /**
  * Standalone OpenWebNinja Google Maps poller.
@@ -62,13 +67,30 @@ export class GoogleMapsTrafficPoller {
       const incidents = await fetchAllOpenWebNinjaGoogleMapsCities();
       const ingested: Incident[] = [];
       for (const incident of incidents) {
-        if (this.hasNearbyDuplicate(incident)) {
-          logger.debug("OpenWebNinja Google Maps skipped near-duplicate already in store", {
-            id: incident.id,
-            type: incident.type,
+        if (!isGoogleMapsAccident(incident)) {
+          this.store.upsert(incident);
+          ingested.push(incident);
+          continue;
+        }
+
+        const nearby = this.findNearbyAccident(incident);
+        if (nearby) {
+          const merged = this.store.upsert({
+            ...incident,
+            id: nearby.id,
+            source: nearby.source,
+            timestamp: nearby.timestamp,
+            notified: nearby.notified,
+          });
+          ingested.push(merged);
+          logger.debug("OpenWebNinja Google Maps merged into nearby active accident", {
+            incomingId: incident.id,
+            mergedIntoId: nearby.id,
+            radiusKm: GOOGLE_MAPS_PUSH_DEDUP_RADIUS_KM,
           });
           continue;
         }
+
         this.store.upsert(incident);
         ingested.push(incident);
       }
@@ -87,20 +109,17 @@ export class GoogleMapsTrafficPoller {
     }
   }
 
-  private hasNearbyDuplicate(incoming: Incident): boolean {
-    // Exact id already handled by store upsert — this catches spatial wobble
-    // with a different minted id across polls.
-    return this.store.getActive().some((existing) => {
+  private findNearbyAccident(incoming: Incident): Incident | undefined {
+    return this.store.getActive().find((existing) => {
       if (existing.id === incoming.id) return false;
-      if (existing.source !== "google_maps") return false;
-      if (existing.type !== incoming.type) return false;
+      if (!existing.type.toUpperCase().startsWith("ACCIDENT")) return false;
       return (
         distanceKm(
           existing.coordinates.latitude,
           existing.coordinates.longitude,
           incoming.coordinates.latitude,
           incoming.coordinates.longitude,
-        ) <= STORE_DEDUP_RADIUS_KM
+        ) <= GOOGLE_MAPS_PUSH_DEDUP_RADIUS_KM
       );
     });
   }
