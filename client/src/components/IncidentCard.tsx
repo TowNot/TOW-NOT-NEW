@@ -1,9 +1,12 @@
 import type { Incident, IncidentSeverity, IncidentSource } from "../types";
+import { showTrafficMapThumbnail } from "../lib/osmStaticMap";
+import { IncidentMapThumbnail } from "./IncidentMapThumbnail";
 
 export function IncidentCard({ incident }: { incident: Incident }) {
   const { latitude: lat, longitude: lng } = incident.coordinates;
   const wazeUrl = `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
   const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+  const showMap = showTrafficMapThumbnail(incident.source);
 
   return (
     <article className="grid gap-3 rounded-lg border border-line bg-panel p-4 md:grid-cols-[9rem_1fr_auto]">
@@ -16,7 +19,9 @@ export function IncidentCard({ incident }: { incident: Incident }) {
           </p>
         </div>
       </div>
-      <div>
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row">
+        {showMap ? <IncidentMapThumbnail lat={lat} lng={lng} /> : null}
+        <div className="min-w-0 flex-1">
         <h3 className="text-base font-semibold text-gray-900">{incident.title}</h3>
         <p className="mt-1 text-sm text-gray-600">{incident.description}</p>
         <p className="mt-2 font-mono text-[11px] text-gray-500">{incident.locationLabel}</p>
@@ -38,6 +43,7 @@ export function IncidentCard({ incident }: { incident: Incident }) {
         <div className="mt-3 flex flex-wrap gap-2">
           <NavLink href={wazeUrl} label="Open in Waze" />
           <NavLink href={googleMapsUrl} label="Open in Google Maps" />
+        </div>
         </div>
       </div>
       <div className="font-mono text-[11px] text-gray-500 md:text-right">
