@@ -123,7 +123,7 @@ const HARD_DROP_TYPES = new Set([
 /**
  * OpenWebNinja types:
  * - accident / crash / collision → real crashes
- * - incident → retained as ACCIDENT (subtype GOOGLE_MAPS_INCIDENT); HARD_DROP_TYPES
+ * - incident / other → retained as ACCIDENT (subtype GOOGLE_MAPS_INCIDENT); HARD_DROP_TYPES
  *   still filter construction/closure noise.
  */
 function classify(rawType: string): {
@@ -135,11 +135,15 @@ function classify(rawType: string): {
   const key = rawType.toLowerCase().trim();
   if (!key || HARD_DROP_TYPES.has(key)) return null;
 
-  if (ACCIDENT_TYPE_WHITELIST.has(key) || key === "incident") {
+  if (ACCIDENT_TYPE_WHITELIST.has(key) || key === "incident" || key === "other") {
     return {
       type: "ACCIDENT",
-      subtype: key === "incident" ? "GOOGLE_MAPS_INCIDENT" : null,
-      title: key === "incident" ? "Traffic Incident / Collision" : "Traffic accident",
+      subtype:
+        key === "incident" || key === "other" ? "GOOGLE_MAPS_INCIDENT" : null,
+      title:
+        key === "incident" || key === "other"
+          ? "Traffic Incident / Collision"
+          : "Traffic accident",
       severity: "high",
     };
   }
@@ -414,18 +418,44 @@ export async function fetchOpenWebNinjaGoogleMapsForCity(
   const mapped: Incident[] = [];
   let dropped = 0;
   const typeCounts: Record<string, number> = {};
+  const droppedSamples: Array<{ type: string; lat: number; lng: number }> = [];
   for (const raw of rawMerged) {
     const rawType = (asString(raw.type) ?? "unknown").toLowerCase();
     typeCounts[rawType] = (typeCounts[rawType] ?? 0) + 1;
     const incident = toIncident(raw, city, now);
     if (incident) mapped.push(incident);
-    else dropped += 1;
+    else {
+      dropped += 1;
+      if (droppedSamples.length < 5) {
+        const lat = asNumber(raw.latitude) ?? asNumber(raw.lat);
+        const lng = asNumber(raw.longitude) ?? asNumber(raw.lng);
+        if (lat != null && lng != null) {
+          droppedSamples.push({ type: rawType, lat, lng });
+        }
+      }
+    }
+  }
+
+  if (droppedSamples.length > 0) {
+    logger.debug("OpenWebNinja Google Maps dropped raw alerts (type filter)", {
+      city: city.id,
+      count: dropped,
+      sample: droppedSamples,
+    });
   }
 
   const deduped = dedupeGoogleMapsIncidents(mapped);
   runtime.lastDedupedCount = deduped.length;
   runtime.lastSuccessAt = now.toISOString();
   runtime.lastTypeCounts = typeCounts;
+
+  const retainedPins = deduped.map((inc) => ({
+    lat: Number(inc.coordinates.latitude.toFixed(5)),
+    lng: Number(inc.coordinates.longitude.toFixed(5)),
+    type: inc.type,
+    subtype: inc.subtype ?? null,
+    location: inc.locationLabel,
+  }));
 
   logger.info("OpenWebNinja Google Maps poll complete", {
     city: city.id,
@@ -439,6 +469,7 @@ export async function fetchOpenWebNinjaGoogleMapsForCity(
     droppedNonAccidents: dropped,
     deduped: deduped.length,
     typeCounts,
+    retainedPins,
     latencyMs: runtime.lastLatencyMs,
   });
 
