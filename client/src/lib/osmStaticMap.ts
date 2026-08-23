@@ -9,9 +9,8 @@ export const MAP_THUMB_HEIGHT = 150;
 
 export interface OsmMapThumbnailLayout {
   src: string;
-  imgSize: number;
-  offsetLeft: number;
-  offsetTop: number;
+  /** object-position percentages — pins lat/lng under the center marker. */
+  objectPosition: string;
 }
 
 function latLngToTilePixel(
@@ -35,26 +34,20 @@ function latLngToTilePixel(
 }
 
 /**
- * Build a single-tile OSM thumbnail layout: one 256px tile scaled and offset
- * so incident coordinates sit under the center pin (300×150 viewport).
+ * Single OSM tile URL + object-position so coordinates sit under the center
+ * pin while object-fit: cover fills the 300×150 viewport (no grey gaps).
  */
 export function buildOsmMapThumbnail(
   lat: number,
   lng: number,
-  width = MAP_THUMB_WIDTH,
-  height = MAP_THUMB_HEIGHT,
+  _width = MAP_THUMB_WIDTH,
+  _height = MAP_THUMB_HEIGHT,
   zoom = 15,
 ): OsmMapThumbnailLayout {
   const { tileX, tileY, pixelX, pixelY } = latLngToTilePixel(lat, lng, zoom);
   const src = `${OSM_TILE_BASE}/${zoom}/${tileX}/${tileY}.png`;
-  const scale = Math.max(width / TILE_SIZE, height / TILE_SIZE);
-  const imgSize = TILE_SIZE * scale;
-  return {
-    src,
-    imgSize,
-    offsetLeft: width / 2 - pixelX * scale,
-    offsetTop: height / 2 - pixelY * scale,
-  };
+  const objectPosition = `${((pixelX / TILE_SIZE) * 100).toFixed(2)}% ${((pixelY / TILE_SIZE) * 100).toFixed(2)}%`;
+  return { src, objectPosition };
 }
 
 export function showTrafficMapThumbnail(source: IncidentSource): boolean {
