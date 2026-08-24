@@ -338,7 +338,8 @@ async function fetchZoom(
     ...boxParams(box),
     zoom: String(zoom),
   });
-  const url = `${ENDPOINT}?${params.toString()}`;
+  // Rollback (previous working shape): `${ENDPOINT}?${params.toString()}`
+  const url = `${ENDPOINT}?${params.toString()}&alert_types=accident`;
   const res = await fetch(url, {
     headers: {
       "X-API-Key": apiKey,
