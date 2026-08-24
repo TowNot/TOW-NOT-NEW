@@ -5,7 +5,6 @@ import {
   incidentSourceDetections,
   sourceLabel,
 } from "../lib/incidentDisplay";
-import { showTrafficMapThumbnail } from "../lib/osmStaticMap";
 import { IncidentMapThumbnail } from "./IncidentMapThumbnail";
 
 export function IncidentCard({ incident }: { incident: Incident }) {

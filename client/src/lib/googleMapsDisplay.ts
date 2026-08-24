@@ -1,16 +1,23 @@
 /** Provider attribution for OpenWebNinja-sourced Google Maps incidents. */
-export function formatOpenWebNinjaGoogleMapsLabel(zoom?: number | null): string {
+export function formatOpenWebNinjaGoogleMapsLabel(
+  zoom?: number | null,
+  rawType?: string | null,
+): string {
+  const type = rawType?.trim();
+  if (zoom != null && type) return `OpenWebNinja (Zoom ${zoom} - ${type}) · Google Maps`;
   if (zoom != null) return `OpenWebNinja (Zoom ${zoom}) · Google Maps`;
+  if (type) return `OpenWebNinja (${type}) · Google Maps`;
   return "OpenWebNinja · Google Maps";
 }
 
 export function formatGoogleMapsProviderAttribution(
   provider?: string,
   googleMapsZoom?: number | null,
+  rawType?: string | null,
 ): string | null {
   if (!provider) return null;
   if (provider === "openwebninja_google_maps") {
-    return formatOpenWebNinjaGoogleMapsLabel(googleMapsZoom);
+    return formatOpenWebNinjaGoogleMapsLabel(googleMapsZoom, rawType);
   }
   const labels: Record<string, string> = {
     blocksinside: "BlocksInside",

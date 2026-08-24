@@ -7,7 +7,7 @@ import {
 } from "../coverageZones";
 import { logger } from "../../logger";
 import type { Incident, IncidentSeverity } from "../../types/incident";
-import { mergeGoogleMapsZoom } from "./googleMapsDisplay";
+import { mergeGoogleMapsRawType, mergeGoogleMapsZoom } from "./googleMapsDisplay";
 
 const ENDPOINT = "https://api.openwebninja.com/google-maps-traffic-alerts/traffic-alerts";
 const ZOOM_MIN = 11;
@@ -265,6 +265,7 @@ function toIncident(
 
   const providerId = asString(raw.id) ?? asString(raw.alert_id);
   const labels = formatLocationLabel(raw, city, lat, lng, mapped.title);
+  const normalizedRawType = rawType.toLowerCase().trim() || undefined;
 
   return {
     id: stableIncidentId({
@@ -285,6 +286,7 @@ function toIncident(
     expiresAt: new Date(now.getTime() + config.incidentTtlMs).toISOString(),
     provider: "openwebninja_google_maps",
     googleMapsZoom: zoom,
+    rawType: normalizedRawType,
   };
 }
 
@@ -302,6 +304,7 @@ export function dedupeGoogleMapsIncidents(incidents: Incident[]): Incident[] {
     byId.set(incident.id, {
       ...existing,
       googleMapsZoom: mergeGoogleMapsZoom(existing.googleMapsZoom, incident.googleMapsZoom),
+      rawType: mergeGoogleMapsRawType(existing.rawType, incident.rawType),
     });
   }
 
@@ -322,6 +325,7 @@ export function dedupeGoogleMapsIncidents(incidents: Incident[]): Incident[] {
         duplicate.googleMapsZoom,
         incident.googleMapsZoom,
       );
+      duplicate.rawType = mergeGoogleMapsRawType(duplicate.rawType, incident.rawType);
       continue;
     }
     unique.push(incident);
@@ -338,8 +342,9 @@ async function fetchZoom(
     ...boxParams(box),
     zoom: String(zoom),
   });
-  // Rollback (previous working shape): `${ENDPOINT}?${params.toString()}`
-  const url = `${ENDPOINT}?${params.toString()}&alert_types=accident`;
+  // Rollback (unfiltered): `${ENDPOINT}?${params.toString()}`
+  // Rollback (accident filter): `${ENDPOINT}?${params.toString()}&alert_types=accident`
+  const url = `${ENDPOINT}?${params.toString()}&alert_types=incident`;
   const res = await fetch(url, {
     headers: {
       "X-API-Key": apiKey,

@@ -1,6 +1,6 @@
 import type { Incident, IncidentSource, SourceDetection } from "../types/incident";
 import type { IncidentStore } from "../store/incidentStore";
-import { mergeGoogleMapsZoom } from "./googleMaps/googleMapsDisplay";
+import { mergeGoogleMapsRawType, mergeGoogleMapsZoom } from "./googleMaps/googleMapsDisplay";
 import { distanceKm } from "./geo";
 import { isBreakdown, isTrueCrash } from "./wazeAggregator";
 
@@ -66,6 +66,7 @@ export function sourceDetectionsFromIncident(incident: Incident): SourceDetectio
       detectedAt: incident.timestamp,
       provider: incident.provider,
       googleMapsZoom: incident.googleMapsZoom,
+      rawType: incident.rawType,
     },
   ];
 }
@@ -151,6 +152,7 @@ export function mergeIntoExistingIncident(
     subtype: existing.subtype ?? incoming.subtype,
     provider: primary.provider ?? existing.provider,
     googleMapsZoom: mergeGoogleMapsZoom(existing.googleMapsZoom, incoming.googleMapsZoom),
+    rawType: mergeGoogleMapsRawType(existing.rawType, incoming.rawType),
     expiresAt:
       new Date(existing.expiresAt).getTime() >= new Date(incoming.expiresAt).getTime()
         ? existing.expiresAt

@@ -49,7 +49,7 @@ const PROVIDER_LABELS: Record<string, string> = {
 
 function labelForIncident(incident: Incident): string {
   if (incident.provider === "openwebninja_google_maps") {
-    return formatOpenWebNinjaGoogleMapsLabel(incident.googleMapsZoom);
+    return formatOpenWebNinjaGoogleMapsLabel(incident.googleMapsZoom, incident.rawType);
   }
   if (incident.provider) {
     const known = PROVIDER_LABELS[incident.provider];

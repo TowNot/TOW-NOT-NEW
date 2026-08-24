@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import { config } from "../config";
-import { mergeGoogleMapsZoom } from "../engine/googleMaps/googleMapsDisplay";
+import { mergeGoogleMapsRawType, mergeGoogleMapsZoom } from "../engine/googleMaps/googleMapsDisplay";
 import {
   mergeSourceDetections,
   sourceDetectionsFromIncident,
@@ -52,6 +52,7 @@ export class IncidentStore extends EventEmitter {
       provider: primaryDetection?.provider ?? existing?.provider ?? incident.provider,
       audioUrl: incident.audioUrl ?? existing?.audioUrl,
       googleMapsZoom: mergeGoogleMapsZoom(existing?.googleMapsZoom, incident.googleMapsZoom),
+      rawType: mergeGoogleMapsRawType(existing?.rawType, incident.rawType),
       expiresAt: incident.expiresAt || new Date(Date.now() + config.incidentTtlMs).toISOString(),
       severity: existing ? higherSeverity(existing.severity, incident.severity) : incident.severity,
       notified: existing?.notified ?? incident.notified,

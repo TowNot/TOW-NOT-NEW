@@ -16,13 +16,14 @@ export function incidentSourceDetections(incident: Incident): SourceDetection[] 
       detectedAt: incident.timestamp,
       provider: incident.provider,
       googleMapsZoom: incident.googleMapsZoom,
+      rawType: incident.rawType,
     },
   ];
 }
 
 export function formatSourceDetectionLabel(detection: SourceDetection): string {
   if (detection.source === "google_maps") {
-    return formatOpenWebNinjaGoogleMapsLabel(detection.googleMapsZoom);
+    return formatOpenWebNinjaGoogleMapsLabel(detection.googleMapsZoom, detection.rawType);
   }
   if (detection.provider === "blocksinside") return "BlocksInside · Waze";
   return SOURCE_LABELS[detection.source];

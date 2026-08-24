@@ -6,6 +6,8 @@ export interface SourceDetection {
   detectedAt: string;
   provider?: string;
   googleMapsZoom?: number;
+  /** Raw OpenWebNinja alert type (accident, incident, etc.). */
+  rawType?: string;
 }
 
 export interface GeoPoint {
@@ -28,6 +30,8 @@ export interface Incident {
   provider?: string;
   /** OpenWebNinja zoom level that first returned this Google Maps pin (field test). */
   googleMapsZoom?: number;
+  /** Raw OpenWebNinja `type` string before we classify it (field test). */
+  rawType?: string;
   /** Per-source first-seen timestamps when multiple providers confirm the same wreck. */
   sourceDetections?: SourceDetection[];
   unverifiedAddress?: boolean;
