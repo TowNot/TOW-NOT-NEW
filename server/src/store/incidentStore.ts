@@ -1,6 +1,10 @@
 import { EventEmitter } from "node:events";
 import { config } from "../config";
 import { mergeGoogleMapsZoom } from "../engine/googleMaps/googleMapsDisplay";
+import {
+  mergeSourceDetections,
+  sourceDetectionsFromIncident,
+} from "../engine/incidentMerge";
 import { logger } from "../logger";
 import type { Incident, IncidentSeverity } from "../types/incident";
 
@@ -35,14 +39,22 @@ export class IncidentStore extends EventEmitter {
   upsert(incident: Incident): Incident {
     const existing = this.incidents.get(incident.id);
     const isNew = !existing;
+    const sourceDetections = mergeSourceDetections(
+      existing?.sourceDetections,
+      incident.sourceDetections ?? sourceDetectionsFromIncident(incident),
+    );
+    const primaryDetection = sourceDetections[0];
     const withExpiry: Incident = {
       ...incident,
-      timestamp: existing?.timestamp ?? incident.timestamp,
-      provider: existing?.provider ?? incident.provider,
+      sourceDetections,
+      source: primaryDetection?.source ?? incident.source,
+      timestamp: primaryDetection?.detectedAt ?? existing?.timestamp ?? incident.timestamp,
+      provider: primaryDetection?.provider ?? existing?.provider ?? incident.provider,
       audioUrl: incident.audioUrl ?? existing?.audioUrl,
       googleMapsZoom: mergeGoogleMapsZoom(existing?.googleMapsZoom, incident.googleMapsZoom),
       expiresAt: incident.expiresAt || new Date(Date.now() + config.incidentTtlMs).toISOString(),
       severity: existing ? higherSeverity(existing.severity, incident.severity) : incident.severity,
+      notified: existing?.notified ?? incident.notified,
     };
     this.incidents.set(withExpiry.id, withExpiry);
     logger.debug("[BROADCAST] Sending incident to client...", {

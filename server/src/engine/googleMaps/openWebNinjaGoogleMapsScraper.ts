@@ -14,8 +14,8 @@ const ZOOM_MIN = 11;
 const ZOOM_MAX = 14;
 /** 2×2 quadrants over the city box (same grid pattern as BlocksInside Waze). */
 const GOOGLE_MAPS_TILE_DIVISIONS = 2;
-/** Push + live-desk merge radius for Google Maps ACCIDENT rows (350 m). */
-export const GOOGLE_MAPS_PUSH_DEDUP_RADIUS_KM = 0.35;
+/** Push + live-desk merge radius for Google Maps ACCIDENT rows (200 m). */
+export const GOOGLE_MAPS_PUSH_DEDUP_RADIUS_KM = 0.2;
 /** Cross-zoom pins often wobble slightly — treat within ~75 m as the same incident. */
 const DEDUP_RADIUS_KM = 0.075;
 const REQUEST_TIMEOUT_MS = 20_000;

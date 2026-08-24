@@ -1,5 +1,10 @@
 import type { Incident, IncidentSeverity, IncidentSource } from "../types";
-import { formatGoogleMapsProviderAttribution } from "../lib/googleMapsDisplay";
+import {
+  formatDetectionClock,
+  formatSourceDetectionLabel,
+  incidentSourceDetections,
+  sourceLabel,
+} from "../lib/incidentDisplay";
 import { showTrafficMapThumbnail } from "../lib/osmStaticMap";
 import { IncidentMapThumbnail } from "./IncidentMapThumbnail";
 
@@ -7,12 +12,15 @@ export function IncidentCard({ incident }: { incident: Incident }) {
   const { latitude: lat, longitude: lng } = incident.coordinates;
   const wazeUrl = `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
   const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
-  const showMap = showTrafficMapThumbnail(incident.source);
+  const detections = incidentSourceDetections(incident);
+  const showMap = detections.some(
+    (detection) => detection.source === "waze" || detection.source === "google_maps",
+  );
 
   return (
     <article className="grid gap-3 rounded-lg border border-line bg-panel p-4 md:grid-cols-[9rem_1fr_auto]">
       <div className="flex items-start justify-between gap-3 md:block">
-        <SourceBadge source={incident.source} />
+        <SourceBadges detections={detections} />
         <div className="md:mt-2">
           <SeverityMark severity={incident.severity} />
           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-gray-400">
@@ -26,11 +34,7 @@ export function IncidentCard({ incident }: { incident: Incident }) {
         <h3 className="text-base font-semibold text-gray-900">{incident.title}</h3>
         <p className="mt-1 text-sm text-gray-600">{incident.description}</p>
         <p className="mt-2 font-mono text-[11px] text-gray-500">{incident.locationLabel}</p>
-        {incident.provider ? (
-          <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.14em] text-gray-400">
-            via {formatGoogleMapsProviderAttribution(incident.provider, incident.googleMapsZoom)}
-          </p>
-        ) : null}
+        <SourceDetectionTimeline detections={detections} />
         {incident.audioUrl ? (
           <div className="mt-3">
             <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.16em] text-orange-700">
@@ -58,6 +62,35 @@ export function IncidentCard({ incident }: { incident: Incident }) {
   );
 }
 
+function SourceDetectionTimeline({ detections }: { detections: ReturnType<typeof incidentSourceDetections> }) {
+  if (detections.length === 0) return null;
+
+  return (
+    <div className="mt-2 space-y-1">
+      {detections.map((detection, index) => (
+        <p
+          key={`${detection.source}-${detection.detectedAt}`}
+          className="font-mono text-[10px] uppercase tracking-[0.12em] text-gray-400"
+        >
+          {index === 0 ? "Primary" : "Confirmed"} · {formatSourceDetectionLabel(detection)} ·{" "}
+          {formatDetectionClock(detection.detectedAt)}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+function SourceBadges({ detections }: { detections: ReturnType<typeof incidentSourceDetections> }) {
+  const uniqueSources = [...new Set(detections.map((detection) => detection.source))];
+  return (
+    <div className="flex flex-wrap gap-1">
+      {uniqueSources.map((source) => (
+        <SourceBadge key={source} source={source} />
+      ))}
+    </div>
+  );
+}
+
 function NavLink({ href, label }: { href: string; label: string }) {
   return (
     <a
@@ -78,15 +111,9 @@ function SourceBadge({ source }: { source: IncidentSource }) {
     fire_dispatch: "border-orange-200 bg-orange-50 text-fire",
     ems: "border-rose-200 bg-rose-50 text-rose-800",
   };
-  const labels: Record<IncidentSource, string> = {
-    waze: "Waze",
-    google_maps: "Google Maps",
-    fire_dispatch: "Fire dispatch",
-    ems: "EMS",
-  };
   return (
     <span className={`inline-flex rounded border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] ${styles[source]}`}>
-      {labels[source]}
+      {sourceLabel(source)}
     </span>
   );
 }

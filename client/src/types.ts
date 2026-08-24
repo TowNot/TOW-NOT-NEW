@@ -1,6 +1,13 @@
 export type IncidentSource = "waze" | "google_maps" | "fire_dispatch" | "ems";
 export type IncidentSeverity = "low" | "medium" | "high" | "critical";
 
+export interface SourceDetection {
+  source: IncidentSource;
+  detectedAt: string;
+  provider?: string;
+  googleMapsZoom?: number;
+}
+
 export interface GeoPoint {
   latitude: number;
   longitude: number;
@@ -21,6 +28,8 @@ export interface Incident {
   provider?: string;
   /** OpenWebNinja zoom level that first returned this Google Maps pin (field test). */
   googleMapsZoom?: number;
+  /** Per-source first-seen timestamps when multiple providers confirm the same wreck. */
+  sourceDetections?: SourceDetection[];
   unverifiedAddress?: boolean;
   audioUrl?: string;
   notified?: boolean;

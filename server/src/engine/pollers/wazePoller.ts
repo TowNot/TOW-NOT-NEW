@@ -3,12 +3,15 @@ import { logger } from "../../logger";
 import { IncidentStore } from "../../store/incidentStore";
 import type { Incident, IncidentSeverity, IncidentSource } from "../../types/incident";
 import { enabledCoverageZones } from "../coverageZones";
-import { distanceKm } from "../geo";
+import {
+  findNearbyMergeableIncident,
+  isMergeableTrafficIncident,
+  mergeIntoExistingIncident,
+  withSourceDetections,
+} from "../incidentMerge";
 import {
   fetchLiveWazeProviders,
-  GOOGLE_MAPS_DEDUP_RADIUS_KM,
   isBreakdown,
-  isNotifiableCrash,
   LIVE_WAZE_PROVIDERS,
   type LiveWazeProvider,
   type ProviderSource,
@@ -114,16 +117,29 @@ export class WazeTrafficPoller {
       );
       const ingested: Incident[] = [];
       for (const alert of alerts) {
-        if (alert.provider === "google_maps" && this.hasNearbyCrash(alert)) {
-          logger.info("Skipped drifting Google Maps pin near an active crash", {
-            street: alert.street,
-            provider: alert.provider,
-          });
-          continue;
-        }
         const incident = mapWazeAlert(alert);
-        this.store.upsert(incident);
-        ingested.push(incident);
+        if (isMergeableTrafficIncident(incident)) {
+          const nearby = findNearbyMergeableIncident(this.store, incident);
+          if (nearby) {
+            const merged = this.store.upsert(
+              mergeIntoExistingIncident(nearby, withSourceDetections(incident)),
+            );
+            ingested.push(merged);
+            logger.debug("Waze alert merged into nearby active incident", {
+              incomingId: incident.id,
+              mergedIntoId: nearby.id,
+              sources: merged.sourceDetections?.map((detection) => detection.source),
+            });
+            continue;
+          }
+        }
+
+        const created = this.store.upsert(
+          isMergeableTrafficIncident(incident)
+            ? withSourceDetections(incident)
+            : incident,
+        );
+        ingested.push(created);
       }
       logger.debug(
         `Live traffic poll complete fetched=${alerts.length} ingested=${ingested.length}`,
@@ -137,18 +153,5 @@ export class WazeTrafficPoller {
     } finally {
       this.inFlight = false;
     }
-  }
-
-  private hasNearbyCrash(alert: WazeAlert): boolean {
-    return this.store.getActive().some(
-      (incident) =>
-        isNotifiableCrash(incident.type, incident.subtype ?? null) &&
-        distanceKm(
-          incident.coordinates.latitude,
-          incident.coordinates.longitude,
-          alert.lat,
-          alert.lng,
-        ) <= GOOGLE_MAPS_DEDUP_RADIUS_KM,
-    );
   }
 }

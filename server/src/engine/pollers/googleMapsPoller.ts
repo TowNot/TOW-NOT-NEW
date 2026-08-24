@@ -2,22 +2,19 @@ import { config } from "../../config";
 import { logger } from "../../logger";
 import { IncidentStore } from "../../store/incidentStore";
 import type { Incident } from "../../types/incident";
-import { distanceKm } from "../geo";
+import {
+  findNearbyMergeableIncident,
+  isMergeableTrafficIncident,
+  mergeIntoExistingIncident,
+  withSourceDetections,
+} from "../incidentMerge";
 import {
   fetchAllOpenWebNinjaGoogleMapsCities,
   GOOGLE_MAPS_CITIES,
-  GOOGLE_MAPS_PUSH_DEDUP_RADIUS_KM,
 } from "../googleMaps/openWebNinjaGoogleMapsScraper";
 
 /** Extreme field-test cadence (15s). Waze uses config.pollIntervalMs (10s). */
 const GOOGLE_MAPS_POLL_INTERVAL_MS = 15_000;
-
-function isGoogleMapsAccident(incident: Incident): boolean {
-  return (
-    incident.source === "google_maps" &&
-    incident.type.toUpperCase().startsWith("ACCIDENT")
-  );
-}
 
 /**
  * Standalone OpenWebNinja Google Maps poller.
@@ -68,33 +65,28 @@ export class GoogleMapsTrafficPoller {
       const incidents = await fetchAllOpenWebNinjaGoogleMapsCities();
       const ingested: Incident[] = [];
       for (const incident of incidents) {
-        if (!isGoogleMapsAccident(incident)) {
+        if (!isMergeableTrafficIncident(incident)) {
           this.store.upsert(incident);
           ingested.push(incident);
           continue;
         }
 
-        const nearby = this.findNearbyAccident(incident);
+        const nearby = findNearbyMergeableIncident(this.store, incident);
         if (nearby) {
-          const merged = this.store.upsert({
-            ...incident,
-            id: nearby.id,
-            source: nearby.source,
-            timestamp: nearby.timestamp,
-            notified: nearby.notified,
-            googleMapsZoom: nearby.googleMapsZoom ?? incident.googleMapsZoom,
-          });
+          const merged = this.store.upsert(
+            mergeIntoExistingIncident(nearby, withSourceDetections(incident)),
+          );
           ingested.push(merged);
-          logger.debug("OpenWebNinja Google Maps merged into nearby active accident", {
+          logger.debug("OpenWebNinja Google Maps merged into nearby active incident", {
             incomingId: incident.id,
             mergedIntoId: nearby.id,
-            radiusKm: GOOGLE_MAPS_PUSH_DEDUP_RADIUS_KM,
+            sources: merged.sourceDetections?.map((detection) => detection.source),
           });
           continue;
         }
 
-        this.store.upsert(incident);
-        ingested.push(incident);
+        const created = this.store.upsert(withSourceDetections(incident));
+        ingested.push(created);
       }
       logger.debug("OpenWebNinja Google Maps ingest complete", {
         fetched: incidents.length,
@@ -109,20 +101,5 @@ export class GoogleMapsTrafficPoller {
     } finally {
       this.inFlight = false;
     }
-  }
-
-  private findNearbyAccident(incoming: Incident): Incident | undefined {
-    return this.store.getActive().find((existing) => {
-      if (existing.id === incoming.id) return false;
-      if (!existing.type.toUpperCase().startsWith("ACCIDENT")) return false;
-      return (
-        distanceKm(
-          existing.coordinates.latitude,
-          existing.coordinates.longitude,
-          incoming.coordinates.latitude,
-          incoming.coordinates.longitude,
-        ) <= GOOGLE_MAPS_PUSH_DEDUP_RADIUS_KM
-      );
-    });
   }
 }

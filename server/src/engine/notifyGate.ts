@@ -35,7 +35,7 @@ function nearbyAccident(
  */
 export function shouldNotifyIncident(incident: Incident, store: IncidentStore): boolean {
   // Google Maps ACCIDENT rows (incl. GOOGLE_MAPS_INCIDENT): push only when no
-  // active accident already exists within 350 m.
+  // active accident already exists within 200 m.
   if (incident.source === "google_maps" && isAccidentType(incident.type)) {
     return !nearbyAccident(incident, store, GOOGLE_MAPS_PUSH_DEDUP_RADIUS_KM);
   }

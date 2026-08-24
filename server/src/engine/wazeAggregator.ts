@@ -37,7 +37,7 @@ const PROVIDER_PRIORITY: ProviderSource[] = [
 const DEDUP_RADIUS_KM = 0.05; // 50 meters
 // google_maps sends no alert ids and its pins drift ~100m between polls, so
 // its cross-provider matching uses a much wider radius.
-export const GOOGLE_MAPS_DEDUP_RADIUS_KM = 0.35; // 350 meters
+export const GOOGLE_MAPS_DEDUP_RADIUS_KM = 0.2; // 200 meters
 
 export interface WazeAlert {
   alertId: string;
