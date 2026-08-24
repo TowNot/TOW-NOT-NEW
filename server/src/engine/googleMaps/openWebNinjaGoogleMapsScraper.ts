@@ -254,7 +254,7 @@ function asString(value: unknown): string | null {
   return trimmed || null;
 }
 
-/** Compact diagnostic for every OpenWebNinja row before filters run. */
+/** Compact diagnostic for every OpenWebNinja row before filters run. Off unless GOOGLE_MAPS_VERBOSE_RAW_LOG=1. */
 function logRawGoogleMapsItem(details: {
   rawId: string;
   incidentId: string;
@@ -265,6 +265,7 @@ function logRawGoogleMapsItem(details: {
   title: string;
   desc: string;
 }): void {
+  if (process.env.GOOGLE_MAPS_VERBOSE_RAW_LOG !== "1") return;
   logger.info(
     `[GoogleMaps Raw Item] rawId: ${details.rawId || "none"} | incidentId: ${details.incidentId} | rawType: ${details.rawType} | lat: ${details.lat}, lng: ${details.lng} | zoom: ${details.zoom} | title: "${details.title}" | desc: "${details.desc}"`,
   );
@@ -540,6 +541,14 @@ async function fetchJobsWithConcurrency(
   return settled;
 }
 
+export interface GoogleMapsCityFetchResult {
+  incidents: Incident[];
+  tiles: number;
+  fetched: number;
+  retained: number;
+  latencyMs: number;
+}
+
 /**
  * Poll OpenWebNinja Google Maps traffic alerts for one city.
  * Zooms 11–14: 2×2 tile grid. Zoom 15: dynamic area-split tiles (~16).
@@ -547,7 +556,7 @@ async function fetchJobsWithConcurrency(
  */
 export async function fetchOpenWebNinjaGoogleMapsForCity(
   city: GoogleMapsCity,
-): Promise<Incident[]> {
+): Promise<GoogleMapsCityFetchResult> {
   const apiKey = config.openWebNinjaApiKey;
   if (!apiKey) {
     throw new Error("OPENWEBNINJA_API_KEY is not configured");
@@ -614,7 +623,7 @@ export async function fetchOpenWebNinjaGoogleMapsForCity(
   runtime.lastSuccessAt = now.toISOString();
   runtime.lastTypeCounts = typeCounts;
 
-  logger.info("OpenWebNinja Google Maps poll complete", {
+  logger.debug("OpenWebNinja Google Maps poll fetch details", {
     city: city.id,
     zooms: GOOGLE_MAPS_ZOOM_LEVELS.join(","),
     tileDivisionsByZoom: Object.fromEntries(
@@ -632,7 +641,13 @@ export async function fetchOpenWebNinjaGoogleMapsForCity(
     latencyMs: runtime.lastLatencyMs,
   });
 
-  return deduped;
+  return {
+    incidents: deduped,
+    tiles: fetchJobs.length,
+    fetched: rawMerged.length,
+    retained: deduped.length,
+    latencyMs: runtime.lastLatencyMs ?? Date.now() - started,
+  };
 }
 
 export async function fetchAllOpenWebNinjaGoogleMapsCities(): Promise<Incident[]> {
@@ -641,7 +656,7 @@ export async function fetchAllOpenWebNinjaGoogleMapsCities(): Promise<Incident[]
   );
   const merged: Incident[] = [];
   for (const result of batches) {
-    if (result.status === "fulfilled") merged.push(...result.value);
+    if (result.status === "fulfilled") merged.push(...result.value.incidents);
     else {
       logger.warn("OpenWebNinja Google Maps city poll failed", {
         error: result.reason instanceof Error ? result.reason.message : String(result.reason),

@@ -28,6 +28,11 @@ import {
 /** Extreme field-test cadence (15s). Waze uses config.pollIntervalMs (10s). */
 const GOOGLE_MAPS_POLL_INTERVAL_MS = 15_000;
 
+interface IngestStats {
+  pushed: number;
+  merged: number;
+}
+
 /**
  * Standalone OpenWebNinja Google Maps poller.
  * One independent timer per configured city; does not import BlocksInside / Fire paths.
@@ -77,9 +82,14 @@ export class GoogleMapsTrafficPoller {
 
   async pollCity(city: GoogleMapsCity): Promise<Incident[]> {
     if (!config.openWebNinjaApiKey) return [];
+    const started = Date.now();
     try {
-      const incidents = await fetchOpenWebNinjaGoogleMapsForCity(city);
-      return this.ingestIncidents(incidents);
+      const fetchResult = await fetchOpenWebNinjaGoogleMapsForCity(city);
+      const { incidents, stats } = this.ingestIncidents(fetchResult.incidents);
+      logger.info(
+        `[GoogleMaps Poll] city=${city.id} | tiles=${fetchResult.tiles} | fetched=${fetchResult.fetched} | retained=${fetchResult.retained} | pushed=${stats.pushed} | merged=${stats.merged} | duration=${fetchResult.latencyMs || Date.now() - started}ms`,
+      );
+      return incidents;
     } catch (error) {
       logger.error("OpenWebNinja Google Maps poll failed", {
         city: city.id,
@@ -89,24 +99,35 @@ export class GoogleMapsTrafficPoller {
     }
   }
 
-  private ingestIncidents(incidents: Incident[]): Incident[] {
+  private ingestIncidents(incidents: Incident[]): {
+    incidents: Incident[];
+    stats: IngestStats;
+  } {
     const ingested: Incident[] = [];
+    let pushed = 0;
+    let merged = 0;
+
     for (const incident of incidents) {
       if (!isMergeableTrafficIncident(incident)) {
+        const existed = this.store.getById(incident.id);
         this.store.upsert(incident);
         ingested.push(incident);
+        if (!existed) pushed += 1;
         continue;
       }
 
       const nearby = findNearbyMergeableIncident(this.store, incident);
       if (nearby) {
-        const merged = this.store.upsert(mergeGoogleMapsIntoCluster(nearby, incident));
-        ingested.push(merged);
-        if (isGoogleMapsClusterUpgrade(nearby, incident, merged)) {
+        const cluster = mergeGoogleMapsIntoCluster(nearby, incident);
+        const upserted = this.store.upsert(cluster);
+        ingested.push(upserted);
+        merged += 1;
+        if (isGoogleMapsClusterUpgrade(nearby, incident, upserted)) {
+          pushed += 1;
           this.store.emitClusterUpgrade({
             previous: nearby,
             incoming: incident,
-            merged,
+            merged: upserted,
           });
         } else {
           logGoogleMapsNotificationGate(
@@ -118,7 +139,7 @@ export class GoogleMapsTrafficPoller {
         logger.debug("OpenWebNinja Google Maps merged into nearby active incident", {
           incomingId: incident.id,
           mergedIntoId: nearby.id,
-          sources: merged.sourceDetections?.map((detection) => detection.source),
+          sources: upserted.sourceDetections?.map((detection) => detection.source),
         });
         continue;
       }
@@ -132,12 +153,17 @@ export class GoogleMapsTrafficPoller {
           "SKIPPED PUSH (Existing ID refresh)",
           `rawType=${incident.rawType ?? "unknown"}`,
         );
+      } else {
+        pushed += 1;
       }
     }
+
     logger.debug("OpenWebNinja Google Maps ingest complete", {
       fetched: incidents.length,
       ingested: ingested.length,
+      pushed,
+      merged,
     });
-    return ingested;
+    return { incidents: ingested, stats: { pushed, merged } };
   }
 }

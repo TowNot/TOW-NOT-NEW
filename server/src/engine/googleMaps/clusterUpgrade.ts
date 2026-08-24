@@ -70,8 +70,8 @@ export function applyGoogleMapsClusterUpgradeFields(
 }
 
 /**
- * True when an OpenWebNinja row materially upgrades an existing cluster —
- * e.g. incident → accident, or a new live google_maps detection joins the pin.
+ * True only on genuine type/severity escalation (e.g. incident/other → accident).
+ * Re-polls that merely add another source detection must NEVER trigger an upgrade push.
  */
 export function isGoogleMapsClusterUpgrade(
   existing: Incident,
@@ -96,13 +96,9 @@ export function isGoogleMapsClusterUpgrade(
     return true;
   }
 
-  const previousDetections = sourceDetectionsFromIncident(existing);
-  const mergedDetections = sourceDetectionsFromIncident(merged);
-  if (mergedDetections.length > previousDetections.length) {
-    return true;
-  }
-
-  const previousGoogle = previousDetections.find((detection) => detection.source === "google_maps");
+  const previousGoogle = sourceDetectionsFromIncident(existing).find(
+    (detection) => detection.source === "google_maps",
+  );
   if (
     incoming.rawType &&
     previousGoogle?.rawType &&
