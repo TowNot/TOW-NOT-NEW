@@ -1,9 +1,13 @@
 import { Router } from "express";
 import { config } from "../config";
 import { getProviderRuntimeStats } from "../engine/wazeAggregator";
-import { enabledCoverageZones } from "../engine/coverageZones";
+import { enabledCoverageZones, zoneToBoundingBox } from "../engine/coverageZones";
 import { zonePublicSummaries } from "../engine/zones.config";
-import { getOpenWebNinjaGoogleMapsRuntime } from "../engine/googleMaps/openWebNinjaGoogleMapsScraper";
+import {
+  countGoogleMapsFetchJobs,
+  getOpenWebNinjaGoogleMapsRuntime,
+  GOOGLE_MAPS_ZOOM_LEVELS,
+} from "../engine/googleMaps/openWebNinjaGoogleMapsScraper";
 import { getFireDispatchRuntime } from "../engine/workers/fireDispatchRuntime";
 import type { IncidentStore } from "../store/incidentStore";
 import { subscriptionStoreStats } from "../store/subscriptionStore";
@@ -101,8 +105,12 @@ export function createSourcesRouter(store: IncidentStore): Router {
       googleMapsOpenWebNinja: {
         ...getOpenWebNinjaGoogleMapsRuntime(),
         intervalMs: config.googleMapsPollIntervalMs,
-        zooms: "11-14",
-        tilesPerCity: 4,
+        zooms: GOOGLE_MAPS_ZOOM_LEVELS.join("-"),
+        tilesPerCity: "dynamic",
+        requestsPerPoll: countGoogleMapsFetchJobs(
+          zoneToBoundingBox(enabledCoverageZones().find((z) => z.id === "london")!),
+        ),
+        note: "TEMPORARY Z15/Z16 visibility test",
         endpoint: "https://api.openwebninja.com/google-maps-traffic-alerts/traffic-alerts",
       },
       subscriptions: subscriptionStoreStats(),

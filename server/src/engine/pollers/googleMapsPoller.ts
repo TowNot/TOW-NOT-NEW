@@ -8,8 +8,10 @@ import {
   withSourceDetections,
 } from "../incidentMerge";
 import {
+  countGoogleMapsFetchJobs,
   fetchOpenWebNinjaGoogleMapsForCity,
   GOOGLE_MAPS_CITIES,
+  GOOGLE_MAPS_ZOOM_LEVELS,
   type GoogleMapsCity,
 } from "../googleMaps/openWebNinjaGoogleMapsScraper";
 import {
@@ -46,11 +48,16 @@ export class GoogleMapsTrafficPoller {
       intervalMs: GOOGLE_MAPS_POLL_INTERVAL_MS,
       staggerMs: ZONE_SCHEDULER_STAGGER_MS,
       independentZoneTimers: true,
-      zooms: "11-14",
-      tilesPerCity: 4,
-      requestsPerPoll: 16,
+      zooms: GOOGLE_MAPS_ZOOM_LEVELS.join("-"),
+      tilesPerCity: "dynamic (2×2 @ Z11–14; area-split @ Z15–16)",
+      requestsPerPoll: GOOGLE_MAPS_CITIES.reduce(
+        (total, city) => total + countGoogleMapsFetchJobs(city.box!),
+        0,
+      ),
+      fetchConcurrency: 8,
       cities: GOOGLE_MAPS_CITIES.map((c) => c.id),
       endpoint: "https://api.openwebninja.com/google-maps-traffic-alerts/traffic-alerts",
+      note: "TEMPORARY Z15/Z16 visibility test",
     });
     this.scheduler = startStaggeredZoneSchedulers({
       label: "OpenWebNinja Google Maps",
