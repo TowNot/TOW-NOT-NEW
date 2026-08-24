@@ -88,6 +88,7 @@ interface RawAlert {
   lng?: unknown;
   id?: unknown;
   alert_id?: unknown;
+  incidentId?: unknown;
   street?: unknown;
   road?: unknown;
   address?: unknown;
@@ -210,6 +211,21 @@ function asString(value: unknown): string | null {
   return trimmed || null;
 }
 
+/** Compact diagnostic for every OpenWebNinja row before filters run. */
+function logRawGoogleMapsItem(raw: RawAlert): void {
+  const id =
+    asString(raw.id) ?? asString(raw.incidentId) ?? asString(raw.alert_id) ?? "";
+  const rawType = asString(raw.type) ?? "";
+  const lat = raw.latitude ?? raw.lat ?? "";
+  const lng = raw.longitude ?? raw.lng ?? "";
+  const title = asString(raw.title) ?? "";
+  const desc =
+    asString(raw.description) ?? asString(raw.snippet) ?? asString(raw.details) ?? "";
+  logger.info(
+    `[GoogleMaps Raw Item] id: ${id} | rawType: ${rawType} | lat: ${lat}, lng: ${lng} | title: "${title}" | desc: "${desc}"`,
+  );
+}
+
 function boxParams(box: BoundingBox): { bottom_left: string; top_right: string } {
   return {
     bottom_left: `${box.bottomLeft.lat},${box.bottomLeft.lng}`,
@@ -293,6 +309,7 @@ function toIncident(
   now: Date,
 ): Incident | null {
   const { raw, zoom } = tagged;
+  logRawGoogleMapsItem(raw);
   const lat = asNumber(raw.latitude) ?? asNumber(raw.lat);
   const lng = asNumber(raw.longitude) ?? asNumber(raw.lng);
   if (lat == null || lng == null) return null;
