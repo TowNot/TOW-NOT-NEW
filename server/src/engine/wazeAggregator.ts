@@ -1190,6 +1190,39 @@ async function fetchBlocksInsideBox(box: BoundingBox): Promise<WazeAlert[]> {
   return merged;
 }
 
+const BLOCKSINSIDE_TILES_PER_ZONE = BLOCKSINSIDE_TILE_DIVISIONS ** 2;
+
+/**
+ * Fetch BlocksInside accidents for a single coverage zone.
+ * Tile scraper (fetchBlocksInsideTile / fetchBlocksInsideBox) is unchanged.
+ */
+export async function fetchBlocksInsideForZone(zone: {
+  id: string;
+  name: string;
+}): Promise<WazeAlert[]> {
+  const match = enabledCoverageZones().find((candidate) => candidate.id === zone.id);
+  const box = match ? zoneToBoundingBox(match) : londonBlocksInsideBox();
+  try {
+    const alerts = await fetchBlocksInsideBox(box);
+    logger.info(
+      `[waze-poller] Polled zone: ${zone.name} | Tiles: ${BLOCKSINSIDE_TILES_PER_ZONE} | Alerts found: ${alerts.length}`,
+    );
+    return alerts;
+  } catch (err) {
+    logger.warn(
+      {
+        zone: zone.name,
+        error: err instanceof Error ? err.message : String(err),
+      },
+      "BlocksInside city fetch failed",
+    );
+    logger.info(
+      `[waze-poller] Polled zone: ${zone.name} | Tiles: ${BLOCKSINSIDE_TILES_PER_ZONE} | Alerts found: 0`,
+    );
+    throw err;
+  }
+}
+
 async function fetchBlocksInside(
   _lat: number,
   _lng: number,

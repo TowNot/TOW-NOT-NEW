@@ -2,7 +2,7 @@ import { config } from "../../config";
 import { logger } from "../../logger";
 import { IncidentStore } from "../../store/incidentStore";
 import type { Incident, IncidentSeverity, IncidentSource } from "../../types/incident";
-import { enabledCoverageZones } from "../coverageZones";
+import { enabledCoverageZones, type CoverageZoneDef } from "../coverageZones";
 import {
   findNearbyMergeableIncident,
   isMergeableTrafficIncident,
@@ -10,13 +10,18 @@ import {
   withSourceDetections,
 } from "../incidentMerge";
 import {
-  fetchLiveWazeProviders,
+  fetchBlocksInsideForZone,
   isBreakdown,
   LIVE_WAZE_PROVIDERS,
   type LiveWazeProvider,
   type ProviderSource,
   type WazeAlert,
 } from "../wazeAggregator";
+import {
+  startStaggeredZoneSchedulers,
+  ZONE_SCHEDULER_STAGGER_MS,
+  type ZoneSchedulerHandle,
+} from "./staggeredZoneScheduler";
 
 export type { WazeAlert };
 
@@ -67,16 +72,17 @@ export function mapWazeAlert(alert: WazeAlert): Incident {
 }
 
 export class WazeTrafficPoller {
-  private timer: NodeJS.Timeout | null = null;
-  private inFlight = false;
+  private scheduler: ZoneSchedulerHandle | null = null;
 
   constructor(private readonly store: IncidentStore) {}
 
   start(): void {
-    if (this.timer) return;
+    if (this.scheduler) return;
     const enabled = enabledCoverageZones();
     logger.info("Live traffic aggregator started", {
       intervalMs: config.pollIntervalMs,
+      staggerMs: ZONE_SCHEDULER_STAGGER_MS,
+      independentZoneTimers: true,
       providers: LIVE_WAZE_PROVIDERS.filter((p) => p === "blocksinside" && config.wazeApiKey),
       wazeApiConfigured: Boolean(config.wazeApiKey),
       filter: '["ACCIDENT"]',
@@ -84,74 +90,78 @@ export class WazeTrafficPoller {
       tiles: 4,
       cities: enabled.map((zone) => zone.id),
     });
-    void this.poll();
-    this.timer = setInterval(() => void this.poll(), config.pollIntervalMs);
-    this.timer.unref();
+    if (!config.wazeApiKey) {
+      logger.warn("Skipping live traffic poll; WAZEAPI_KEY is unset");
+      return;
+    }
+    const zones: Array<{ id: string; name: string }> =
+      enabled.length > 0 ? enabled : [{ id: "london", name: "London" } as CoverageZoneDef];
+    this.scheduler = startStaggeredZoneSchedulers({
+      label: "Waze",
+      zones,
+      intervalMs: config.pollIntervalMs,
+      zoneId: (zone) => zone.id,
+      run: async (zone) => {
+        await this.pollZone(zone);
+      },
+    });
   }
 
   stop(): void {
-    if (this.timer) {
-      clearInterval(this.timer);
-      this.timer = null;
-    }
+    this.scheduler?.stop();
+    this.scheduler = null;
   }
 
-  async poll(): Promise<Incident[]> {
+  private liveProviders(): LiveWazeProvider[] {
     const providers: LiveWazeProvider[] = [];
     if (config.wazeApiKey) providers.push("blocksinside");
-    if (providers.length === 0) {
-      logger.warn("Skipping live traffic poll; WAZEAPI_KEY is unset");
-      return [];
-    }
-    if (this.inFlight) {
-      logger.debug("Live traffic poll skipped: previous pass still running");
-      return [];
-    }
-    this.inFlight = true;
-    try {
-      const alerts = await fetchLiveWazeProviders(
-        config.londonLat,
-        config.londonLng,
-        config.pollRadiusKm,
-        providers,
-      );
-      const ingested: Incident[] = [];
-      for (const alert of alerts) {
-        const incident = mapWazeAlert(alert);
-        if (isMergeableTrafficIncident(incident)) {
-          const nearby = findNearbyMergeableIncident(this.store, incident);
-          if (nearby) {
-            const merged = this.store.upsert(
-              mergeIntoExistingIncident(nearby, withSourceDetections(incident)),
-            );
-            ingested.push(merged);
-            logger.debug("Waze alert merged into nearby active incident", {
-              incomingId: incident.id,
-              mergedIntoId: nearby.id,
-              sources: merged.sourceDetections?.map((detection) => detection.source),
-            });
-            continue;
-          }
-        }
+    return providers;
+  }
 
-        const created = this.store.upsert(
-          isMergeableTrafficIncident(incident)
-            ? withSourceDetections(incident)
-            : incident,
-        );
-        ingested.push(created);
-      }
-      logger.debug(
-        `Live traffic poll complete fetched=${alerts.length} ingested=${ingested.length}`,
-      );
-      return ingested;
+  async pollZone(zone: { id: string; name: string }): Promise<Incident[]> {
+    if (this.liveProviders().length === 0) return [];
+    try {
+      const alerts = await fetchBlocksInsideForZone(zone);
+      return this.ingestAlerts(alerts);
     } catch (error) {
       logger.error("Live traffic poll failed", {
+        zone: zone.id,
         error: error instanceof Error ? error.message : String(error),
       });
       return [];
-    } finally {
-      this.inFlight = false;
     }
+  }
+
+  private ingestAlerts(alerts: WazeAlert[]): Incident[] {
+    const ingested: Incident[] = [];
+    for (const alert of alerts) {
+      const incident = mapWazeAlert(alert);
+      if (isMergeableTrafficIncident(incident)) {
+        const nearby = findNearbyMergeableIncident(this.store, incident);
+        if (nearby) {
+          const merged = this.store.upsert(
+            mergeIntoExistingIncident(nearby, withSourceDetections(incident)),
+          );
+          ingested.push(merged);
+          logger.debug("Waze alert merged into nearby active incident", {
+            incomingId: incident.id,
+            mergedIntoId: nearby.id,
+            sources: merged.sourceDetections?.map((detection) => detection.source),
+          });
+          continue;
+        }
+      }
+
+      const created = this.store.upsert(
+        isMergeableTrafficIncident(incident)
+          ? withSourceDetections(incident)
+          : incident,
+      );
+      ingested.push(created);
+    }
+    logger.debug(
+      `Live traffic poll complete fetched=${alerts.length} ingested=${ingested.length}`,
+    );
+    return ingested;
   }
 }
