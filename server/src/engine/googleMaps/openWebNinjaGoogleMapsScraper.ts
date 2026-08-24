@@ -10,8 +10,8 @@ import type { Incident, IncidentSeverity } from "../../types/incident";
 import { mergeGoogleMapsZoom } from "./googleMapsDisplay";
 
 const ENDPOINT = "https://api.openwebninja.com/google-maps-traffic-alerts/traffic-alerts";
-const ZOOM_MIN = 10;
-const ZOOM_MAX = 16;
+const ZOOM_MIN = 11;
+const ZOOM_MAX = 14;
 /** 2×2 quadrants over the city box (same grid pattern as BlocksInside Waze). */
 const GOOGLE_MAPS_TILE_DIVISIONS = 2;
 /** Push + live-desk merge radius for Google Maps ACCIDENT rows (350 m). */
@@ -19,7 +19,7 @@ export const GOOGLE_MAPS_PUSH_DEDUP_RADIUS_KM = 0.35;
 /** Cross-zoom pins often wobble slightly — treat within ~75 m as the same incident. */
 const DEDUP_RADIUS_KM = 0.075;
 const REQUEST_TIMEOUT_MS = 20_000;
-/** Max parallel OpenWebNinja calls per poll (4 tiles × 7 zooms = 28 jobs, run in waves). */
+/** Max parallel OpenWebNinja calls per poll (4 tiles × 4 zooms = 16 jobs, run in waves). */
 const FETCH_CONCURRENCY = 6;
 
 export interface GoogleMapsCity {
@@ -373,7 +373,7 @@ async function fetchJobsWithConcurrency(
 
 /**
  * Poll OpenWebNinja Google Maps traffic alerts for one city: 2×2 tile grid,
- * zooms 10–16 per tile. Completely independent of BlocksInside / Fire pipelines.
+ * zooms 11–14 per tile. Completely independent of BlocksInside / Fire pipelines.
  */
 export async function fetchOpenWebNinjaGoogleMapsForCity(
   city: GoogleMapsCity,

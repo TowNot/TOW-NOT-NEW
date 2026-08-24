@@ -101,7 +101,7 @@ export function createSourcesRouter(store: IncidentStore): Router {
       googleMapsOpenWebNinja: {
         ...getOpenWebNinjaGoogleMapsRuntime(),
         intervalMs: config.googleMapsPollIntervalMs,
-        zooms: "10-16",
+        zooms: "11-14",
         tilesPerCity: 4,
         endpoint: "https://api.openwebninja.com/google-maps-traffic-alerts/traffic-alerts",
       },
