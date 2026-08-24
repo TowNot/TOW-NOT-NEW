@@ -8,6 +8,10 @@ import { config } from "./config";
 import { PushDispatcher } from "./dispatch/pushDispatcher";
 import { DataAggregatorEngine } from "./engine/aggregator";
 import { isGoogleMapsClusterUpgrade } from "./engine/googleMaps/clusterUpgrade";
+import {
+  googleMapsNotificationBlockReason,
+  logGoogleMapsNotificationGate,
+} from "./engine/googleMaps/googleMapsNotificationGate";
 import { shouldNotifyIncident } from "./engine/notifyGate";
 import { GoogleMapsTrafficPoller } from "./engine/pollers/googleMapsPoller";
 import { WazeTrafficPoller } from "./engine/pollers/wazePoller";
@@ -61,17 +65,34 @@ const engine = new DataAggregatorEngine(waze, googleMaps, radio);
 
 store.on("created", (incident) => {
   if (!shouldNotifyIncident(incident, store)) {
-    logger.info("Stored without push", {
-      incidentId: incident.id,
-      type: incident.type,
-      subtype: incident.subtype,
-      source: incident.source,
-    });
+    if (incident.source === "google_maps") {
+      logGoogleMapsNotificationGate(
+        incident.id,
+        "STORED WITHOUT PUSH (Gate blocked)",
+        googleMapsNotificationBlockReason(incident, store) ?? undefined,
+      );
+    } else {
+      logger.info("Stored without push", {
+        incidentId: incident.id,
+        type: incident.type,
+        subtype: incident.subtype,
+        source: incident.source,
+      });
+    }
     return;
   }
   void dispatcher
     .notifyIncident(incident)
-    .then(() => store.markNotified(incident.id))
+    .then(() => {
+      store.markNotified(incident.id);
+      if (incident.source === "google_maps") {
+        logGoogleMapsNotificationGate(
+          incident.id,
+          "PUSHED NEW",
+          `rawType=${incident.rawType ?? "unknown"} | subtype=${incident.subtype ?? "none"}`,
+        );
+      }
+    })
     .catch((error: unknown) => {
       logger.error("Automatic push failed", {
         error: error instanceof Error ? error.message : String(error),
@@ -82,17 +103,24 @@ store.on("created", (incident) => {
 store.on("clusterUpgrade", ({ previous, incoming, merged }) => {
   if (!isGoogleMapsClusterUpgrade(previous, incoming, merged)) return;
   if (!shouldNotifyIncident(merged, store)) {
-    logger.info("Google Maps cluster upgrade stored without push", {
-      incidentId: merged.id,
-      previousRawType: previous.rawType,
-      incomingRawType: incoming.rawType,
-      mergedRawType: merged.rawType,
-    });
+    logGoogleMapsNotificationGate(
+      merged.id,
+      "STORED WITHOUT PUSH (Gate blocked)",
+      googleMapsNotificationBlockReason(merged, store) ??
+        `upgrade ${previous.rawType ?? "?"}→${incoming.rawType ?? "?"}`,
+    );
     return;
   }
   void dispatcher
     .notifyIncident(merged)
-    .then(() => store.markNotified(merged.id))
+    .then(() => {
+      store.markNotified(merged.id);
+      logGoogleMapsNotificationGate(
+        merged.id,
+        "UPGRADE PUSH TRIGGERED",
+        `incoming=${incoming.id} | rawType ${previous.rawType ?? "?"}→${merged.rawType ?? "?"}`,
+      );
+    })
     .catch((error: unknown) => {
       logger.error("Google Maps cluster upgrade push failed", {
         incidentId: merged.id,

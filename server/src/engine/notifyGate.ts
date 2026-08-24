@@ -1,6 +1,5 @@
 import { GOOGLE_MAPS_DEDUP_RADIUS_KM, isNotifiableCrash } from "./wazeAggregator";
-import { GOOGLE_MAPS_PUSH_DEDUP_RADIUS_KM } from "./googleMaps/openWebNinjaGoogleMapsScraper";
-import { mergeCategory, sameMergeCategory } from "./incidentMerge";
+import { shouldNotifyGoogleMapsIncident } from "./googleMaps/googleMapsNotificationGate";
 import { distanceKm } from "./geo";
 import type { Incident } from "../types/incident";
 import type { IncidentStore } from "../store/incidentStore";
@@ -12,30 +11,6 @@ function isAccidentType(type: string): boolean {
 }
 
 /**
- * Same-category accident within merge radius → suppress duplicate push.
- * Road closures / construction nearby never block an accident notification.
- */
-function nearbySameCategoryAccident(
-  incident: Incident,
-  store: IncidentStore,
-  radiusKm: number,
-): Incident | undefined {
-  if (mergeCategory(incident) !== "accident") return undefined;
-  return store.getActive().find((other) => {
-    if (other.id === incident.id) return false;
-    if (!sameMergeCategory(incident, other)) return false;
-    return (
-      distanceKm(
-        other.coordinates.latitude,
-        other.coordinates.longitude,
-        incident.coordinates.latitude,
-        incident.coordinates.longitude,
-      ) <= radiusKm
-    );
-  });
-}
-
-/**
  * Push gate. Only crashes, MVCs, and towable breakdowns alert; major hazards
  * pass ingestion for the map and feed but stay silent here.
  */
@@ -44,7 +19,7 @@ export function shouldNotifyIncident(incident: Incident, store: IncidentStore): 
   // active same-category accident already exists within 200 m.
   // Road_closed / construction nearby do NOT suppress the push.
   if (incident.source === "google_maps" && isAccidentType(incident.type)) {
-    return !nearbySameCategoryAccident(incident, store, GOOGLE_MAPS_PUSH_DEDUP_RADIUS_KM);
+    return shouldNotifyGoogleMapsIncident(incident, store);
   }
 
   if (!isNotifiableCrash(incident.type, incident.subtype ?? null)) return false;

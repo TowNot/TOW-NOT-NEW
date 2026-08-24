@@ -8,6 +8,7 @@ import {
 import { logger } from "../../logger";
 import type { Incident, IncidentSeverity } from "../../types/incident";
 import { mergeGoogleMapsRawType, mergeGoogleMapsZoom } from "./googleMapsDisplay";
+import { logGoogleMapsNotificationGate } from "./googleMapsNotificationGate";
 
 const ENDPOINT = "https://api.openwebninja.com/google-maps-traffic-alerts/traffic-alerts";
 /** 2×2 quadrants over the city box at zooms 11–14 (same grid pattern as BlocksInside Waze). */
@@ -254,17 +255,18 @@ function asString(value: unknown): string | null {
 }
 
 /** Compact diagnostic for every OpenWebNinja row before filters run. */
-function logRawGoogleMapsItem(raw: RawAlert): void {
-  const id =
-    asString(raw.id) ?? asString(raw.incidentId) ?? asString(raw.alert_id) ?? "";
-  const rawType = asString(raw.type) ?? "";
-  const lat = raw.latitude ?? raw.lat ?? "";
-  const lng = raw.longitude ?? raw.lng ?? "";
-  const title = asString(raw.title) ?? "";
-  const desc =
-    asString(raw.description) ?? asString(raw.snippet) ?? asString(raw.details) ?? "";
+function logRawGoogleMapsItem(details: {
+  rawId: string;
+  incidentId: string;
+  rawType: string;
+  lat: number | string;
+  lng: number | string;
+  zoom: number;
+  title: string;
+  desc: string;
+}): void {
   logger.info(
-    `[GoogleMaps Raw Item] id: ${id} | rawType: ${rawType} | lat: ${lat}, lng: ${lng} | title: "${title}" | desc: "${desc}"`,
+    `[GoogleMaps Raw Item] rawId: ${details.rawId || "none"} | incidentId: ${details.incidentId} | rawType: ${details.rawType} | lat: ${details.lat}, lng: ${details.lng} | zoom: ${details.zoom} | title: "${details.title}" | desc: "${details.desc}"`,
   );
 }
 
@@ -351,37 +353,89 @@ function toIncident(
   now: Date,
 ): Incident | null {
   const { raw, zoom } = tagged;
-  logRawGoogleMapsItem(raw);
+  const rawId =
+    asString(raw.id) ?? asString(raw.incidentId) ?? asString(raw.alert_id) ?? "";
   const lat = asNumber(raw.latitude) ?? asNumber(raw.lat);
   const lng = asNumber(raw.longitude) ?? asNumber(raw.lng);
-  if (lat == null || lng == null) return null;
-
   const rawType = asString(raw.type) ?? "";
+
+  if (lat == null || lng == null) {
+    logRawGoogleMapsItem({
+      rawId,
+      incidentId: "n/a",
+      rawType,
+      lat: String(raw.latitude ?? raw.lat ?? ""),
+      lng: String(raw.longitude ?? raw.lng ?? ""),
+      zoom,
+      title: asString(raw.title) ?? "",
+      desc:
+        asString(raw.description) ??
+        asString(raw.snippet) ??
+        asString(raw.details) ??
+        "",
+    });
+    return null;
+  }
+
   const mapped = classify(rawType);
-  if (!mapped) return null;
+  const labels = formatLocationLabel(raw, city, lat, lng, mapped?.title ?? "");
+  const description =
+    asString(raw.description) || labels.description || asString(raw.snippet) || "";
+  const title = mapped?.title ?? asString(raw.title) ?? "";
+
+  if (!mapped) {
+    logRawGoogleMapsItem({
+      rawId,
+      incidentId: "n/a",
+      rawType,
+      lat,
+      lng,
+      zoom,
+      title,
+      desc: description,
+    });
+    logGoogleMapsNotificationGate(
+      rawId || `${lat.toFixed(5)},${lng.toFixed(5)}`,
+      "DROPPED (Type filter)",
+      `rawType=${rawType || "unknown"}`,
+    );
+    return null;
+  }
 
   const providerId = asString(raw.id) ?? asString(raw.alert_id);
-  const labels = formatLocationLabel(raw, city, lat, lng, mapped.title);
   const normalizedRawType = rawType.toLowerCase().trim() || undefined;
-  const description = asString(raw.description) || labels.description;
+  const incidentId = stableIncidentId({
+    providerId,
+    type: mapped.type,
+    lat,
+    lng,
+  });
+
+  logRawGoogleMapsItem({
+    rawId,
+    incidentId,
+    rawType,
+    lat,
+    lng,
+    zoom,
+    title: mapped.title,
+    desc: description,
+  });
 
   const excludedKeyword = findExcludedKeyword(
     collectRawAlertText(raw, mapped.title, description),
   );
   if (excludedKeyword) {
-    logger.info(
-      `[GoogleMaps] Dropped false positive due to keyword match: "${excludedKeyword}" | rawType: ${normalizedRawType ?? rawType}`,
+    logGoogleMapsNotificationGate(
+      incidentId,
+      "DROPPED (Keyword filter)",
+      `keyword="${excludedKeyword}" | rawType=${normalizedRawType ?? rawType}`,
     );
     return null;
   }
 
   return {
-    id: stableIncidentId({
-      providerId,
-      type: mapped.type,
-      lat,
-      lng,
-    }),
+    id: incidentId,
     source: "google_maps",
     type: mapped.type,
     subtype: mapped.subtype,

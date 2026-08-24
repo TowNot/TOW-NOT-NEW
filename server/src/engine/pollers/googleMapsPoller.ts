@@ -18,6 +18,7 @@ import {
   isGoogleMapsClusterUpgrade,
   mergeGoogleMapsIntoCluster,
 } from "../googleMaps/clusterUpgrade";
+import { logGoogleMapsNotificationGate } from "../googleMaps/googleMapsNotificationGate";
 import {
   startStaggeredZoneSchedulers,
   ZONE_SCHEDULER_STAGGER_MS,
@@ -107,6 +108,12 @@ export class GoogleMapsTrafficPoller {
             incoming: incident,
             merged,
           });
+        } else {
+          logGoogleMapsNotificationGate(
+            incident.id,
+            "MERGED WITHOUT PUSH (Existing cluster)",
+            `cluster=${nearby.id} | rawType=${incident.rawType ?? "unknown"}`,
+          );
         }
         logger.debug("OpenWebNinja Google Maps merged into nearby active incident", {
           incomingId: incident.id,
@@ -116,8 +123,16 @@ export class GoogleMapsTrafficPoller {
         continue;
       }
 
+      const existed = this.store.getById(incident.id);
       const created = this.store.upsert(withSourceDetections(incident));
       ingested.push(created);
+      if (existed) {
+        logGoogleMapsNotificationGate(
+          incident.id,
+          "SKIPPED PUSH (Existing ID refresh)",
+          `rawType=${incident.rawType ?? "unknown"}`,
+        );
+      }
     }
     logger.debug("OpenWebNinja Google Maps ingest complete", {
       fetched: incidents.length,
