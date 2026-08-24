@@ -8,6 +8,12 @@ import {
 import { logger } from "../logger";
 import type { Incident, IncidentSeverity } from "../types/incident";
 
+export interface ClusterUpgradeEvent {
+  previous: Incident;
+  incoming: Incident;
+  merged: Incident;
+}
+
 const SEVERITY_RANK: Record<IncidentSeverity, number> = {
   low: 0,
   medium: 1,
@@ -67,6 +73,10 @@ export class IncidentStore extends EventEmitter {
     this.emit("upsert", withExpiry);
     if (isNew) this.emit("created", withExpiry);
     return withExpiry;
+  }
+
+  emitClusterUpgrade(event: ClusterUpgradeEvent): void {
+    this.emit("clusterUpgrade", event);
   }
 
   markNotified(id: string): void {

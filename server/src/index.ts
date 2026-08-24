@@ -7,6 +7,7 @@ import { applyClientAssets, applyTerminalHandlers, createApp } from "./app";
 import { config } from "./config";
 import { PushDispatcher } from "./dispatch/pushDispatcher";
 import { DataAggregatorEngine } from "./engine/aggregator";
+import { isGoogleMapsClusterUpgrade } from "./engine/googleMaps/clusterUpgrade";
 import { shouldNotifyIncident } from "./engine/notifyGate";
 import { GoogleMapsTrafficPoller } from "./engine/pollers/googleMapsPoller";
 import { WazeTrafficPoller } from "./engine/pollers/wazePoller";
@@ -73,6 +74,28 @@ store.on("created", (incident) => {
     .then(() => store.markNotified(incident.id))
     .catch((error: unknown) => {
       logger.error("Automatic push failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+});
+
+store.on("clusterUpgrade", ({ previous, incoming, merged }) => {
+  if (!isGoogleMapsClusterUpgrade(previous, incoming, merged)) return;
+  if (!shouldNotifyIncident(merged, store)) {
+    logger.info("Google Maps cluster upgrade stored without push", {
+      incidentId: merged.id,
+      previousRawType: previous.rawType,
+      incomingRawType: incoming.rawType,
+      mergedRawType: merged.rawType,
+    });
+    return;
+  }
+  void dispatcher
+    .notifyIncident(merged)
+    .then(() => store.markNotified(merged.id))
+    .catch((error: unknown) => {
+      logger.error("Google Maps cluster upgrade push failed", {
+        incidentId: merged.id,
         error: error instanceof Error ? error.message : String(error),
       });
     });

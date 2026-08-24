@@ -5,7 +5,6 @@ import type { Incident } from "../../types/incident";
 import {
   findNearbyMergeableIncident,
   isMergeableTrafficIncident,
-  mergeIntoExistingIncident,
   withSourceDetections,
 } from "../incidentMerge";
 import {
@@ -13,6 +12,10 @@ import {
   GOOGLE_MAPS_CITIES,
   type GoogleMapsCity,
 } from "../googleMaps/openWebNinjaGoogleMapsScraper";
+import {
+  isGoogleMapsClusterUpgrade,
+  mergeGoogleMapsIntoCluster,
+} from "../googleMaps/clusterUpgrade";
 import {
   startStaggeredZoneSchedulers,
   ZONE_SCHEDULER_STAGGER_MS,
@@ -90,10 +93,15 @@ export class GoogleMapsTrafficPoller {
 
       const nearby = findNearbyMergeableIncident(this.store, incident);
       if (nearby) {
-        const merged = this.store.upsert(
-          mergeIntoExistingIncident(nearby, withSourceDetections(incident)),
-        );
+        const merged = this.store.upsert(mergeGoogleMapsIntoCluster(nearby, incident));
         ingested.push(merged);
+        if (isGoogleMapsClusterUpgrade(nearby, incident, merged)) {
+          this.store.emitClusterUpgrade({
+            previous: nearby,
+            incoming: incident,
+            merged,
+          });
+        }
         logger.debug("OpenWebNinja Google Maps merged into nearby active incident", {
           incomingId: incident.id,
           mergedIntoId: nearby.id,

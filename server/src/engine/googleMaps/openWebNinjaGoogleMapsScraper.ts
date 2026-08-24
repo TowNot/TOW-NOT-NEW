@@ -97,6 +97,8 @@ interface RawAlert {
   name?: unknown;
   cross_street?: unknown;
   crossStreet?: unknown;
+  details?: unknown;
+  snippet?: unknown;
 }
 
 interface TaggedRawAlert {
@@ -154,6 +156,42 @@ function classify(rawType: string): {
     };
   }
 
+  return null;
+}
+
+// ROLLBACK: remove EXCLUDED_KEYWORDS + findExcludedKeyword match below to disable filter.
+const EXCLUDED_KEYWORDS = [
+  "construction",
+  "roadwork",
+  "road work",
+  "paving",
+  "maintenance",
+  "closure",
+  "closed",
+];
+
+function collectRawAlertText(raw: RawAlert, mappedTitle: string, mappedDescription: string): string {
+  const parts = [
+    mappedTitle,
+    mappedDescription,
+    asString(raw.title),
+    asString(raw.description),
+    asString(raw.details),
+    asString(raw.snippet),
+    asString(raw.name),
+    asString(raw.street),
+    asString(raw.road),
+    asString(raw.address),
+    extractStreetLabel(raw),
+  ];
+  return parts.filter(Boolean).join(" ");
+}
+
+function findExcludedKeyword(text: string): string | null {
+  const lower = text.toLowerCase();
+  for (const keyword of EXCLUDED_KEYWORDS) {
+    if (lower.includes(keyword)) return keyword;
+  }
   return null;
 }
 
@@ -266,6 +304,17 @@ function toIncident(
   const providerId = asString(raw.id) ?? asString(raw.alert_id);
   const labels = formatLocationLabel(raw, city, lat, lng, mapped.title);
   const normalizedRawType = rawType.toLowerCase().trim() || undefined;
+  const description = asString(raw.description) || labels.description;
+
+  const excludedKeyword = findExcludedKeyword(
+    collectRawAlertText(raw, mapped.title, description),
+  );
+  if (excludedKeyword) {
+    logger.info(
+      `[GoogleMaps] Dropped false positive due to keyword match: "${excludedKeyword}" | rawType: ${normalizedRawType ?? rawType}`,
+    );
+    return null;
+  }
 
   return {
     id: stableIncidentId({
@@ -278,7 +327,7 @@ function toIncident(
     type: mapped.type,
     subtype: mapped.subtype,
     title: mapped.title,
-    description: asString(raw.description) || labels.description,
+    description,
     coordinates: { latitude: lat, longitude: lng },
     locationLabel: labels.locationLabel,
     severity: mapped.severity,
