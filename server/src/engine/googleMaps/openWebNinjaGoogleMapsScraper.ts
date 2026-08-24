@@ -10,27 +10,58 @@ import type { Incident, IncidentSeverity } from "../../types/incident";
 import { mergeGoogleMapsRawType, mergeGoogleMapsZoom } from "./googleMapsDisplay";
 
 const ENDPOINT = "https://api.openwebninja.com/google-maps-traffic-alerts/traffic-alerts";
-/** 2×2 quadrants over the city box (same grid pattern as BlocksInside Waze). */
+/** 2×2 quadrants over the city box at zooms 11–14 (same grid pattern as BlocksInside Waze). */
 const GOOGLE_MAPS_TILE_DIVISIONS = 2;
+/** OpenWebNinja max queryable tile area (km²) at zoom 15. */
+const ZOOM_15_MAX_TILE_AREA_KM2 = 30;
 const REQUEST_TIMEOUT_MS = 20_000;
-/** Max parallel OpenWebNinja calls per poll (4 tiles × 4 zooms = 16 jobs, run in waves). */
-const FETCH_CONCURRENCY = 6;
+/** Max parallel OpenWebNinja calls per poll (batched to avoid rate limits with Z15 tiles). */
+const FETCH_CONCURRENCY = 8;
 /** Push + live-desk merge radius for Google Maps ACCIDENT rows (200 m). */
 export const GOOGLE_MAPS_PUSH_DEDUP_RADIUS_KM = 0.2;
 /** Cross-zoom pins often wobble slightly — treat within ~75 m as the same incident. */
 const DEDUP_RADIUS_KM = 0.075;
 
-export const GOOGLE_MAPS_ZOOM_LEVELS = [11, 12, 13, 14] as const;
+export const GOOGLE_MAPS_ZOOM_LEVELS = [11, 12, 13, 14, 15] as const;
 
-export function countGoogleMapsFetchJobs(_box: BoundingBox): number {
-  return GOOGLE_MAPS_ZOOM_LEVELS.length * GOOGLE_MAPS_TILE_DIVISIONS ** 2;
+function boundingBoxAreaKm2(box: BoundingBox): number {
+  const heightKm = distanceKm(
+    box.bottomLeft.lat,
+    box.bottomLeft.lng,
+    box.topRight.lat,
+    box.bottomLeft.lng,
+  );
+  const widthKm = distanceKm(
+    box.bottomLeft.lat,
+    box.bottomLeft.lng,
+    box.bottomLeft.lat,
+    box.topRight.lng,
+  );
+  return heightKm * widthKm;
+}
+
+/** Z11–14 use 2×2; Z15 splits the box to stay under OpenWebNinja's 30 km² cap. */
+function tileDivisionsForZoom(box: BoundingBox, zoom: number): number {
+  if (zoom <= 14) return GOOGLE_MAPS_TILE_DIVISIONS;
+
+  const fullAreaKm2 = boundingBoxAreaKm2(box);
+  const minDivisions = Math.ceil(Math.sqrt(fullAreaKm2 / ZOOM_15_MAX_TILE_AREA_KM2));
+  return Math.max(GOOGLE_MAPS_TILE_DIVISIONS, minDivisions);
+}
+
+export function countGoogleMapsFetchJobs(box: BoundingBox): number {
+  return GOOGLE_MAPS_ZOOM_LEVELS.reduce((total, zoom) => {
+    const divisions = tileDivisionsForZoom(box, zoom);
+    return total + divisions * divisions;
+  }, 0);
 }
 
 function buildGoogleMapsFetchJobs(box: BoundingBox): Array<{ tile: BoundingBox; zoom: number }> {
-  const tiles = splitBoundingBox(box, GOOGLE_MAPS_TILE_DIVISIONS);
-  return GOOGLE_MAPS_ZOOM_LEVELS.flatMap((zoom) =>
-    tiles.map((tile) => ({ tile, zoom })),
-  );
+  return GOOGLE_MAPS_ZOOM_LEVELS.flatMap((zoom) => {
+    const divisions = tileDivisionsForZoom(box, zoom);
+    const tiles = splitBoundingBox(box, divisions);
+    return tiles.map((tile) => ({ tile, zoom }));
+  });
 }
 
 export interface GoogleMapsCity {
@@ -456,8 +487,9 @@ async function fetchJobsWithConcurrency(
 }
 
 /**
- * Poll OpenWebNinja Google Maps traffic alerts for one city: 2×2 tile grid,
- * zooms 11–14 per tile. Completely independent of BlocksInside / Fire pipelines.
+ * Poll OpenWebNinja Google Maps traffic alerts for one city.
+ * Zooms 11–14: 2×2 tile grid. Zoom 15: dynamic area-split tiles (~16).
+ * Completely independent of BlocksInside / Fire pipelines.
  */
 export async function fetchOpenWebNinjaGoogleMapsForCity(
   city: GoogleMapsCity,
@@ -530,8 +562,10 @@ export async function fetchOpenWebNinjaGoogleMapsForCity(
 
   logger.info("OpenWebNinja Google Maps poll complete", {
     city: city.id,
-    tiles: GOOGLE_MAPS_TILE_DIVISIONS ** 2,
     zooms: GOOGLE_MAPS_ZOOM_LEVELS.join(","),
+    tileDivisionsByZoom: Object.fromEntries(
+      GOOGLE_MAPS_ZOOM_LEVELS.map((zoom) => [zoom, tileDivisionsForZoom(box, zoom)]),
+    ),
     zoomsOk,
     zoomsFailed,
     zoomsTotal: fetchJobs.length,

@@ -8,6 +8,7 @@ import {
   withSourceDetections,
 } from "../incidentMerge";
 import {
+  countGoogleMapsFetchJobs,
   fetchOpenWebNinjaGoogleMapsForCity,
   GOOGLE_MAPS_CITIES,
   GOOGLE_MAPS_ZOOM_LEVELS,
@@ -48,9 +49,12 @@ export class GoogleMapsTrafficPoller {
       staggerMs: ZONE_SCHEDULER_STAGGER_MS,
       independentZoneTimers: true,
       zooms: GOOGLE_MAPS_ZOOM_LEVELS.join("-"),
-      tilesPerCity: 4,
-      requestsPerPoll: 16,
-      fetchConcurrency: 6,
+      tilesPerCity: "4 @ Z11–14; dynamic @ Z15",
+      requestsPerPoll: GOOGLE_MAPS_CITIES.reduce(
+        (total, city) => total + countGoogleMapsFetchJobs(city.box!),
+        0,
+      ),
+      fetchConcurrency: 8,
       cities: GOOGLE_MAPS_CITIES.map((c) => c.id),
       endpoint: "https://api.openwebninja.com/google-maps-traffic-alerts/traffic-alerts",
     });
