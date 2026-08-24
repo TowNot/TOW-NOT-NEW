@@ -1,5 +1,6 @@
 import { GOOGLE_MAPS_DEDUP_RADIUS_KM, isNotifiableCrash } from "./wazeAggregator";
 import { GOOGLE_MAPS_PUSH_DEDUP_RADIUS_KM } from "./googleMaps/openWebNinjaGoogleMapsScraper";
+import { mergeCategory, sameMergeCategory } from "./incidentMerge";
 import { distanceKm } from "./geo";
 import type { Incident } from "../types/incident";
 import type { IncidentStore } from "../store/incidentStore";
@@ -10,14 +11,19 @@ function isAccidentType(type: string): boolean {
   return type.toUpperCase().startsWith("ACCIDENT");
 }
 
-function nearbyAccident(
+/**
+ * Same-category accident within merge radius → suppress duplicate push.
+ * Road closures / construction nearby never block an accident notification.
+ */
+function nearbySameCategoryAccident(
   incident: Incident,
   store: IncidentStore,
   radiusKm: number,
 ): Incident | undefined {
+  if (mergeCategory(incident) !== "accident") return undefined;
   return store.getActive().find((other) => {
     if (other.id === incident.id) return false;
-    if (!isAccidentType(other.type)) return false;
+    if (!sameMergeCategory(incident, other)) return false;
     return (
       distanceKm(
         other.coordinates.latitude,
@@ -35,9 +41,10 @@ function nearbyAccident(
  */
 export function shouldNotifyIncident(incident: Incident, store: IncidentStore): boolean {
   // Google Maps ACCIDENT rows (incl. GOOGLE_MAPS_INCIDENT): push only when no
-  // active accident already exists within 200 m.
+  // active same-category accident already exists within 200 m.
+  // Road_closed / construction nearby do NOT suppress the push.
   if (incident.source === "google_maps" && isAccidentType(incident.type)) {
-    return !nearbyAccident(incident, store, GOOGLE_MAPS_PUSH_DEDUP_RADIUS_KM);
+    return !nearbySameCategoryAccident(incident, store, GOOGLE_MAPS_PUSH_DEDUP_RADIUS_KM);
   }
 
   if (!isNotifiableCrash(incident.type, incident.subtype ?? null)) return false;

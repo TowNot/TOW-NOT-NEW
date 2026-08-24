@@ -2,19 +2,58 @@ import type { Incident, IncidentSource, SourceDetection } from "../types/inciden
 import type { IncidentStore } from "../store/incidentStore";
 import { mergeGoogleMapsZoom } from "./googleMaps/googleMapsDisplay";
 import { distanceKm } from "./geo";
-import { isNotifiableCrash } from "./wazeAggregator";
+import { isBreakdown, isTrueCrash } from "./wazeAggregator";
 
 /** Cross-provider crash merge + push dedup radius (200 m). */
 export const CROSS_SOURCE_MERGE_RADIUS_KM = 0.2;
 
+/**
+ * Strict merge categories — proximity alone is never enough.
+ * Accident ↔ road_hazard must never merge or suppress each other.
+ */
+export type MergeCategory = "accident" | "breakdown" | "road_hazard" | "other";
+
+const ROAD_HAZARD_RE =
+  /ROAD[_\s-]?CLOSED|ROADCLOSED|CONSTRUCTION|ROADWORK|MAINTENANCE|\bCLOSURE\b/;
+
+export function mergeCategory(incident: Incident): MergeCategory {
+  const type = (incident.type ?? "").toUpperCase();
+  const subtype = (incident.subtype ?? "").toUpperCase();
+  const blob = `${type} ${subtype}`;
+
+  if (ROAD_HAZARD_RE.test(blob)) return "road_hazard";
+
+  if (isBreakdown(incident.type, incident.subtype ?? null)) return "breakdown";
+
+  if (
+    type.startsWith("ACCIDENT") ||
+    type.includes("CRASH") ||
+    type.includes("COLLISION") ||
+    subtype === "GOOGLE_MAPS_INCIDENT" ||
+    isTrueCrash(incident.type, incident.subtype ?? null)
+  ) {
+    return "accident";
+  }
+
+  return "other";
+}
+
+/** True when both rows share a mergeable category (never accident vs road_hazard). */
+export function sameMergeCategory(a: Incident, b: Incident): boolean {
+  const left = mergeCategory(a);
+  const right = mergeCategory(b);
+  if (left === "other" || right === "other") return false;
+  return left === right;
+}
+
+/** Eligible for 200 m same-type proximity merge. */
 export function isMergeableTrafficIncident(incident: Incident): boolean {
-  if (incident.source === "google_maps") {
-    return incident.type.toUpperCase().startsWith("ACCIDENT");
-  }
-  if (incident.source === "waze") {
-    return isNotifiableCrash(incident.type, incident.subtype ?? null);
-  }
-  return false;
+  const category = mergeCategory(incident);
+  return (
+    category === "accident" ||
+    category === "breakdown" ||
+    category === "road_hazard"
+  );
 }
 
 export function sourceDetectionsFromIncident(incident: Incident): SourceDetection[] {
@@ -66,11 +105,13 @@ export function findNearbyMergeableIncident(
   incoming: Incident,
   radiusKm = CROSS_SOURCE_MERGE_RADIUS_KM,
 ): Incident | undefined {
+  if (!isMergeableTrafficIncident(incoming)) return undefined;
+
   return store.getActive().find((existing) => {
     if (existing.id === incoming.id) return false;
-    if (!isMergeableTrafficIncident(existing) || !isMergeableTrafficIncident(incoming)) {
-      return false;
-    }
+    if (!isMergeableTrafficIncident(existing)) return false;
+    // Type-aware: accident≠road_closed, accident≠breakdown, etc.
+    if (!sameMergeCategory(existing, incoming)) return false;
     return (
       distanceKm(
         existing.coordinates.latitude,
