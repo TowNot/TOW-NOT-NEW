@@ -20,6 +20,8 @@ export interface Incident {
   expiresAt: string;
   subtype?: string | null;
   provider?: string;
+  /** OpenWebNinja zoom level that first returned this Google Maps pin (field test). */
+  googleMapsZoom?: number;
   unverifiedAddress?: boolean;
   /** Fire-dispatch clip for manual address verification. */
   audioUrl?: string;

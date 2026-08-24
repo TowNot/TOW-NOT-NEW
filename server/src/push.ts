@@ -1,5 +1,6 @@
 import { config } from "./config";
 import { zoneIdForCoordinates, zonePushTag } from "./engine/coverageZones";
+import { formatOpenWebNinjaGoogleMapsLabel } from "./engine/googleMaps/googleMapsDisplay";
 import { getCoverageZone } from "./engine/zones.config";
 import { logger } from "./logger";
 import type { Incident, PushPayload } from "./types/incident";
@@ -47,6 +48,9 @@ const PROVIDER_LABELS: Record<string, string> = {
 };
 
 function labelForIncident(incident: Incident): string {
+  if (incident.provider === "openwebninja_google_maps") {
+    return formatOpenWebNinjaGoogleMapsLabel(incident.googleMapsZoom);
+  }
   if (incident.provider) {
     const known = PROVIDER_LABELS[incident.provider];
     if (known) return known;

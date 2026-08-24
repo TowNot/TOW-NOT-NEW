@@ -7,10 +7,11 @@ import {
 } from "../coverageZones";
 import { logger } from "../../logger";
 import type { Incident, IncidentSeverity } from "../../types/incident";
+import { mergeGoogleMapsZoom } from "./googleMapsDisplay";
 
 const ENDPOINT = "https://api.openwebninja.com/google-maps-traffic-alerts/traffic-alerts";
-const ZOOM_MIN = 11;
-const ZOOM_MAX = 14;
+const ZOOM_MIN = 10;
+const ZOOM_MAX = 16;
 /** 2×2 quadrants over the city box (same grid pattern as BlocksInside Waze). */
 const GOOGLE_MAPS_TILE_DIVISIONS = 2;
 /** Push + live-desk merge radius for Google Maps ACCIDENT rows (350 m). */
@@ -18,8 +19,8 @@ export const GOOGLE_MAPS_PUSH_DEDUP_RADIUS_KM = 0.35;
 /** Cross-zoom pins often wobble slightly — treat within ~75 m as the same incident. */
 const DEDUP_RADIUS_KM = 0.075;
 const REQUEST_TIMEOUT_MS = 20_000;
-/** Max parallel OpenWebNinja calls per poll (4 tiles × 4 zooms = 16 jobs, run in waves). */
-const FETCH_CONCURRENCY = 4;
+/** Max parallel OpenWebNinja calls per poll (4 tiles × 7 zooms = 28 jobs, run in waves). */
+const FETCH_CONCURRENCY = 6;
 
 export interface GoogleMapsCity {
   id: string;
@@ -96,6 +97,11 @@ interface RawAlert {
   name?: unknown;
   cross_street?: unknown;
   crossStreet?: unknown;
+}
+
+interface TaggedRawAlert {
+  raw: RawAlert;
+  zoom: number;
 }
 
 /** Explicit crash/collision types → notifiable ACCIDENT. */
@@ -244,10 +250,11 @@ function stableIncidentId(opts: {
 }
 
 function toIncident(
-  raw: RawAlert,
+  tagged: TaggedRawAlert,
   city: GoogleMapsCity,
   now: Date,
 ): Incident | null {
+  const { raw, zoom } = tagged;
   const lat = asNumber(raw.latitude) ?? asNumber(raw.lat);
   const lng = asNumber(raw.longitude) ?? asNumber(raw.lng);
   if (lat == null || lng == null) return null;
@@ -277,6 +284,7 @@ function toIncident(
     timestamp: now.toISOString(),
     expiresAt: new Date(now.getTime() + config.incidentTtlMs).toISOString(),
     provider: "openwebninja_google_maps",
+    googleMapsZoom: zoom,
   };
 }
 
@@ -286,7 +294,15 @@ function toIncident(
 export function dedupeGoogleMapsIncidents(incidents: Incident[]): Incident[] {
   const byId = new Map<string, Incident>();
   for (const incident of incidents) {
-    if (!byId.has(incident.id)) byId.set(incident.id, incident);
+    const existing = byId.get(incident.id);
+    if (!existing) {
+      byId.set(incident.id, incident);
+      continue;
+    }
+    byId.set(incident.id, {
+      ...existing,
+      googleMapsZoom: mergeGoogleMapsZoom(existing.googleMapsZoom, incident.googleMapsZoom),
+    });
   }
 
   const unique: Incident[] = [];
@@ -301,7 +317,13 @@ export function dedupeGoogleMapsIncidents(incidents: Incident[]): Incident[] {
           incident.coordinates.longitude,
         ) <= DEDUP_RADIUS_KM,
     );
-    if (duplicate) continue;
+    if (duplicate) {
+      duplicate.googleMapsZoom = mergeGoogleMapsZoom(
+        duplicate.googleMapsZoom,
+        incident.googleMapsZoom,
+      );
+      continue;
+    }
     unique.push(incident);
   }
   return unique;
@@ -311,7 +333,7 @@ async function fetchZoom(
   box: BoundingBox,
   zoom: number,
   apiKey: string,
-): Promise<RawAlert[]> {
+): Promise<TaggedRawAlert[]> {
   const params = new URLSearchParams({
     ...boxParams(box),
     zoom: String(zoom),
@@ -330,15 +352,15 @@ async function fetchZoom(
     throw new Error(`openwebninja google_maps zoom=${zoom} status=${res.status} body=${body.slice(0, 200)}`);
   }
   const json = (await res.json().catch(() => ({}))) as unknown;
-  return extractAlerts(json);
+  return extractAlerts(json).map((raw) => ({ raw, zoom }));
 }
 
 /** Run tile/zoom fetches in small parallel batches to avoid API timeouts. */
 async function fetchJobsWithConcurrency(
   jobs: Array<{ tile: BoundingBox; zoom: number }>,
   apiKey: string,
-): Promise<PromiseSettledResult<RawAlert[]>[]> {
-  const settled: PromiseSettledResult<RawAlert[]>[] = [];
+): Promise<PromiseSettledResult<TaggedRawAlert[]>[]> {
+  const settled: PromiseSettledResult<TaggedRawAlert[]>[] = [];
   for (let i = 0; i < jobs.length; i += FETCH_CONCURRENCY) {
     const batch = jobs.slice(i, i + FETCH_CONCURRENCY);
     const batchResults = await Promise.allSettled(
@@ -351,7 +373,7 @@ async function fetchJobsWithConcurrency(
 
 /**
  * Poll OpenWebNinja Google Maps traffic alerts for one city: 2×2 tile grid,
- * zooms 11–14 per tile. Completely independent of BlocksInside / Fire pipelines.
+ * zooms 10–16 per tile. Completely independent of BlocksInside / Fire pipelines.
  */
 export async function fetchOpenWebNinjaGoogleMapsForCity(
   city: GoogleMapsCity,
@@ -380,7 +402,7 @@ export async function fetchOpenWebNinjaGoogleMapsForCity(
 
   const settled = await fetchJobsWithConcurrency(fetchJobs, apiKey);
 
-  const rawMerged: RawAlert[] = [];
+  const rawMerged: TaggedRawAlert[] = [];
   let zoomsOk = 0;
   const failureMessages: string[] = [];
   for (const result of settled) {
@@ -418,10 +440,10 @@ export async function fetchOpenWebNinjaGoogleMapsForCity(
   const mapped: Incident[] = [];
   let dropped = 0;
   const typeCounts: Record<string, number> = {};
-  for (const raw of rawMerged) {
-    const rawType = (asString(raw.type) ?? "unknown").toLowerCase();
+  for (const tagged of rawMerged) {
+    const rawType = (asString(tagged.raw.type) ?? "unknown").toLowerCase();
     typeCounts[rawType] = (typeCounts[rawType] ?? 0) + 1;
-    const incident = toIncident(raw, city, now);
+    const incident = toIncident(tagged, city, now);
     if (incident) mapped.push(incident);
     else dropped += 1;
   }

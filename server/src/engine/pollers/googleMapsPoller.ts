@@ -9,8 +9,8 @@ import {
   GOOGLE_MAPS_PUSH_DEDUP_RADIUS_KM,
 } from "../googleMaps/openWebNinjaGoogleMapsScraper";
 
-/** OpenWebNinja field-test cadence (30s). Waze uses config.pollIntervalMs (10s). */
-const GOOGLE_MAPS_POLL_INTERVAL_MS = 30_000;
+/** Extreme field-test cadence (15s). Waze uses config.pollIntervalMs (10s). */
+const GOOGLE_MAPS_POLL_INTERVAL_MS = 15_000;
 
 function isGoogleMapsAccident(incident: Incident): boolean {
   return (
@@ -39,8 +39,9 @@ export class GoogleMapsTrafficPoller {
     }
     logger.info("[GOOGLE MAPS] starting OpenWebNinja city poller", {
       intervalMs: GOOGLE_MAPS_POLL_INTERVAL_MS,
-      zooms: "11-14",
+      zooms: "10-16",
       tilesPerCity: 4,
+      requestsPerPoll: 28,
       cities: GOOGLE_MAPS_CITIES.map((c) => c.id),
       endpoint: "https://api.openwebninja.com/google-maps-traffic-alerts/traffic-alerts",
     });
@@ -81,6 +82,7 @@ export class GoogleMapsTrafficPoller {
             source: nearby.source,
             timestamp: nearby.timestamp,
             notified: nearby.notified,
+            googleMapsZoom: nearby.googleMapsZoom ?? incident.googleMapsZoom,
           });
           ingested.push(merged);
           logger.debug("OpenWebNinja Google Maps merged into nearby active accident", {

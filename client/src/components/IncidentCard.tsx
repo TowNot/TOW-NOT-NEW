@@ -1,4 +1,5 @@
 import type { Incident, IncidentSeverity, IncidentSource } from "../types";
+import { formatGoogleMapsProviderAttribution } from "../lib/googleMapsDisplay";
 import { showTrafficMapThumbnail } from "../lib/osmStaticMap";
 import { IncidentMapThumbnail } from "./IncidentMapThumbnail";
 
@@ -27,7 +28,7 @@ export function IncidentCard({ incident }: { incident: Incident }) {
         <p className="mt-2 font-mono text-[11px] text-gray-500">{incident.locationLabel}</p>
         {incident.provider ? (
           <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.14em] text-gray-400">
-            via {formatProvider(incident.provider)}
+            via {formatGoogleMapsProviderAttribution(incident.provider, incident.googleMapsZoom)}
           </p>
         ) : null}
         {incident.audioUrl ? (
@@ -68,18 +69,6 @@ function NavLink({ href, label }: { href: string; label: string }) {
       {label}
     </a>
   );
-}
-
-function formatProvider(provider: string): string {
-  const labels: Record<string, string> = {
-    blocksinside: "BlocksInside",
-    openwebninja_google_maps: "OpenWebNinja · Google Maps",
-    london_fire_dispatch: "Fire dispatch",
-  };
-  if (labels[provider]) return labels[provider];
-  const ems = provider.match(/^([a-zA-Z]+)_ems$/);
-  if (ems) return `EMS · ${ems[1]}`;
-  return provider;
 }
 
 function SourceBadge({ source }: { source: IncidentSource }) {
