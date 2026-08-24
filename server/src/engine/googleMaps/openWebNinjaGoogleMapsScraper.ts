@@ -343,8 +343,8 @@ async function fetchZoom(
     zoom: String(zoom),
   });
   // Rollback (unfiltered): `${ENDPOINT}?${params.toString()}`
-  // Rollback (accident filter): `${ENDPOINT}?${params.toString()}&alert_types=accident`
-  const url = `${ENDPOINT}?${params.toString()}&alert_types=incident`;
+  // Rollback (incident filter): `${ENDPOINT}?${params.toString()}&alert_types=incident`
+  const url = `${ENDPOINT}?${params.toString()}&alert_types=accident`;
   const res = await fetch(url, {
     headers: {
       "X-API-Key": apiKey,
