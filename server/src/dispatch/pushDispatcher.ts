@@ -64,7 +64,9 @@ export class PushDispatcher extends EventEmitter {
     }
 
     // Police is push opt-in only — do not SMS every Twilio subscriber.
-    if (!isPoliceType(incident.type, incident.subtype ?? null)) {
+    // Bake-off AAI/SM competitors also skip SMS so users only get one text (Deepgram).
+    const bakeOffCompetitor = /_fire_dispatch_(aai|sm)$/.test(incident.provider ?? "");
+    if (!isPoliceType(incident.type, incident.subtype ?? null) && !bakeOffCompetitor) {
       try {
         notifySmsSubscribers(incident);
       } catch (error) {

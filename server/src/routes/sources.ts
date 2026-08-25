@@ -96,6 +96,8 @@ export function createSourcesRouter(store: IncidentStore): Router {
         wazeApi: Boolean(config.wazeApiKey),
         apify: Boolean(config.apifyApiToken),
         deepgram: Boolean(config.deepgramApiKey),
+        assemblyAi: Boolean(config.assemblyAiApiKey),
+        speechmatics: Boolean(config.speechmaticsApiKey),
         progressier: Boolean(config.progressierApiKey),
         twilio: Boolean(config.twilioAccountSid && config.twilioAuthToken),
         stripe: Boolean(config.stripeSecretKey && config.stripeWebhookSecret),

@@ -96,6 +96,9 @@ export const config = {
   wazeTopRight: process.env.WAZE_TOP_RIGHT?.trim() || "43.0749, -81.1223",
   apifyApiToken: process.env.APIFY_API_TOKEN ?? "",
   deepgramApiKey: process.env.DEEPGRAM_API_KEY ?? "",
+  /** Optional STT bake-off — failures never affect Deepgram. */
+  assemblyAiApiKey: process.env.ASSEMBLYAI_API_KEY?.trim() || "",
+  speechmaticsApiKey: process.env.SPEECHMATICS_API_KEY?.trim() || "",
   residentialProxyUrl: process.env.RESIDENTIAL_PROXY_URL ?? "",
   // Downtown London, ON (same pin the fire-dispatch geocoder uses). A 15 km
   // radius covers Western campus, the 401, and Hyde Park without overflowing

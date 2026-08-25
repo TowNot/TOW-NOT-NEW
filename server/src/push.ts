@@ -58,7 +58,9 @@ function labelForIncident(incident: Incident): string {
   if (incident.provider) {
     const known = PROVIDER_LABELS[incident.provider];
     if (known) return known;
-    const fireM = incident.provider.match(/^([a-zA-Z]+)_fire_dispatch(?:_(hls|stream))?$/);
+    const fireM = incident.provider.match(
+      /^([a-zA-Z]+)_fire_dispatch(?:_(?:hls|stream|dg|aai|sm))?$/,
+    );
     if (fireM) {
       const zone = getCoverageZone(fireM[1]);
       return zone ? `Fire dispatch · ${zone.name}` : "Fire dispatch";
@@ -108,7 +110,9 @@ export function buildProgressierPayload(
 
 export function resolveIncidentZoneId(incident: Incident): string | null {
   if (incident.source === "fire_dispatch" || incident.source === "ems") {
-    const m = incident.provider?.match(/^([a-zA-Z]+)_(?:fire_dispatch(?:_(?:hls|stream))?|ems)$/);
+    const m = incident.provider?.match(
+      /^([a-zA-Z]+)_(?:fire_dispatch(?:_(?:hls|stream|dg|aai|sm))?|ems)$/,
+    );
     if (m) return m[1];
   }
   return zoneIdForCoordinates(
@@ -122,10 +126,15 @@ export function incidentToPushPayload(incident: Incident): PushPayload {
   const providerLabel = labelForIncident(incident);
   const zoneId = resolveIncidentZoneId(incident);
   const note = incident.description?.trim();
+  // STT bake-off: keep [DG]/[AAI]/[SM] at the front of the Progressier title
+  // so the 50-char cap doesn't strip the engine tag.
+  const bakeOffTitle = /^\[(DG|AAI|SM)\]/.test(incident.title);
   return {
     title: police
       ? "AlertNav · Waze (Police)"
-      : `AlertNav · ${providerLabel} · ${incident.title}`,
+      : bakeOffTitle
+        ? truncate(incident.title, TITLE_MAX)
+        : `AlertNav · ${providerLabel} · ${incident.title}`,
     body: police
       ? truncate(
           [incident.locationLabel, note && note !== incident.locationLabel ? note : null]
