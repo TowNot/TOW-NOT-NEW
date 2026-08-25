@@ -1,3 +1,8 @@
+import { useMemo, useState } from "react";
+import {
+  buildGoogleStaticMapUrl,
+  resolveGoogleMapsApiKey,
+} from "../lib/googleMapsStatic";
 import {
   buildOsmMapThumbnail,
   MAP_THUMB_HEIGHT,
@@ -9,13 +14,47 @@ interface IncidentMapThumbnailProps {
   lng: number;
 }
 
-/** Non-interactive OSM static map — lazy tile imgs only, no map JS libraries. */
+/**
+ * Incident card map: Google Static Maps when a key is available (one lightweight
+ * img, lazy-loaded). Falls back to the existing OSM tile collage on missing key
+ * or load error.
+ */
 export function IncidentMapThumbnail({ lat, lng }: IncidentMapThumbnailProps) {
+  const apiKey = useMemo(() => resolveGoogleMapsApiKey(), []);
+  const googleSrc = useMemo(
+    () => (apiKey ? buildGoogleStaticMapUrl(lat, lng, apiKey) : null),
+    [apiKey, lat, lng],
+  );
+  const [useOsmFallback, setUseOsmFallback] = useState(!googleSrc);
+
+  if (!useOsmFallback && googleSrc) {
+    return (
+      <div
+        className="relative aspect-video w-[300px] max-w-full shrink-0 overflow-hidden rounded-md border border-line bg-ink"
+        style={{ width: MAP_THUMB_WIDTH, height: MAP_THUMB_HEIGHT }}
+      >
+        <img
+          src={googleSrc}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          draggable={false}
+          className="h-full w-full object-cover"
+          onError={() => setUseOsmFallback(true)}
+        />
+      </div>
+    );
+  }
+
+  return <OsmMapThumbnailFallback lat={lat} lng={lng} />;
+}
+
+function OsmMapThumbnailFallback({ lat, lng }: IncidentMapThumbnailProps) {
   const map = buildOsmMapThumbnail(lat, lng);
 
   return (
     <div
-      className="relative shrink-0 overflow-hidden rounded-md border border-line"
+      className="relative shrink-0 overflow-hidden rounded-md border border-line bg-ink"
       style={{ width: MAP_THUMB_WIDTH, height: MAP_THUMB_HEIGHT }}
     >
       <div

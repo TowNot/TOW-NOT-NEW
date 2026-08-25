@@ -117,4 +117,10 @@ export const config = {
     "https://buy.stripe.com/5kQbJ0eL3ahB6ax6dc8Vi00",
   clerkPublishableKey: process.env.CLERK_PUBLISHABLE_KEY?.trim() || "",
   clerkSecretKey: process.env.CLERK_SECRET_KEY?.trim() || "",
+  /** Client Static Maps key — injected into index.html (Vite does not read NEXT_PUBLIC_*). */
+  googleMapsApiKey:
+    process.env.GOOGLE_MAPS_API_KEY?.trim() ||
+    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() ||
+    process.env.VITE_GOOGLE_MAPS_API_KEY?.trim() ||
+    "",
 } as const;

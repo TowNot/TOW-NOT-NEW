@@ -122,11 +122,20 @@ export function applyClientAssets(app: express.Express): void {
 
   const sendIndex = (_req: Request, res: Response, next: NextFunction): void => {
     try {
-      const key = config.clerkPublishableKey;
-      const inject =
-        key && /^pk_(test|live)_/.test(key)
-          ? `<script>window.__CLERK_PUBLISHABLE_KEY__=${JSON.stringify(key)};</script>`
-          : "";
+      const scripts: string[] = [];
+      const clerkKey = config.clerkPublishableKey;
+      if (clerkKey && /^pk_(test|live)_/.test(clerkKey)) {
+        scripts.push(
+          `<script>window.__CLERK_PUBLISHABLE_KEY__=${JSON.stringify(clerkKey)};</script>`,
+        );
+      }
+      const mapsKey = config.googleMapsApiKey;
+      if (mapsKey) {
+        scripts.push(
+          `<script>window.__GOOGLE_MAPS_API_KEY__=${JSON.stringify(mapsKey)};</script>`,
+        );
+      }
+      const inject = scripts.join("");
       const html = inject
         ? indexTemplate.replace(/<head([^>]*)>/i, `<head$1>${inject}`)
         : indexTemplate;
