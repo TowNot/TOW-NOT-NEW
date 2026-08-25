@@ -12,6 +12,7 @@ import {
 import {
   fetchBlocksInsideForZone,
   isBreakdown,
+  isPoliceType,
   LIVE_WAZE_PROVIDERS,
   type LiveWazeProvider,
   type ProviderSource,
@@ -30,6 +31,7 @@ function toSource(provider: ProviderSource): IncidentSource {
 }
 
 function toSeverity(alert: WazeAlert): IncidentSeverity {
+  if (isPoliceType(alert.type, alert.subtype)) return "medium";
   if (isBreakdown(alert.type, alert.subtype)) return "high";
   const subtype = (alert.subtype ?? "").toUpperCase();
   if (subtype.includes("MAJOR") || subtype.includes("SEVERE") || subtype.includes("PILE")) {
@@ -42,11 +44,25 @@ function toSeverity(alert: WazeAlert): IncidentSeverity {
 }
 
 function toTitle(alert: WazeAlert): string {
+  if (isPoliceType(alert.type, alert.subtype)) return "Police";
   if (isBreakdown(alert.type, alert.subtype)) return "Disabled vehicle";
   const subtype = (alert.subtype ?? "").toUpperCase();
   if (subtype.includes("MAJOR") || subtype.includes("PILE")) return "Major collision";
   if (alert.type.toUpperCase().startsWith("ACCIDENT")) return "Traffic accident";
   return alert.street ? `${alert.type} on ${alert.street}` : alert.type;
+}
+
+function toDescription(alert: WazeAlert, street: string): string {
+  const note = alert.description?.trim();
+  if (isPoliceType(alert.type, alert.subtype)) {
+    const subtype = alert.subtype?.trim();
+    const parts = [note, subtype && subtype.toUpperCase() !== "POLICE" ? subtype : null].filter(
+      Boolean,
+    ) as string[];
+    if (parts.length > 0) return parts.join(" · ");
+    return `Police reported on ${street}.`;
+  }
+  return note || `${toTitle(alert)} reported on ${street}.`;
 }
 
 export function mapWazeAlert(alert: WazeAlert): Incident {
@@ -59,9 +75,7 @@ export function mapWazeAlert(alert: WazeAlert): Incident {
     type: alert.type,
     subtype: alert.subtype,
     title: toTitle(alert),
-    description:
-      alert.description?.trim() ||
-      `${toTitle(alert)} reported on ${street}.`,
+    description: toDescription(alert, street),
     coordinates: { latitude: alert.lat, longitude: alert.lng },
     locationLabel: `${street}, ${city}`,
     severity: toSeverity(alert),
@@ -85,7 +99,7 @@ export class WazeTrafficPoller {
       independentZoneTimers: true,
       providers: LIVE_WAZE_PROVIDERS.filter((p) => p === "blocksinside" && config.wazeApiKey),
       wazeApiConfigured: Boolean(config.wazeApiKey),
-      filter: '["ACCIDENT"]',
+      filter: '["ACCIDENT","POLICE"]',
       country: config.wazeApiCountry,
       tiles: 4,
       cities: enabled.map((zone) => zone.id),

@@ -173,16 +173,14 @@ function asNumber(v: unknown): number | null {
 }
 
 /**
- * Strict crash-only category filter. Exactly three Waze crash report
- * categories are allowed through the pipeline:
+ * Strict crash-only category filter historically dropped everything except
+ * crashes / major hazards. POLICE is now an explicit allowlisted category
+ * with its own merge lane and opt-in push audience.
  *  - Standard Crash: ACCIDENT / ACCIDENT_MINOR
  *  - Pileup:         ACCIDENT_MAJOR
- *    (any ACCIDENT type or ACCIDENT_* subtype qualifies, covering future
- *    crash subtypes across all 7 providers)
  *  - Other Side Crash: HAZARD / HAZARD_ON_ROAD_FEATURE
- * Everything else — POLICE, construction, weather, jams, general hazards,
- * road closures — is dropped at the raw fetch layer and never processed,
- * stored, or notified.
+ *  - Police:         POLICE / POLICE_*
+ * Construction, weather, jams, and road closures are still dropped.
  */
 /**
  * Ingestion type allowlist: every row with one of these primary types (or an
@@ -190,6 +188,7 @@ function asNumber(v: unknown): number | null {
  */
 export const INGEST_TYPE_ALLOWLIST = new Set([
   "ACCIDENT",
+  "POLICE",
   "HAZARD",
   "ROAD_CLOSED",
   "JAM",
@@ -438,10 +437,18 @@ export function isAccidentType(type: string): boolean {
   return t.startsWith("ACCIDENT") || t === "CRASH" || t === "COLLISION" || t === "MVC" || t === "MVA";
 }
 
+/** Waze police presence (POLICE, POLICE_VISIBLE, etc.). */
+export function isPoliceType(type: string, subtype?: string | null): boolean {
+  const t = (type ?? "").toUpperCase();
+  const s = (subtype ?? "").toUpperCase();
+  return t === "POLICE" || t.startsWith("POLICE_") || s.startsWith("POLICE");
+}
+
 export function isNotifiableCrash(
   type: string,
   subtype: string | null,
 ): boolean {
+  if (isPoliceType(type, subtype)) return true;
   const s = (subtype ?? "").toUpperCase();
   if (NON_CRASH_SUBTYPE_BLOCKLIST.some((k) => s.includes(k))) {
     return false;
@@ -610,11 +617,13 @@ export function parseRawAlerts(
     // Everything else — minor municipal notices, jams, weather, congestion
     // pins — is rejected here.
     const crashTyped = isAccidentType(tUp) || isTrueCrash(tUp, sUp);
+    const policeHit = isPoliceType(tUp, sUp);
     const majorHazardHit = isMajorHazard(tUp, sUp, crashText);
     if (
       !keywordHit &&
       !breakdownHit &&
       !crashTyped &&
+      !policeHit &&
       !majorHazardHit
     ) {
       earlyDropped++;
@@ -633,6 +642,8 @@ export function parseRawAlerts(
 
     const acceptedAs = keywordHit || crashTyped
       ? "crash"
+      : policeHit
+        ? "police"
       : breakdownHit
         ? "breakdown"
         : "major hazard (silent)";
@@ -689,17 +700,16 @@ export function parseRawAlerts(
           return `geo-${snapGrid(latVal, tight)},${snapGrid(lngVal, tight)}-${(type ?? "INCIDENT").toUpperCase()}${tight ? `-t${t}` : ""}`;
         })(),
       provider,
-      // Keyword-crawl hits, ACCIDENT variants (ACCIDENT_MINOR/_MAJOR/
-      // _PILE_UP/_CHAIN_REACTION/_OTHER_SIDE), and any type/subtype the
-      // notification gate recognizes as a crash (pileup/chain/other-side
-      // subtypes on non-ACCIDENT rows) normalize to ACCIDENT so they map
-      // cleanly in the API payload and dispatch push/SMS. Other allowlisted
-      // types (HAZARD/ROAD_CLOSED/JAM/OTHER) keep their raw type so the
-      // gate can still distinguish crashes from stored-but-silent events.
+      // Keyword-crawl hits, ACCIDENT variants, and crash subtypes normalize
+      // to ACCIDENT. POLICE keeps its raw type so merge/push can isolate it.
+      // Other allowlisted types (HAZARD/ROAD_CLOSED/JAM/OTHER) keep their raw
+      // type so the gate can still distinguish crashes from silent events.
       type:
-        keywordHit || isAccidentType(tUp) || isTrueCrash(tUp, sUp)
-          ? "ACCIDENT"
-          : tUp || "OTHER",
+        policeHit
+          ? "POLICE"
+          : keywordHit || isAccidentType(tUp) || isTrueCrash(tUp, sUp)
+            ? "ACCIDENT"
+            : tUp || "OTHER",
       // Preserve the raw crash granularity: keep the provider subtype, or
       // fall back to the raw type when it carried the detail (e.g.
       // ACCIDENT_MAJOR as a type, HAZARD_ON_ROAD_FEATURE opposite-side).
@@ -1119,7 +1129,7 @@ async function fetchBlocksInsideTile(tile: BoundingBox): Promise<WazeAlert[]> {
   const params = new URLSearchParams({
     "bottom-left": blocksInsideCoordPair(tile.bottomLeft.lat, tile.bottomLeft.lng),
     "top-right": blocksInsideCoordPair(tile.topRight.lat, tile.topRight.lng),
-    filter: '["ACCIDENT"]',
+    filter: '["ACCIDENT","POLICE"]',
   });
   const url = `https://api.wazeapi.com/v1/alerts?${params.toString()}`;
   const started = Date.now();
@@ -1240,7 +1250,7 @@ async function fetchBlocksInside(
       cities: jobs.map((j) => j.zone.id),
       tilesPerCity: tilesPerZone,
       country: config.wazeApiCountry,
-      filter: '["ACCIDENT"]',
+      filter: '["ACCIDENT","POLICE"]',
     },
     "BlocksInside 4-tile poll",
   );

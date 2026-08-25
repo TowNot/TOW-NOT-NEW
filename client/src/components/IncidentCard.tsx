@@ -19,7 +19,7 @@ export function IncidentCard({ incident }: { incident: Incident }) {
   return (
     <article className="grid gap-3 rounded-lg border border-line bg-panel p-4 md:grid-cols-[9rem_1fr_auto]">
       <div className="flex items-start justify-between gap-3 md:block">
-        <SourceBadges detections={detections} />
+        <SourceBadges detections={detections} incident={incident} />
         <div className="md:mt-2">
           <SeverityMark severity={incident.severity} />
           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-gray-400">
@@ -33,7 +33,7 @@ export function IncidentCard({ incident }: { incident: Incident }) {
         <h3 className="text-base font-semibold text-gray-900">{incident.title}</h3>
         <p className="mt-1 text-sm text-gray-600">{incident.description}</p>
         <p className="mt-2 font-mono text-[11px] text-gray-500">{incident.locationLabel}</p>
-        <SourceDetectionTimeline detections={detections} />
+        <SourceDetectionTimeline detections={detections} incident={incident} />
         {incident.audioUrl ? (
           <div className="mt-3">
             <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.16em] text-orange-700">
@@ -61,7 +61,13 @@ export function IncidentCard({ incident }: { incident: Incident }) {
   );
 }
 
-function SourceDetectionTimeline({ detections }: { detections: ReturnType<typeof incidentSourceDetections> }) {
+function SourceDetectionTimeline({
+  detections,
+  incident,
+}: {
+  detections: ReturnType<typeof incidentSourceDetections>;
+  incident: Incident;
+}) {
   if (detections.length === 0) return null;
 
   return (
@@ -71,7 +77,8 @@ function SourceDetectionTimeline({ detections }: { detections: ReturnType<typeof
           key={`${detection.source}-${detection.detectedAt}`}
           className="font-mono text-[10px] uppercase tracking-[0.12em] text-gray-400"
         >
-          {index === 0 ? "Primary" : "Confirmed"} · {formatSourceDetectionLabel(detection)} ·{" "}
+          {index === 0 ? "Primary" : "Confirmed"} ·{" "}
+          {formatSourceDetectionLabel(detection, incident)} ·{" "}
           {formatDetectionClock(detection.detectedAt)}
         </p>
       ))}
@@ -79,12 +86,23 @@ function SourceDetectionTimeline({ detections }: { detections: ReturnType<typeof
   );
 }
 
-function SourceBadges({ detections }: { detections: ReturnType<typeof incidentSourceDetections> }) {
+function SourceBadges({
+  detections,
+  incident,
+}: {
+  detections: ReturnType<typeof incidentSourceDetections>;
+  incident: Incident;
+}) {
   const uniqueSources = [...new Set(detections.map((detection) => detection.source))];
   return (
     <div className="flex flex-wrap gap-1">
       {uniqueSources.map((source) => (
-        <SourceBadge key={source} source={source} />
+        <SourceBadge
+          key={source}
+          source={source}
+          type={incident.type}
+          subtype={incident.subtype}
+        />
       ))}
     </div>
   );
@@ -103,7 +121,15 @@ function NavLink({ href, label }: { href: string; label: string }) {
   );
 }
 
-function SourceBadge({ source }: { source: IncidentSource }) {
+function SourceBadge({
+  source,
+  type,
+  subtype,
+}: {
+  source: IncidentSource;
+  type?: string | null;
+  subtype?: string | null;
+}) {
   const styles: Record<IncidentSource, string> = {
     waze: "border-sky-200 bg-sky-50 text-waze",
     google_maps: "border-emerald-200 bg-emerald-50 text-maps",
@@ -112,7 +138,7 @@ function SourceBadge({ source }: { source: IncidentSource }) {
   };
   return (
     <span className={`inline-flex rounded border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] ${styles[source]}`}>
-      {sourceLabel(source)}
+      {sourceLabel(source, type, subtype)}
     </span>
   );
 }

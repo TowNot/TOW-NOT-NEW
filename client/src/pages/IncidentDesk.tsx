@@ -1,11 +1,14 @@
 import { Header } from "../components/Header";
 import { IncidentFeed } from "../components/IncidentFeed";
+import { PoliceAlertsSettings } from "../components/PoliceAlertsSettings";
 import { SmsSettings } from "../components/SmsSettings";
 import { useAlertOnNewIncidents } from "../hooks/useAlertOnNewIncidents";
 import { useIncidents } from "../hooks/useIncidents";
+import { usePoliceAlertsPreference } from "../hooks/usePoliceAlertsPreference";
 import { useProgressier } from "../hooks/useProgressier";
 import { usePushAlertBridge } from "../hooks/usePushAlertBridge";
 import { useSelectedZone, type ZoneUser } from "../hooks/useSelectedZone";
+import { isPoliceIncident } from "../lib/policeAlerts";
 import { getZone, incidentInZone } from "../lib/zones";
 
 /**
@@ -16,10 +19,21 @@ import { getZone, incidentInZone } from "../lib/zones";
 export function IncidentDesk({ user }: { user?: ZoneUser | null }) {
   const { incidents, connected, health } = useIncidents();
   const { selectedZoneId, saveZone, fallbackZone } = useSelectedZone(user);
+  const { enabled: policeAlertsEnabled, togglePoliceAlerts } = usePoliceAlertsPreference();
   const activeZone = getZone(selectedZoneId) ?? fallbackZone;
-  const zoneIncidents = incidents.filter((incident) =>
-    incidentInZone(incident.coordinates.latitude, incident.coordinates.longitude, activeZone),
-  );
+  const zoneIncidents = incidents.filter((incident) => {
+    if (
+      !policeAlertsEnabled &&
+      isPoliceIncident(incident.type, incident.subtype)
+    ) {
+      return false;
+    }
+    return incidentInZone(
+      incident.coordinates.latitude,
+      incident.coordinates.longitude,
+      activeZone,
+    );
+  });
 
   useProgressier();
   useAlertOnNewIncidents(zoneIncidents);
@@ -33,7 +47,11 @@ export function IncidentDesk({ user }: { user?: ZoneUser | null }) {
         zoneId={activeZone.id}
         onZoneChange={(id) => void saveZone(id)}
       />
-      <div className="mx-auto w-full max-w-6xl px-5 pt-6">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-5 pt-6">
+        <PoliceAlertsSettings
+          enabled={policeAlertsEnabled}
+          onToggle={togglePoliceAlerts}
+        />
         <SmsSettings />
       </div>
       <IncidentFeed incidents={zoneIncidents} hasEmsFeed={activeZone.hasEmsFeed} />

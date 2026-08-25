@@ -1,4 +1,6 @@
 /** London-proven half-span for every Southern Ontario coverage box. */
+import { readPoliceAlertsEnabled } from "./policeAlerts";
+
 const ZONE_LAT_HALF = 0.09;
 const ZONE_LNG_HALF = 0.123;
 
@@ -287,18 +289,41 @@ export function zonePushTag(zoneId: ZoneId): string {
   return `zone-${zoneId}`;
 }
 
+/** Opt-in Progressier tag for Waze police pushes in this city. */
+export function zonePolicePushTag(zoneId: ZoneId): string {
+  return `zone-${zoneId}-waze-police`;
+}
+
+export interface ProgressierTagOptions {
+  policeAlertsEnabled?: boolean;
+}
+
 /**
  * Progressier tags for the active city only.
  * Passed as an array so Progressier overwrites prior tags (drops the previous city).
+ * When police alerts are enabled, also includes `zone-<id>-waze-police`.
  */
-export function progressierTagsForPush(zoneId: ZoneId): string[] {
-  return ["tow-not", zonePushTag(zoneId)];
+export function progressierTagsForPush(
+  zoneId: ZoneId,
+  options?: ProgressierTagOptions,
+): string[] {
+  const tags = ["tow-not", zonePushTag(zoneId)];
+  if (options?.policeAlertsEnabled) {
+    tags.push(zonePolicePushTag(zoneId));
+  }
+  return tags;
 }
 
 /** Instantly re-tag this device for `zoneId` only — previous city tags are cleared. */
-export function syncProgressierPushTags(zoneId: ZoneId): void {
+export function syncProgressierPushTags(
+  zoneId: ZoneId,
+  options?: ProgressierTagOptions,
+): void {
   try {
-    window.progressier?.add?.({ tags: progressierTagsForPush(zoneId) });
+    const policeAlertsEnabled = options?.policeAlertsEnabled ?? readPoliceAlertsEnabled();
+    window.progressier?.add?.({
+      tags: progressierTagsForPush(zoneId, { policeAlertsEnabled }),
+    });
   } catch {
     // Progressier may not be loaded yet.
   }

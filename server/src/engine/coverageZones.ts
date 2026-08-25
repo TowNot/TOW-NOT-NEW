@@ -41,3 +41,8 @@ export function zoneIdForCoordinates(lat: number, lng: number): string | null {
 export function zonePushTag(zoneId: string): string {
   return `zone-${zoneId}`;
 }
+
+/** Progressier tag for devices that opted into Waze police alerts in a city. */
+export function zonePolicePushTag(zoneId: string): string {
+  return `zone-${zoneId}-waze-police`;
+}

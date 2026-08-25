@@ -18,7 +18,7 @@ export class DataAggregatorEngine {
       wazeApi: Boolean(config.wazeApiKey),
       twilio: Boolean(config.twilioAccountSid && config.twilioAuthToken),
       publicUrl: config.publicUrl,
-      filter: '["ACCIDENT"]',
+      filter: '["ACCIDENT","POLICE"]',
       country: config.wazeApiCountry,
       tilesPerCity: 4,
       cities: enabled.map((zone) => zone.id),

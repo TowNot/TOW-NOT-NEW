@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
+import { isPoliceType } from "../engine/wazeAggregator";
 import { logger } from "../logger";
 import { incidentToPushPayload, sendProgressierPush } from "../push";
 import { notifySmsSubscribers } from "../sms/twilioClient";
@@ -59,13 +60,16 @@ export class PushDispatcher extends EventEmitter {
   }
 
   async notifyIncident(incident: Incident): Promise<PushReceipt | null> {
-    try {
-      notifySmsSubscribers(incident);
-    } catch (error) {
-      logger.warn("Twilio SMS dispatch skipped", {
-        incidentId: incident.id,
-        error: error instanceof Error ? error.message : String(error),
-      });
+    // Police is push opt-in only — do not SMS every Twilio subscriber.
+    if (!isPoliceType(incident.type, incident.subtype ?? null)) {
+      try {
+        notifySmsSubscribers(incident);
+      } catch (error) {
+        logger.warn("Twilio SMS dispatch skipped", {
+          incidentId: incident.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
     return this.send(incidentToPushPayload(incident));
   }

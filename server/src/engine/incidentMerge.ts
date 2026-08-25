@@ -2,16 +2,16 @@ import type { Incident, IncidentSource, SourceDetection } from "../types/inciden
 import type { IncidentStore } from "../store/incidentStore";
 import { mergeGoogleMapsRawType, mergeGoogleMapsZoom } from "./googleMaps/googleMapsDisplay";
 import { distanceKm } from "./geo";
-import { isBreakdown, isTrueCrash } from "./wazeAggregator";
+import { isBreakdown, isPoliceType, isTrueCrash } from "./wazeAggregator";
 
 /** Cross-provider crash merge + push dedup radius (200 m). */
 export const CROSS_SOURCE_MERGE_RADIUS_KM = 0.2;
 
 /**
  * Strict merge categories — proximity alone is never enough.
- * Accident ↔ road_hazard must never merge or suppress each other.
+ * Accident ↔ road_hazard ↔ police must never merge or suppress each other.
  */
-export type MergeCategory = "accident" | "breakdown" | "road_hazard" | "other";
+export type MergeCategory = "accident" | "breakdown" | "road_hazard" | "police" | "other";
 
 const ROAD_HAZARD_RE =
   /ROAD[_\s-]?CLOSED|ROADCLOSED|CONSTRUCTION|ROADWORK|MAINTENANCE|\bCLOSURE\b/;
@@ -20,6 +20,8 @@ export function mergeCategory(incident: Incident): MergeCategory {
   const type = (incident.type ?? "").toUpperCase();
   const subtype = (incident.subtype ?? "").toUpperCase();
   const blob = `${type} ${subtype}`;
+
+  if (isPoliceType(incident.type, incident.subtype ?? null)) return "police";
 
   if (ROAD_HAZARD_RE.test(blob)) return "road_hazard";
 
@@ -52,7 +54,8 @@ export function isMergeableTrafficIncident(incident: Incident): boolean {
   return (
     category === "accident" ||
     category === "breakdown" ||
-    category === "road_hazard"
+    category === "road_hazard" ||
+    category === "police"
   );
 }
 

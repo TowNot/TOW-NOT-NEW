@@ -50,6 +50,8 @@ export interface PushPayload {
   url?: string;
   /** When set, Progressier targets only devices tagged `zone-<id>`. */
   zoneId?: string;
+  /** Opt-in police audience uses `zone-<id>-waze-police` instead of the zone tag. */
+  audience?: "zone" | "zone_police";
 }
 
 export interface PushReceipt {

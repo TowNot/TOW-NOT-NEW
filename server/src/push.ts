@@ -1,7 +1,8 @@
 import { config } from "./config";
-import { zoneIdForCoordinates, zonePushTag } from "./engine/coverageZones";
+import { zoneIdForCoordinates, zonePolicePushTag, zonePushTag } from "./engine/coverageZones";
 import { formatOpenWebNinjaGoogleMapsLabel } from "./engine/googleMaps/googleMapsDisplay";
 import { getCoverageZone } from "./engine/zones.config";
+import { isPoliceType } from "./engine/wazeAggregator";
 import { logger } from "./logger";
 import type { Incident, PushPayload } from "./types/incident";
 
@@ -48,6 +49,9 @@ const PROVIDER_LABELS: Record<string, string> = {
 };
 
 function labelForIncident(incident: Incident): string {
+  if (isPoliceType(incident.type, incident.subtype ?? null)) {
+    return "Waze (Police)";
+  }
   if (incident.provider === "openwebninja_google_maps") {
     return formatOpenWebNinjaGoogleMapsLabel(incident.googleMapsZoom, incident.rawType);
   }
@@ -74,8 +78,14 @@ export function resolvePushDestination(payload: PushPayload): string {
   return absoluteUrl("/desk");
 }
 
-/** Single-city recipients — only devices tagged for this zone. */
-export function recipientsForIncidentZone(zoneId: string): Record<string, string> {
+/** Single-city recipients — only devices tagged for this zone (or police opt-in). */
+export function recipientsForIncidentZone(
+  zoneId: string,
+  audience: PushPayload["audience"] = "zone",
+): Record<string, string> {
+  if (audience === "zone_police") {
+    return { tags: zonePolicePushTag(zoneId) };
+  }
   return { tags: zonePushTag(zoneId) };
 }
 
@@ -108,15 +118,27 @@ export function resolveIncidentZoneId(incident: Incident): string | null {
 }
 
 export function incidentToPushPayload(incident: Incident): PushPayload {
+  const police = isPoliceType(incident.type, incident.subtype ?? null);
   const providerLabel = labelForIncident(incident);
   const zoneId = resolveIncidentZoneId(incident);
+  const note = incident.description?.trim();
   return {
-    title: `AlertNav · ${providerLabel} · ${incident.title}`,
-    body: `${incident.locationLabel} — caught by ${providerLabel}`,
+    title: police
+      ? "AlertNav · Waze (Police)"
+      : `AlertNav · ${providerLabel} · ${incident.title}`,
+    body: police
+      ? truncate(
+          [incident.locationLabel, note && note !== incident.locationLabel ? note : null]
+            .filter(Boolean)
+            .join(" — ") || incident.locationLabel,
+          BODY_MAX,
+        )
+      : `${incident.locationLabel} — caught by ${providerLabel}`,
     severity: incident.severity,
     incidentId: incident.id,
     url: `/desk?incident=${encodeURIComponent(incident.id)}`,
     zoneId: zoneId ?? undefined,
+    audience: police ? "zone_police" : "zone",
   };
 }
 
@@ -193,7 +215,7 @@ export async function sendProgressierPush(payload: PushPayload): Promise<void> {
   }
 
   const recipients = zoneId
-    ? recipientsForIncidentZone(zoneId)
+    ? recipientsForIncidentZone(zoneId, payload.audience ?? "zone")
     : { ...PROGRESSIER_RECIPIENTS };
 
   await postProgressier(apiKey, buildProgressierPayload(payload, recipients), payload.incidentId);

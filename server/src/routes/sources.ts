@@ -79,7 +79,7 @@ export function createSourcesRouter(store: IncidentStore): Router {
       },
       wazeQuery: {
         endpoint: "https://api.wazeapi.com/v1/alerts",
-        filter: '["ACCIDENT"]',
+        filter: '["ACCIDENT","POLICE"]',
         limit: "",
         tiles: 4,
         tileDivisions: 2,

@@ -241,8 +241,9 @@ const checks: Array<[string, () => void]> = [
               longitude: -81.24,
             },
             {
-              alert_id: "drop-police",
+              alert_id: "keep-police",
               type: "POLICE",
+              reportDescription: "TPS on scene",
               latitude: 42.98,
               longitude: -81.24,
             },
@@ -255,13 +256,13 @@ const checks: Array<[string, () => void]> = [
             },
           ] as Record<string, unknown>[],
           "openwebninja",
-        ),
-        [],
+        ).map((a) => ({ type: a.type, description: a.description })),
+        [{ type: "POLICE", description: "TPS on scene" }],
       );
     },
   ],
   [
-    "BlocksInside ACCIDENT rows ingest; construction HAZARD is dropped",
+    "BlocksInside ACCIDENT and POLICE rows ingest; construction HAZARD is dropped",
     () => {
       const parsed = parseRawAlerts(
         [
@@ -281,6 +282,8 @@ const checks: Array<[string, () => void]> = [
           },
           {
             type: "POLICE",
+            subType: "POLICE_VISIBLE",
+            reportDescription: "TPS on scene",
             latitude: 42.97,
             longitude: -81.25,
             street: "Wonderland",
@@ -288,9 +291,12 @@ const checks: Array<[string, () => void]> = [
         ] as Record<string, unknown>[],
         "blocksinside",
       );
-      assert.equal(parsed.length, 1);
+      assert.equal(parsed.length, 2);
       assert.equal(parsed[0]?.type, "ACCIDENT");
       assert.equal(parsed[0]?.street, "Oxford St");
+      assert.equal(parsed[1]?.type, "POLICE");
+      assert.equal(parsed[1]?.subtype, "POLICE_VISIBLE");
+      assert.equal(parsed[1]?.description, "TPS on scene");
     },
   ],
   [

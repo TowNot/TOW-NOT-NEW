@@ -1,5 +1,6 @@
 import type { Incident, IncidentSource, SourceDetection } from "../types";
 import { formatOpenWebNinjaGoogleMapsLabel } from "./googleMapsDisplay";
+import { isPoliceIncident } from "./policeAlerts";
 
 const SOURCE_LABELS: Record<IncidentSource, string> = {
   waze: "Waze",
@@ -21,7 +22,17 @@ export function incidentSourceDetections(incident: Incident): SourceDetection[] 
   ];
 }
 
-export function formatSourceDetectionLabel(detection: SourceDetection): string {
+export function formatSourceDetectionLabel(
+  detection: SourceDetection,
+  incident?: Pick<Incident, "type" | "subtype">,
+): string {
+  if (
+    incident &&
+    detection.source === "waze" &&
+    isPoliceIncident(incident.type, incident.subtype)
+  ) {
+    return "Waze (Police)";
+  }
   if (detection.source === "google_maps") {
     return formatOpenWebNinjaGoogleMapsLabel(detection.googleMapsZoom, detection.rawType);
   }
@@ -38,6 +49,11 @@ export function formatDetectionClock(iso: string): string {
   }).format(new Date(iso));
 }
 
-export function sourceLabel(source: IncidentSource): string {
+export function sourceLabel(
+  source: IncidentSource,
+  type?: string | null,
+  subtype?: string | null,
+): string {
+  if (source === "waze" && isPoliceIncident(type, subtype)) return "Waze (Police)";
   return SOURCE_LABELS[source];
 }
