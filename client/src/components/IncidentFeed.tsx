@@ -82,6 +82,18 @@ export function IncidentFeed({ incidents, hasEmsFeed }: IncidentFeedProps) {
             </button>
           );
         })}
+        {/* UI placeholder only — no OPP feed, filter, or scraper. */}
+        <span
+          className="inline-flex cursor-not-allowed items-center gap-2 rounded-md border border-dashed border-line bg-ink px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-gray-400 opacity-70"
+          title="OPP First Available — coming soon"
+          aria-disabled="true"
+          role="status"
+        >
+          OPP First Available
+          <span className="rounded border border-line bg-panel px-1.5 py-0.5 font-mono text-[9px] font-medium normal-case tracking-normal text-gray-400">
+            Coming Soon
+          </span>
+        </span>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
