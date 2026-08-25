@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { markPushAlerted } from "../lib/dispatchAlerts";
+import { showIncidentNotification } from "../lib/showIncidentNotification";
 
 interface AlertNavAlertMessage {
   type?: string;
@@ -18,10 +19,10 @@ function incidentIdFromUrl(url: string | undefined): string | null {
 }
 
 /**
- * Foreground handler for Progressier push messages.
- * The service worker already called showNotification — do NOT fire another
- * Notification here (that was the double-banner race). Only mark the incident
- * so SSE/in-app tones do not stack on top of the push.
+ * Foreground bridge for Progressier push messages.
+ * OS banner is owned by Progressier's SW (background). When a /desk tab is
+ * visible, Progressier may skip showNotification — then we banner once here.
+ * Never banner again on top of Progressier's background display.
  */
 export function usePushAlertBridge(): void {
   useEffect(() => {
@@ -33,6 +34,14 @@ export function usePushAlertBridge(): void {
 
       const incidentId = incidentIdFromUrl(data.url);
       if (incidentId) markPushAlerted(incidentId);
+
+      if (document.visibilityState === "visible") {
+        showIncidentNotification({
+          id: incidentId ?? undefined,
+          title: data.title || "AlertNav",
+          body: data.body || "",
+        });
+      }
     };
 
     navigator.serviceWorker.addEventListener("message", onMessage);

@@ -35,8 +35,6 @@ const PROGRESSIER_SW_SOURCE = [
   '      const title = payload.title || nested.title || "AlertNav";',
   "      const body = payload.body || payload.message || nested.body || nested.message || \"\";",
   '      const url = payload.url || data.url || nested.url || "";',
-  "      const icon = payload.icon || nested.icon || \"\";",
-  "      await self.registration.showNotification(title, { body, icon: icon || undefined, tag: url || title, renotify: true, data: { url } });",
   '      const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });',
   "      for (const client of windows) {",
   '        client.postMessage({ type: "tow-not-alert", title, body, url });',

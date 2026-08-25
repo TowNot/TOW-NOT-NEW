@@ -1,6 +1,11 @@
 importScripts("https://progressier.app/Bv9Rb1Vm5PkATyh6w0wG/sw.js");
 
-// Always showNotification on push, even when a /desk tab is focused.
+/**
+ * Progressier's imported SW already calls showNotification on push.
+ * A second showNotification here (especially with renotify:true) produced
+ * identical duplicate lock-screen banners. This handler only forwards to
+ * open clients for in-app bridging — it must NOT show another OS notification.
+ */
 self.addEventListener("push", (event) => {
   event.waitUntil(
     (async () => {
@@ -15,16 +20,6 @@ self.addEventListener("push", (event) => {
       const title = payload.title || nested.title || "AlertNav";
       const body = payload.body || payload.message || nested.body || nested.message || "";
       const url = payload.url || data.url || nested.url || "";
-      const icon = payload.icon || nested.icon || "";
-      // Always banner, including when a /desk tab is focused. Progressier's
-      // imported handler may skip showNotification for visible clients.
-      await self.registration.showNotification(title, {
-        body,
-        icon: icon || undefined,
-        tag: url || title,
-        renotify: true,
-        data: { url },
-      });
       const windows = await self.clients.matchAll({
         type: "window",
         includeUncontrolled: true,
