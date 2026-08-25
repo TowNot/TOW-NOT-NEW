@@ -23,7 +23,16 @@ export function logGoogleMapsNotificationGate(
   detail?: string,
 ): void {
   const suffix = detail ? ` | ${detail}` : "";
-  logger.info(`[Notification Gate] ID: ${incidentId} | Decision: ${decision}${suffix}`);
+  const line = `[Notification Gate] ID: ${incidentId} | Decision: ${decision}${suffix}`;
+  // Routine re-poll chatter stays at debug; pushes / blocks stay at info.
+  if (
+    decision === "MERGED WITHOUT PUSH (Existing cluster)" ||
+    decision === "SKIPPED PUSH (Existing ID refresh)"
+  ) {
+    logger.debug(line);
+    return;
+  }
+  logger.info(line);
 }
 
 function isAccidentType(type: string): boolean {

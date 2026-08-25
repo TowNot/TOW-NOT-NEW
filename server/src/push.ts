@@ -147,13 +147,12 @@ async function postProgressier(
   body: ProgressierPushRequest,
   incidentId: string | undefined,
 ): Promise<void> {
-  logger.info("Sending Progressier push", {
+  logger.debug("Sending Progressier push", {
     title: body.title,
     incidentId,
     endpoint: config.progressierPushUrl,
     recipients: body.recipients,
     url: body.url,
-    hasIcon: Boolean(body.icon),
   });
 
   const response = await fetch(config.progressierPushUrl, {
@@ -175,14 +174,12 @@ async function postProgressier(
     }
   }
 
-  logger.info("Progressier push response", {
-    status: response.status,
-    ok: response.ok,
-    recipients: body.recipients,
-    body: detail.slice(0, 500),
-  });
-
   if (!response.ok) {
+    logger.error("Progressier push failed", {
+      status: response.status,
+      incidentId,
+      body: detail.slice(0, 500),
+    });
     throw new Error(
       `Progressier push failed (${response.status}) at ${config.progressierPushUrl}: ${detail || response.statusText}`,
     );
@@ -190,10 +187,19 @@ async function postProgressier(
 
   const gatewayError = parsed && parsed["error"];
   if (parsed && (parsed["success"] === false || typeof gatewayError === "string")) {
+    logger.error("Progressier push rejected", {
+      status: response.status,
+      incidentId,
+      error: String(gatewayError ?? "unknown error"),
+    });
     throw new Error(
       `Progressier push rejected at ${config.progressierPushUrl}: ${String(gatewayError ?? "unknown error")}`,
     );
   }
+
+  logger.info(
+    `[Progressier] Pushed alert for ${incidentId ?? "unknown"} | status: ${response.status}`,
+  );
 }
 
 /**

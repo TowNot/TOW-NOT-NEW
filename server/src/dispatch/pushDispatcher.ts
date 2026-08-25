@@ -14,10 +14,6 @@ export interface PushChannel {
 export class ProgressierPushChannel implements PushChannel {
   async send(payload: PushPayload): Promise<void> {
     await sendProgressierPush(payload);
-    logger.info("Progressier push dispatched", {
-      title: payload.title,
-      incidentId: payload.incidentId,
-    });
   }
 }
 

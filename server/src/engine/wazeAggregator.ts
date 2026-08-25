@@ -1908,7 +1908,7 @@ export async function fetchWazeAlerts(
           alert.provider === "google_maps" || dup.provider === "google_maps"
             ? GOOGLE_MAPS_DEDUP_RADIUS_KM * 1000
             : DEDUP_RADIUS_KM * 1000;
-        logger.info(
+        logger.debug(
           {
             provider: alert.provider,
             street: alert.street ?? "?",
