@@ -1,10 +1,11 @@
-import { randomUUID } from "node:crypto";
-import { EventEmitter } from "node:events";
 import { isPoliceType } from "../engine/wazeAggregator";
+import { claimIncidentPush, logSkippedPush } from "../engine/pushDedup";
 import { logger } from "../logger";
 import { incidentToPushPayload, sendProgressierPush } from "../push";
 import { notifySmsSubscribers } from "../sms/twilioClient";
 import type { Incident, PushPayload, PushReceipt } from "../types/incident";
+import { randomUUID } from "node:crypto";
+import { EventEmitter } from "node:events";
 
 export interface PushChannel {
   send(payload: PushPayload): Promise<void>;
@@ -60,6 +61,12 @@ export class PushDispatcher extends EventEmitter {
   }
 
   async notifyIncident(incident: Incident): Promise<PushReceipt | null> {
+    const claim = claimIncidentPush(incident);
+    if (!claim.ok) {
+      logSkippedPush(incident.id, claim.reason);
+      return null;
+    }
+
     // Police is push opt-in only — do not SMS every Twilio subscriber.
     if (!isPoliceType(incident.type, incident.subtype ?? null)) {
       try {

@@ -3,6 +3,7 @@ import type { IncidentStore } from "../../store/incidentStore";
 import { logger } from "../../logger";
 import { GOOGLE_MAPS_PUSH_DEDUP_RADIUS_KM } from "./openWebNinjaGoogleMapsScraper";
 import { mergeCategory, sameMergeCategory } from "../incidentMerge";
+import { isIncidentTooOldForPush } from "../pushDedup";
 import { distanceKm } from "../geo";
 
 export type GoogleMapsNotificationDecision =
@@ -11,6 +12,8 @@ export type GoogleMapsNotificationDecision =
   | "UPGRADE PUSH TRIGGERED"
   | "STORED WITHOUT PUSH (Gate blocked)"
   | "SKIPPED PUSH (Existing ID refresh)"
+  | "SKIPPED PUSH (Duplicate concurrent lock)"
+  | "SKIPPED PUSH (Too old)"
   | "DROPPED (Keyword filter)"
   | "DROPPED (Type filter)";
 
@@ -54,6 +57,10 @@ export function googleMapsNotificationBlockReason(
 ): string | null {
   if (incident.source !== "google_maps") return "not a Google Maps incident";
   if (!isAccidentType(incident.type)) return `type ${incident.type} is not push-eligible`;
+
+  if (isIncidentTooOldForPush(incident)) {
+    return "SKIPPED PUSH (Too old)";
+  }
 
   const nearby = nearbySameCategoryAccident(
     incident,

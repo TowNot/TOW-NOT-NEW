@@ -83,7 +83,8 @@ store.on("created", (incident) => {
   }
   void dispatcher
     .notifyIncident(incident)
-    .then(() => {
+    .then((receipt) => {
+      if (!receipt) return;
       store.markNotified(incident.id);
       if (incident.source === "google_maps") {
         logGoogleMapsNotificationGate(
@@ -113,7 +114,8 @@ store.on("clusterUpgrade", ({ previous, incoming, merged }) => {
   }
   void dispatcher
     .notifyIncident(merged)
-    .then(() => {
+    .then((receipt) => {
+      if (!receipt) return;
       store.markNotified(merged.id);
       logGoogleMapsNotificationGate(
         merged.id,

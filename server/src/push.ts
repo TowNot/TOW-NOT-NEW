@@ -197,7 +197,9 @@ async function postProgressier(
 }
 
 /**
- * Strict single-city Progressier send. Live incidents target only `zone-<id>`.
+ * Strict single-city Progressier send.
+ * Accidents → only `zone-<id>` (one send even if device also has police tag).
+ * Police → only `zone-<id>-waze-police` (never also zone tag — no double-send).
  * Incidents outside known boxes are skipped. Test pushes still broadcast.
  */
 export async function sendProgressierPush(payload: PushPayload): Promise<void> {

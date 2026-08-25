@@ -1,5 +1,6 @@
 import { GOOGLE_MAPS_DEDUP_RADIUS_KM, isNotifiableCrash, isPoliceType } from "./wazeAggregator";
 import { shouldNotifyGoogleMapsIncident } from "./googleMaps/googleMapsNotificationGate";
+import { isIncidentTooOldForPush } from "./pushDedup";
 import { distanceKm } from "./geo";
 import type { Incident } from "../types/incident";
 import type { IncidentStore } from "../store/incidentStore";
@@ -15,6 +16,8 @@ function isAccidentType(type: string): boolean {
  * Major hazards pass ingestion for the map and feed but stay silent here.
  */
 export function shouldNotifyIncident(incident: Incident, store: IncidentStore): boolean {
+  if (isIncidentTooOldForPush(incident)) return false;
+
   // Google Maps ACCIDENT rows (incl. GOOGLE_MAPS_INCIDENT): push only when no
   // active same-category accident already exists within 200 m.
   // Road_closed / construction nearby do NOT suppress the push.

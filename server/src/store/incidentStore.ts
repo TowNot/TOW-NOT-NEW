@@ -42,7 +42,10 @@ export class IncidentStore extends EventEmitter {
     }
   }
 
-  upsert(incident: Incident): Incident {
+  upsert(
+    incident: Incident,
+    options?: { suppressPush?: boolean },
+  ): Incident {
     const existing = this.incidents.get(incident.id);
     const isNew = !existing;
     const sourceDetections = mergeSourceDetections(
@@ -61,7 +64,11 @@ export class IncidentStore extends EventEmitter {
       rawType: mergeGoogleMapsRawType(existing?.rawType, incident.rawType),
       expiresAt: incident.expiresAt || new Date(Date.now() + config.incidentTtlMs).toISOString(),
       severity: existing ? higherSeverity(existing.severity, incident.severity) : incident.severity,
-      notified: existing?.notified ?? incident.notified,
+      // Cold-start ingest marks notified so a later refresh cannot re-push.
+      notified:
+        options?.suppressPush && isNew
+          ? true
+          : (existing?.notified ?? incident.notified),
     };
     this.incidents.set(withExpiry.id, withExpiry);
     logger.debug("[BROADCAST] Sending incident to client...", {
@@ -69,9 +76,10 @@ export class IncidentStore extends EventEmitter {
       title: withExpiry.title,
       source: withExpiry.source,
       isNew,
+      suppressPush: Boolean(options?.suppressPush),
     });
     this.emit("upsert", withExpiry);
-    if (isNew) this.emit("created", withExpiry);
+    if (isNew && !options?.suppressPush) this.emit("created", withExpiry);
     return withExpiry;
   }
 
