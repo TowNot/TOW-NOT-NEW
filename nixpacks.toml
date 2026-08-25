@@ -1,9 +1,9 @@
 [variables]
 NPM_CONFIG_PRODUCTION = "false"
-NIXPACKS_NODE_VERSION = "20"
+NIXPACKS_NODE_VERSION = "24"
 
 [phases.setup]
-nixPkgs = ["nodejs_20", "ffmpeg", "curl"]
+nixPkgs = ["nodejs_24", "ffmpeg", "curl"]
 
 [phases.build]
 cmds = ["npm run build"]
