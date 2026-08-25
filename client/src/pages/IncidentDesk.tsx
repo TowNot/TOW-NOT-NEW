@@ -54,7 +54,12 @@ export function IncidentDesk({ user }: { user?: ZoneUser | null }) {
         />
         <SmsSettings />
       </div>
-      <IncidentFeed incidents={zoneIncidents} hasEmsFeed={activeZone.hasEmsFeed} />
+      <IncidentFeed
+        incidents={zoneIncidents}
+        zoneName={activeZone.name}
+        hasFireFeed={activeZone.hasFireFeed}
+        hasEmsFeed={activeZone.hasEmsFeed}
+      />
     </div>
   );
 }

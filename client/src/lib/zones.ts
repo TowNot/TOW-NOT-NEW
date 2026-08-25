@@ -241,6 +241,8 @@ export interface CoverageZone {
   region: string;
   /** Agencies monitored on this city's radio feed (empty = not configured yet). */
   scannedAgencies: string[];
+  /** True when a Broadcastify HLS or Icecast fire stream is configured (not TBD). */
+  hasFireFeed: boolean;
   /** True when this city's radio stream includes EMS (CYKF Waterloo Region). */
   hasEmsFeed: boolean;
   /** south-west → north-east, used to filter incidents. */
@@ -269,12 +271,19 @@ function boxFromCenter(center: { lat: number; lng: number }): CoverageZone["box"
   };
 }
 
+/** Fire audio is configured when "Fire" appears in scannedAgencies (pending cities use []). */
+export function zoneHasFireFeed(zone: Pick<CoverageZone, "scannedAgencies">): boolean {
+  return zone.scannedAgencies.some((agency) => agency.toLowerCase() === "fire");
+}
+
 function buildClientZone(seed: ZoneSeed): CoverageZone {
+  const scannedAgencies = [...seed.scannedAgencies];
   return {
     id: seed.id,
     name: seed.name,
     region: "Ontario",
-    scannedAgencies: [...seed.scannedAgencies],
+    scannedAgencies,
+    hasFireFeed: zoneHasFireFeed({ scannedAgencies }),
     hasEmsFeed: seed.hasEmsFeed === true,
     box: boxFromCenter(seed.center),
   };

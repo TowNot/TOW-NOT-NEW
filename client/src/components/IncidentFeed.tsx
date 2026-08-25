@@ -13,11 +13,20 @@ const SOURCE_SHORT: Record<IncidentSource, string> = {
 
 interface IncidentFeedProps {
   incidents: Incident[];
+  /** Display name of the active coverage city (for Fire coming-soon copy). */
+  zoneName: string;
+  /** When false, Fire pillar is grayed out (audio feed TBD / pending). */
+  hasFireFeed: boolean;
   /** When false, EMS pillar is grayed out (encrypted / unavailable in zone). */
   hasEmsFeed: boolean;
 }
 
-export function IncidentFeed({ incidents, hasEmsFeed }: IncidentFeedProps) {
+export function IncidentFeed({
+  incidents,
+  zoneName,
+  hasFireFeed,
+  hasEmsFeed,
+}: IncidentFeedProps) {
   const [activeSources, setActiveSources] = useState<Set<IncidentSource>>(
     () => new Set(SOURCE_ORDER),
   );
@@ -31,13 +40,15 @@ export function IncidentFeed({ incidents, hasEmsFeed }: IncidentFeedProps) {
     () =>
       incidents.filter((incident) => {
         if (incident.source === "ems" && !hasEmsFeed) return false;
+        if (incident.source === "fire_dispatch" && !hasFireFeed) return false;
         return activeSources.has(incident.source);
       }),
-    [incidents, activeSources, hasEmsFeed],
+    [incidents, activeSources, hasEmsFeed, hasFireFeed],
   );
 
   function toggleSource(source: IncidentSource) {
     if (source === "ems" && !hasEmsFeed) return;
+    if (source === "fire_dispatch" && !hasFireFeed) return;
     setActiveSources((prev) => {
       const next = new Set(prev);
       if (next.has(source)) next.delete(source);
@@ -55,18 +66,25 @@ export function IncidentFeed({ incidents, hasEmsFeed }: IncidentFeedProps) {
       >
         {SOURCE_ORDER.map((source) => {
           const emsLocked = source === "ems" && !hasEmsFeed;
-          const on = !emsLocked && activeSources.has(source);
+          const fireLocked = source === "fire_dispatch" && !hasFireFeed;
+          const locked = emsLocked || fireLocked;
+          const on = !locked && activeSources.has(source);
+          const lockTitle = fireLocked
+            ? `${zoneName} Fire coming soon`
+            : emsLocked
+              ? "EMS Encrypted in this Region"
+              : undefined;
           return (
             <button
               key={source}
               type="button"
-              disabled={emsLocked}
-              title={emsLocked ? "EMS Encrypted in this Region" : undefined}
+              disabled={locked}
+              title={lockTitle}
               aria-pressed={on}
-              aria-disabled={emsLocked}
+              aria-disabled={locked}
               onClick={() => toggleSource(source)}
               className={
-                emsLocked
+                locked
                   ? "relative cursor-not-allowed rounded-md border border-line bg-ink px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-gray-400 opacity-60"
                   : on
                     ? `rounded-md border px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] ${pillarOnClass(source)}`
@@ -74,6 +92,11 @@ export function IncidentFeed({ incidents, hasEmsFeed }: IncidentFeedProps) {
               }
             >
               {SOURCE_SHORT[source]}
+              {fireLocked ? (
+                <span className="mt-1 block normal-case tracking-normal text-[10px] font-medium text-gray-400">
+                  {zoneName} Fire coming soon
+                </span>
+              ) : null}
               {emsLocked ? (
                 <span className="mt-1 block normal-case tracking-normal text-[10px] font-medium text-gray-400">
                   EMS Encrypted in this Region
@@ -99,20 +122,32 @@ export function IncidentFeed({ incidents, hasEmsFeed }: IncidentFeedProps) {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {counts.map((item) => {
           const emsLocked = item.source === "ems" && !hasEmsFeed;
+          const fireLocked = item.source === "fire_dispatch" && !hasFireFeed;
+          const locked = emsLocked || fireLocked;
           return (
             <article
               key={item.source}
-              className={`rounded-lg border border-line bg-panel px-4 py-3 ${emsLocked ? "opacity-50" : ""}`}
-              title={emsLocked ? "EMS Encrypted in this Region" : undefined}
+              className={`rounded-lg border border-line bg-panel px-4 py-3 ${locked ? "opacity-50" : ""}`}
+              title={
+                fireLocked
+                  ? `${zoneName} Fire coming soon`
+                  : emsLocked
+                    ? "EMS Encrypted in this Region"
+                    : undefined
+              }
             >
               <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-gray-500">
                 {sourceLabel(item.source)}
               </p>
               <p className="mt-1 text-2xl font-semibold tabular-nums text-gray-900">
-                {emsLocked ? "—" : item.count}
+                {locked ? "—" : item.count}
               </p>
               <p className="text-xs text-gray-500">
-                {emsLocked ? "encrypted in this region" : "active in 3-hour window"}
+                {fireLocked
+                  ? `${zoneName} Fire coming soon`
+                  : emsLocked
+                    ? "encrypted in this region"
+                    : "active in 3-hour window"}
               </p>
             </article>
           );

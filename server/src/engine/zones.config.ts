@@ -487,32 +487,41 @@ export function zonePublicSummaries(): Array<{
   name: string;
   enabled: boolean;
   scannedAgencies: string[];
+  hasFireFeed: boolean;
   hasEmsFeed: boolean;
   audio:
     | { type: "hls"; feedId: number | null; description: string; enabled: boolean }
     | { type: "stream"; url: string; description: string; enabled: boolean }
     | null;
 }> {
-  return COVERAGE_ZONES.map((zone) => ({
-    id: zone.id,
-    name: zone.name,
-    enabled: zone.enabled,
-    scannedAgencies: [...zone.scannedAgencies],
-    hasEmsFeed: zone.hasEmsFeed,
-    audio: zone.audio
-      ? zone.audio.type === "hls"
-        ? {
-            type: "hls" as const,
-            feedId: zone.audio.feedId,
-            description: zone.audio.description,
-            enabled: zone.audio.enabled,
-          }
-        : {
-            type: "stream" as const,
-            url: zone.audio.url,
-            description: zone.audio.description,
-            enabled: zone.audio.enabled,
-          }
-      : null,
-  }));
+  return COVERAGE_ZONES.map((zone) => {
+    const hasFireFeed =
+      zone.audio != null &&
+      zone.audio.enabled &&
+      (zone.audio.type === "stream" ||
+        (zone.audio.type === "hls" && zone.audio.feedId != null));
+    return {
+      id: zone.id,
+      name: zone.name,
+      enabled: zone.enabled,
+      scannedAgencies: [...zone.scannedAgencies],
+      hasFireFeed,
+      hasEmsFeed: zone.hasEmsFeed,
+      audio: zone.audio
+        ? zone.audio.type === "hls"
+          ? {
+              type: "hls" as const,
+              feedId: zone.audio.feedId,
+              description: zone.audio.description,
+              enabled: zone.audio.enabled,
+            }
+          : {
+              type: "stream" as const,
+              url: zone.audio.url,
+              description: zone.audio.description,
+              enabled: zone.audio.enabled,
+            }
+        : null,
+    };
+  });
 }
