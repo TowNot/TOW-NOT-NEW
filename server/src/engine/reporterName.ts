@@ -23,6 +23,8 @@ export function normalizeReporterName(value: unknown): string | undefined {
   if (value && typeof value === "object") {
     const obj = value as Record<string, unknown>;
     return (
+      normalizeReporterName(obj.reported_by) ??
+      normalizeReporterName(obj.reportedBy) ??
       normalizeReporterName(obj.reportByNickname) ??
       normalizeReporterName(obj.report_by_nickname) ??
       normalizeReporterName(obj.username) ??
@@ -38,17 +40,20 @@ export function normalizeReporterName(value: unknown): string | undefined {
 
 /**
  * Pull reporter / publisher from Waze / BlocksInside / Maps field shapes.
- * Waze Partners feed uses `reportByNickname` (and sometimes `reportBy`).
+ *
+ * BlocksInside: official/verified partners (Police, MTO, …) send their name in
+ * `reported_by`; crowdsourced users return null/empty → omit (anonymous).
+ * Fallback to `reportByNickname` / related keys for alternate payload versions.
  */
 export function extractReporterName(raw: Record<string, unknown>): string | undefined {
   const direct =
+    normalizeReporterName(raw.reported_by) ??
+    normalizeReporterName(raw.reportedBy) ??
     normalizeReporterName(raw.reportByNickname) ??
     normalizeReporterName(raw.report_by_nickname) ??
     normalizeReporterName(raw.reportedByNickname) ??
     normalizeReporterName(raw.reportBy) ??
     normalizeReporterName(raw.report_by) ??
-    normalizeReporterName(raw.reported_by) ??
-    normalizeReporterName(raw.reportedBy) ??
     normalizeReporterName(raw.reporter) ??
     normalizeReporterName(raw.reporterName) ??
     normalizeReporterName(raw.reporter_name) ??
@@ -59,8 +64,7 @@ export function extractReporterName(raw: Record<string, unknown>): string | unde
     normalizeReporterName(raw.publisher) ??
     normalizeReporterName(raw.sourceName) ??
     normalizeReporterName(raw.source_name) ??
-    normalizeReporterName(raw.user) ??
-    normalizeReporterName(raw.reportBy);
+    normalizeReporterName(raw.user);
 
   if (direct) return direct;
 
@@ -68,10 +72,13 @@ export function extractReporterName(raw: Record<string, unknown>): string | unde
   for (const [key, value] of Object.entries(raw)) {
     const k = key.toLowerCase();
     if (
+      k === "reported_by" ||
+      k === "reportedby" ||
       k === "reportbynickname" ||
       k === "report_by_nickname" ||
       k === "reportedbynickname" ||
       k === "reportby" ||
+      k === "report_by" ||
       (k.includes("nickname") && k.includes("report"))
     ) {
       const hit = normalizeReporterName(value);
