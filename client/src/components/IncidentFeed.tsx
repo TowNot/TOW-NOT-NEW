@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { Incident, IncidentSource } from "../types";
+import { fireDispatchDisplayLabel } from "../lib/fireDispatchLabel";
 import { IncidentCard } from "./IncidentCard";
 
 const SOURCE_ORDER: IncidentSource[] = ["waze", "google_maps", "fire_dispatch", "ems"];
@@ -137,7 +138,7 @@ export function IncidentFeed({
               }
             >
               <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-gray-500">
-                {sourceLabel(item.source)}
+                {sourceLabel(item.source, zoneName)}
               </p>
               <p className="mt-1 text-2xl font-semibold tabular-nums text-gray-900">
                 {locked ? "—" : item.count}
@@ -190,9 +191,9 @@ function pillarOnClass(source: IncidentSource): string {
   return "border-rose-300 bg-rose-50 text-rose-800";
 }
 
-function sourceLabel(source: IncidentSource): string {
+function sourceLabel(source: IncidentSource, zoneName: string): string {
   if (source === "waze") return "Waze traffic";
   if (source === "google_maps") return "Google Maps";
   if (source === "ems") return "EMS";
-  return "Fire dispatch";
+  return fireDispatchDisplayLabel(zoneName);
 }

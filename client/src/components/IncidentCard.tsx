@@ -96,14 +96,18 @@ function SourceBadges({
   const uniqueSources = [...new Set(detections.map((detection) => detection.source))];
   return (
     <div className="flex flex-wrap gap-1">
-      {uniqueSources.map((source) => (
-        <SourceBadge
-          key={source}
-          source={source}
-          type={incident.type}
-          subtype={incident.subtype}
-        />
-      ))}
+      {uniqueSources.map((source) => {
+        const detection = detections.find((d) => d.source === source);
+        return (
+          <SourceBadge
+            key={source}
+            source={source}
+            type={incident.type}
+            subtype={incident.subtype}
+            provider={detection?.provider ?? incident.provider}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -125,10 +129,12 @@ function SourceBadge({
   source,
   type,
   subtype,
+  provider,
 }: {
   source: IncidentSource;
   type?: string | null;
   subtype?: string | null;
+  provider?: string | null;
 }) {
   const styles: Record<IncidentSource, string> = {
     waze: "border-sky-200 bg-sky-50 text-waze",
@@ -138,7 +144,7 @@ function SourceBadge({
   };
   return (
     <span className={`inline-flex rounded border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] ${styles[source]}`}>
-      {sourceLabel(source, type, subtype)}
+      {sourceLabel(source, type, subtype, provider)}
     </span>
   );
 }

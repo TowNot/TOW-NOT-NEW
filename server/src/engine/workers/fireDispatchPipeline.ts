@@ -14,6 +14,7 @@ import {
   type DispatchPriority,
 } from "../dispatchKeywords";
 import { speechToText } from "../deepgramClient";
+import { fireDispatchDisplayLabel } from "../fireDispatchLabel";
 import {
   safeBakeOffTranscribe,
   STT_PUSH_PREFIX,
@@ -333,8 +334,10 @@ export class FireDispatchProcessor {
     const zoneName = getCoverageZone(this.ctx.zoneId)?.name ?? "Ontario";
     const existing = this.incidentStore.getById(id);
     const tag = STT_PUSH_PREFIX[sttProvider];
-    const titlePrefix = agency === "ems" ? "EMS" : "Fire dispatch";
-    const typeLabel = agency === "ems" ? "EMS" : "Fire dispatch";
+    const titlePrefix =
+      agency === "ems" ? "EMS" : fireDispatchDisplayLabel(this.ctx.zoneId);
+    const typeLabel =
+      agency === "ems" ? "EMS" : fireDispatchDisplayLabel(this.ctx.zoneId);
     const incident: Incident = {
       id,
       source,

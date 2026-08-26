@@ -1,4 +1,5 @@
 import type { Incident, IncidentSource, SourceDetection } from "../types";
+import { fireDispatchDisplayLabel } from "./fireDispatchLabel";
 import { formatOpenWebNinjaGoogleMapsLabel } from "./googleMapsDisplay";
 import { isPoliceIncident } from "./policeAlerts";
 
@@ -24,7 +25,7 @@ export function incidentSourceDetections(incident: Incident): SourceDetection[] 
 
 export function formatSourceDetectionLabel(
   detection: SourceDetection,
-  incident?: Pick<Incident, "type" | "subtype">,
+  incident?: Pick<Incident, "type" | "subtype" | "provider">,
 ): string {
   if (
     incident &&
@@ -35,6 +36,9 @@ export function formatSourceDetectionLabel(
   }
   if (detection.source === "google_maps") {
     return formatOpenWebNinjaGoogleMapsLabel(detection.googleMapsZoom, detection.rawType);
+  }
+  if (detection.source === "fire_dispatch") {
+    return fireDispatchDisplayLabel(detection.provider ?? incident?.provider);
   }
   if (detection.provider === "blocksinside") return "BlocksInside · Waze";
   return SOURCE_LABELS[detection.source];
@@ -53,7 +57,9 @@ export function sourceLabel(
   source: IncidentSource,
   type?: string | null,
   subtype?: string | null,
+  provider?: string | null,
 ): string {
   if (source === "waze" && isPoliceIncident(type, subtype)) return "Waze (Police)";
+  if (source === "fire_dispatch") return fireDispatchDisplayLabel(provider);
   return SOURCE_LABELS[source];
 }

@@ -1,5 +1,6 @@
 import { config } from "./config";
 import { zoneIdForCoordinates, zonePolicePushTag, zonePushTag } from "./engine/coverageZones";
+import { fireDispatchDisplayLabel } from "./engine/fireDispatchLabel";
 import { formatOpenWebNinjaGoogleMapsLabel } from "./engine/googleMaps/googleMapsDisplay";
 import {
   isTorontoFireCadProvider,
@@ -51,7 +52,6 @@ const PROVIDER_LABELS: Record<string, string> = {
   openwebninja: "OpenWebNinja",
   openwebninja_google_maps: "Google Maps",
   google_maps: "Google Maps",
-  london_fire_dispatch: "Fire dispatch",
   [TORONTO_FIRE_CAD_PROVIDER]: "Toronto Fire",
 };
 
@@ -65,6 +65,9 @@ function labelForIncident(incident: Incident): string {
   if (incident.provider === "openwebninja_google_maps") {
     return formatOpenWebNinjaGoogleMapsLabel(incident.googleMapsZoom, incident.rawType);
   }
+  if (incident.source === "fire_dispatch") {
+    return fireDispatchDisplayLabel(incident.provider ?? resolveIncidentZoneId(incident));
+  }
   if (incident.provider) {
     const known = PROVIDER_LABELS[incident.provider];
     if (known) return known;
@@ -72,8 +75,7 @@ function labelForIncident(incident: Incident): string {
       /^([a-zA-Z]+)_fire_dispatch(?:_(?:hls|stream|dg|aai|sm))?$/,
     );
     if (fireM) {
-      const zone = getCoverageZone(fireM[1]);
-      return zone ? `Fire dispatch · ${zone.name}` : "Fire dispatch";
+      return fireDispatchDisplayLabel(fireM[1]);
     }
     const emsM = incident.provider.match(/^([a-zA-Z]+)_ems$/);
     if (emsM) {

@@ -1,3 +1,5 @@
+import { fireDispatchDisplayLabel } from "./fireDispatchLabel";
+
 /** Provider attribution for OpenWebNinja-sourced Google Maps incidents. */
 export function formatOpenWebNinjaGoogleMapsLabel(
   zoom?: number | null,
@@ -19,11 +21,10 @@ export function formatGoogleMapsProviderAttribution(
   if (provider === "openwebninja_google_maps") {
     return formatOpenWebNinjaGoogleMapsLabel(googleMapsZoom, rawType);
   }
-  const labels: Record<string, string> = {
-    blocksinside: "BlocksInside",
-    london_fire_dispatch: "Fire dispatch",
-  };
-  if (labels[provider]) return labels[provider];
+  if (provider === "blocksinside") return "BlocksInside";
+  if (/^[a-zA-Z]+_fire_dispatch/.test(provider)) {
+    return fireDispatchDisplayLabel(provider);
+  }
   const ems = provider.match(/^([a-zA-Z]+)_ems$/);
   if (ems) return `EMS · ${ems[1]}`;
   return provider;
