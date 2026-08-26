@@ -2,6 +2,7 @@ import { Router } from "express";
 import { config } from "../config";
 import { getProviderRuntimeStats } from "../engine/wazeAggregator";
 import { enabledCoverageZones, zoneToBoundingBox } from "../engine/coverageZones";
+import { LONDON_ONLY_INGEST, LONDON_ZONE_ID } from "../engine/londonOnly";
 import { zonePublicSummaries } from "../engine/zones.config";
 import {
   countGoogleMapsFetchJobs,
@@ -23,6 +24,8 @@ export function createSourcesRouter(store: IncidentStore): Router {
   router.get("/zones", (_req, res) => {
     res.json({
       checkedAt: new Date().toISOString(),
+      londonOnly: LONDON_ONLY_INGEST,
+      activeIngestZones: enabledCoverageZones().map((z) => z.id),
       zones: zonePublicSummaries(),
     });
   });
@@ -71,6 +74,9 @@ export function createSourcesRouter(store: IncidentStore): Router {
     const blocksinside = providers.blocksinside;
     res.json({
       checkedAt: new Date().toISOString(),
+      londonOnly: LONDON_ONLY_INGEST,
+      activeIngestZones: enabledCoverageZones().map((z) => z.id),
+      activeZone: LONDON_ONLY_INGEST ? LONDON_ZONE_ID : null,
       pollCenter: {
         lat: config.londonLat,
         lng: config.londonLng,
@@ -126,6 +132,11 @@ export function createSourcesRouter(store: IncidentStore): Router {
       fireDispatch: {
         ...getFireDispatchRuntime(),
         streamOverride: Boolean(config.radioHlsUrl),
+      },
+      torontoFireCad: {
+        enabled: config.torontoFireCadEnabled && !LONDON_ONLY_INGEST,
+        blockedByLondonOnly: LONDON_ONLY_INGEST,
+        envFlag: config.torontoFireCadEnabled,
       },
       zones: zonePublicSummaries(),
       providers,

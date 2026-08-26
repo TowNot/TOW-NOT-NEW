@@ -1,10 +1,20 @@
 import type { BoundingBox } from "./geo";
-import { COVERAGE_ZONES, type CoverageZoneDef } from "./zones.config";
+import { isIngestZoneAllowed } from "./londonOnly";
+import {
+  COVERAGE_ZONES,
+  type CoverageZoneDef,
+} from "./zones.config";
 
 export { COVERAGE_ZONES, COVERAGE_ZONE_IDS, type CoverageZoneDef } from "./zones.config";
 
+/**
+ * Zones that may be scraped / radio-listened right now.
+ * Honors zone.enabled AND the London-only ingest lock.
+ */
 export function enabledCoverageZones(): CoverageZoneDef[] {
-  return COVERAGE_ZONES.filter((zone) => zone.enabled);
+  return COVERAGE_ZONES.filter(
+    (zone) => zone.enabled && isIngestZoneAllowed(zone.id),
+  );
 }
 
 export function zoneToBoundingBox(zone: CoverageZoneDef): BoundingBox {

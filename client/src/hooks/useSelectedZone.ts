@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   DEFAULT_ZONE_ID,
   getZone,
+  isZoneEnabledForDesk,
   isZoneId,
   readLocalZoneId,
   syncProgressierPushTags,
@@ -19,14 +20,16 @@ export interface ZoneUser {
 function metadataZoneId(user: ZoneUser | null | undefined): ZoneId | null {
   if (!user) return null;
   const fromPublic = user.publicMetadata?.selectedZoneId;
-  if (isZoneId(fromPublic)) return fromPublic;
+  if (isZoneId(fromPublic) && isZoneEnabledForDesk(fromPublic)) return fromPublic;
   const fromUnsafe = user.unsafeMetadata?.selectedZoneId;
-  if (isZoneId(fromUnsafe)) return fromUnsafe;
+  if (isZoneId(fromUnsafe) && isZoneEnabledForDesk(fromUnsafe)) return fromUnsafe;
   return null;
 }
 
 export function resolveSelectedZoneId(user?: ZoneUser | null): ZoneId | null {
-  return metadataZoneId(user) ?? readLocalZoneId();
+  const raw = metadataZoneId(user) ?? readLocalZoneId();
+  if (raw && isZoneEnabledForDesk(raw)) return raw;
+  return DEFAULT_ZONE_ID;
 }
 
 async function persistZoneToClerk(user: ZoneUser, zoneId: ZoneId): Promise<void> {
@@ -52,9 +55,19 @@ export function useSelectedZone(user?: ZoneUser | null) {
   const [localZoneId, setLocalZoneId] = useState<ZoneId | null>(() => readLocalZoneId());
 
   const metadataId = metadataZoneId(user);
-  const selectedZoneId: ZoneId = metadataId ?? localZoneId ?? DEFAULT_ZONE_ID;
+  const localEnabled =
+    localZoneId && isZoneEnabledForDesk(localZoneId) ? localZoneId : null;
+  const selectedZoneId: ZoneId = metadataId ?? localEnabled ?? DEFAULT_ZONE_ID;
   const zone: CoverageZone = getZone(selectedZoneId) ?? getZone(DEFAULT_ZONE_ID)!;
-  const hasPreference = Boolean(metadataId ?? localZoneId);
+  const hasPreference = Boolean(metadataId ?? localEnabled);
+
+  useEffect(() => {
+    // Migrate stale localStorage away from paused cities (e.g. Toronto).
+    if (localZoneId && !isZoneEnabledForDesk(localZoneId)) {
+      writeLocalZoneId(DEFAULT_ZONE_ID);
+      setLocalZoneId(DEFAULT_ZONE_ID);
+    }
+  }, [localZoneId]);
 
   useEffect(() => {
     syncProgressierPushTags(selectedZoneId);
@@ -62,6 +75,7 @@ export function useSelectedZone(user?: ZoneUser | null) {
 
   const saveZone = useCallback(
     async (zoneId: ZoneId) => {
+      if (!isZoneEnabledForDesk(zoneId)) return;
       writeLocalZoneId(zoneId);
       setLocalZoneId(zoneId);
       // Overwrite Progressier tags immediately so the previous city stops receiving.

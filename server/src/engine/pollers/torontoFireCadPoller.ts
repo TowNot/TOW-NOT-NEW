@@ -2,6 +2,7 @@ import { config } from "../../config";
 import { logger } from "../../logger";
 import type { IncidentStore } from "../../store/incidentStore";
 import type { Incident } from "../../types/incident";
+import { LONDON_ONLY_INGEST } from "../londonOnly";
 import {
   findNearbyMergeableIncident,
   isMergeableTrafficIncident,
@@ -122,9 +123,9 @@ export class TorontoFireCadPoller {
 
   start(): void {
     if (this.timer) return;
-    if (!config.torontoFireCadEnabled) {
+    if (LONDON_ONLY_INGEST || !config.torontoFireCadEnabled) {
       logger.info(
-        "[Toronto Fire CAD] skipped — TORONTO_FIRE_CAD_ENABLED not set (London-only mode)",
+        "[Toronto Fire CAD] skipped — London-only mode (set LONDON_ONLY_INGEST=0 and TORONTO_FIRE_CAD_ENABLED=1 to enable)",
       );
       return;
     }

@@ -70,13 +70,23 @@ function boundsFromCenter(center: { lat: number; lng: number }): CoverageZoneDef
   };
 }
 
+import { isIngestZoneAllowed } from "./londonOnly";
+
 function buildZone(seed: ZoneSeed): CoverageZoneDef {
+  // London-only lock (default on) + seed.enabled. Flip LONDON_ONLY_INGEST=0 then
+  // set seed.enabled=true to resume a city without deleting its config.
+  const enabled = isIngestZoneAllowed(seed.id) && seed.enabled === true;
+  let audio = seed.audio ?? null;
+  // Keep feedId/URL for later, but pause audio so radio never starts while zone is off.
+  if (audio && !enabled) {
+    audio = { ...audio, enabled: false };
+  }
   return {
     id: seed.id,
     name: seed.name,
-    enabled: seed.enabled === true,
+    enabled,
     bounds: boundsFromCenter(seed.center),
-    audio: seed.audio ?? null,
+    audio,
     scannedAgencies: seed.scannedAgencies ?? [],
     hasEmsFeed: seed.hasEmsFeed === true,
   };
@@ -84,12 +94,13 @@ function buildZone(seed: ZoneSeed): CoverageZoneDef {
 
 /**
  * Southern Ontario coverage catalog.
- * Testing: only London is enabled (Waze + Google Maps + Fire HLS 34296).
- * Other cities keep feed IDs / stream URLs but zone.enabled=false until scale-up.
- * Do not casually change existing city centers / half-spans.
+ * STRICT LONDON-ONLY ops: only `london` is ingest-enabled (Waze + GMaps + Fire HLS).
+ * Other cities keep centers / feed IDs / stream URLs but zone.enabled=false and
+ * audio.enabled is forced off in buildZone until you deliberately scale up.
+ * Master lock: server/src/engine/londonOnly.ts (LONDON_ONLY_INGEST, default on).
  */
 const ZONE_SEEDS: ZoneSeed[] = [
-  // ── Fire / CYKF audio (London-only enabled for testing) ─────────────
+  // ── Active (London only) ────────────────────────────────────────────
   {
     id: "london",
     name: "London",
@@ -103,6 +114,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     },
     scannedAgencies: ["Fire", "Public Works"],
   },
+  // ── Paused cities (enabled: false — retained, zero scrape/radio) ────
   {
     id: "milton",
     name: "Milton",

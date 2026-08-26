@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { AuthControls } from "../components/AuthControls";
 import { useSelectedZone, type ZoneUser } from "../hooks/useSelectedZone";
-import { COVERAGE_ZONES, type ZoneId } from "../lib/zones";
+import { selectableCoverageZones, type ZoneId } from "../lib/zones";
 
 export function SelectZonePage({ user }: { user?: ZoneUser | null }) {
   const { saveZone } = useSelectedZone(user);
   const [busy, setBusy] = useState<ZoneId | null>(null);
+  const zones = selectableCoverageZones();
 
   const onSelect = async (id: ZoneId) => {
     setBusy(id);
@@ -39,7 +40,7 @@ export function SelectZonePage({ user }: { user?: ZoneUser | null }) {
         </p>
 
         <ul className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {COVERAGE_ZONES.map((zone) => (
+          {zones.map((zone) => (
             <li key={zone.id}>
               <button
                 type="button"

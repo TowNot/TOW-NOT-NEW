@@ -1,5 +1,6 @@
 import { logger } from "../../logger";
 import { IncidentStore } from "../../store/incidentStore";
+import { isIngestZoneAllowed } from "../londonOnly";
 import { COVERAGE_ZONES } from "../zones.config";
 import { attachFireDispatchStore } from "./fireDispatchPipeline";
 import { startHlsFireListener } from "./hlsFireListener";
@@ -24,7 +25,10 @@ export function startRadioOrchestrator(store: IncidentStore): void {
   const active: string[] = [];
 
   for (const zone of COVERAGE_ZONES) {
+    // zone.enabled + audio.enabled; London-only lock also applied via enabledCoverageZones
+    // for Waze/GMaps — radio uses the same enabled flags here.
     if (!zone.enabled || !zone.audio?.enabled) continue;
+    if (!isIngestZoneAllowed(zone.id)) continue;
 
     if (zone.audio.type === "hls" && zone.audio.feedId == null) {
       logger.debug(

@@ -1,6 +1,7 @@
 import { config } from "../config";
 import { logger } from "../logger";
 import { enabledCoverageZones } from "./coverageZones";
+import { LONDON_ONLY_INGEST, LONDON_ZONE_ID } from "./londonOnly";
 import { GoogleMapsTrafficPoller } from "./pollers/googleMapsPoller";
 import { TorontoFireCadPoller } from "./pollers/torontoFireCadPoller";
 import { WazeTrafficPoller } from "./pollers/wazePoller";
@@ -17,6 +18,8 @@ export class DataAggregatorEngine {
   start(): void {
     const enabled = enabledCoverageZones();
     logger.info("[WAZE API] starting BlocksInside 4-tile Waze scraper", {
+      londonOnly: LONDON_ONLY_INGEST,
+      activeZone: LONDON_ZONE_ID,
       wazeApi: Boolean(config.wazeApiKey),
       twilio: Boolean(config.twilioAccountSid && config.twilioAuthToken),
       publicUrl: config.publicUrl,
@@ -39,10 +42,11 @@ export class DataAggregatorEngine {
     logger.info("[FIRE SCANNER] starting zone audio orchestrator (HLS + continuous streams)");
     this.radio.start();
     this.googleMaps.start();
-    // Independent 60s CAD poller — does not share timers with Waze/GMaps/audio.
+    // CAD no-ops under London-only / when TORONTO_FIRE_CAD_ENABLED is off.
     this.torontoFireCad.start();
     logger.info(
-      "Data aggregator engine running (BlocksInside + fire dispatch + OpenWebNinja Google Maps + Toronto Fire CAD)",
+      "Data aggregator engine running (London-only ingest unless LONDON_ONLY_INGEST=0)",
+      { cities: enabled.map((z) => z.id) },
     );
   }
 

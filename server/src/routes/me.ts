@@ -1,9 +1,10 @@
 import { clerkClient, getAuth } from "@clerk/express";
 import { Router } from "express";
-import { COVERAGE_ZONE_IDS } from "../engine/coverageZones";
+import { enabledCoverageZones } from "../engine/coverageZones";
 import { logger } from "../logger";
 
-const ZONE_IDS = new Set(COVERAGE_ZONE_IDS);
+/** Only zones that are ingest-enabled (London-only today). */
+const ENABLED_ZONE_IDS = new Set(enabledCoverageZones().map((zone) => zone.id));
 
 export function createMeRouter(): Router {
   const router = Router();
@@ -18,8 +19,11 @@ export function createMeRouter(): Router {
 
       const selectedZoneId =
         typeof req.body?.selectedZoneId === "string" ? req.body.selectedZoneId.trim() : "";
-      if (!ZONE_IDS.has(selectedZoneId)) {
-        res.status(400).json({ error: "Unknown zone" });
+      if (!ENABLED_ZONE_IDS.has(selectedZoneId)) {
+        res.status(400).json({
+          error: "Zone not available (London-only mode)",
+          allowed: [...ENABLED_ZONE_IDS],
+        });
         return;
       }
 

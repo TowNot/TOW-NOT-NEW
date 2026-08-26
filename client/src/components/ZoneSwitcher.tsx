@@ -1,4 +1,4 @@
-import { COVERAGE_ZONES, getZone, type ZoneId } from "../lib/zones";
+import { getZone, selectableCoverageZones, type ZoneId } from "../lib/zones";
 
 export function ZoneSwitcher({
   value,
@@ -9,6 +9,7 @@ export function ZoneSwitcher({
 }) {
   const active = getZone(value);
   const firePending = active ? !active.hasFireFeed : false;
+  const zones = selectableCoverageZones();
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -22,7 +23,7 @@ export function ZoneSwitcher({
           className="max-w-[14rem] bg-transparent text-sm font-semibold text-cobalt outline-none sm:max-w-none"
           aria-label="Active coverage zone"
         >
-          {COVERAGE_ZONES.map((zone) => (
+          {zones.map((zone) => (
             <option key={zone.id} value={zone.id}>
               {zone.hasFireFeed ? zone.name : `${zone.name} · Fire soon`}
             </option>

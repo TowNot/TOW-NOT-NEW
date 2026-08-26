@@ -291,6 +291,17 @@ function buildClientZone(seed: ZoneSeed): CoverageZone {
 
 export const COVERAGE_ZONES: CoverageZone[] = ZONE_SEEDS.map(buildClientZone);
 
+/** Desk / onboarding: only London until multi-city is intentionally opened. */
+export const ENABLED_ZONE_IDS: readonly ZoneId[] = ["london"];
+
+export function isZoneEnabledForDesk(id: string): boolean {
+  return (ENABLED_ZONE_IDS as readonly string[]).includes(id);
+}
+
+export function selectableCoverageZones(): CoverageZone[] {
+  return COVERAGE_ZONES.filter((zone) => isZoneEnabledForDesk(zone.id));
+}
+
 export const DEFAULT_ZONE_ID: ZoneId = "london";
 export const ZONE_STORAGE_KEY = "alertnav-selected-zone-id";
 
