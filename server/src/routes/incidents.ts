@@ -48,6 +48,14 @@ export function createIncidentRouter(store: IncidentStore): Router {
       clients.delete(client);
       logger.info("SSE client disconnected", { id: client.id, total: clients.size });
     });
+    req.on("error", (error) => {
+      clearInterval(heartbeat);
+      clients.delete(client);
+      logger.warn("SSE client error", {
+        id: client.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
   });
 
   return router;

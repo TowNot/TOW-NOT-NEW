@@ -193,12 +193,47 @@ function shutdown(signal: string): void {
 
 process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
+
+function isTransientProcessError(error: unknown): boolean {
+  const message = (error instanceof Error ? error.message : String(error)).toLowerCase();
+  return (
+    message.includes("websocket was closed before the connection was established") ||
+    message.includes("socket is not open") ||
+    message.includes("socket not ready") ||
+    message.includes("econnreset") ||
+    message.includes("econnrefused") ||
+    message.includes("etimedout") ||
+    message.includes("epipe") ||
+    message.includes("socket hang up") ||
+    message.includes("network socket disconnected") ||
+    message.includes("aborted")
+  );
+}
+
 process.on("unhandledRejection", (reason: unknown) => {
+  if (isTransientProcessError(reason)) {
+    logger.warn("Unhandled rejection (transient network/WebSocket — continuing)", {
+      error: reason instanceof Error ? reason.message : String(reason),
+    });
+    return;
+  }
   logger.error("Unhandled promise rejection", {
     error: reason instanceof Error ? reason.message : String(reason),
+    stack: reason instanceof Error ? reason.stack : undefined,
   });
 });
+
 process.on("uncaughtException", (error: Error) => {
-  logger.error("Uncaught exception", { error: error.message });
+  if (isTransientProcessError(error)) {
+    logger.warn("Uncaught exception (transient network/WebSocket — continuing)", {
+      error: error.message,
+    });
+    return;
+  }
+  logger.error("Uncaught exception", {
+    error: error.message,
+    stack: error.stack,
+  });
+  // Only fatal / unexpected exceptions tear down the process.
   shutdown("uncaughtException");
 });

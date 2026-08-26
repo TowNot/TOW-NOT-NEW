@@ -1,6 +1,7 @@
 /**
  * Parallel STT bake-off helpers for AssemblyAI + Speechmatics.
- * Failures here must never throw into the Deepgram fire-dispatch path.
+ * Failures here must never throw into the Deepgram fire-dispatch path,
+ * and must never leave WebSocket 'error' events unhandled (Railway crash).
  */
 import { config } from "../config";
 import { logger } from "./pinoCompat";
@@ -22,17 +23,72 @@ export function pcmFromWav(wav: Buffer): Buffer {
   return wav.subarray(44);
 }
 
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+function errorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === "string") return err;
+  return String(err);
+}
+
+/** Known transient WS / network messages that must not kill the process. */
+export function isTransientNetworkError(err: unknown): boolean {
+  const message = errorMessage(err).toLowerCase();
+  return (
+    message.includes("websocket was closed before the connection was established") ||
+    message.includes("socket is not open") ||
+    message.includes("socket not ready") ||
+    message.includes("econnreset") ||
+    message.includes("econnrefused") ||
+    message.includes("etimedout") ||
+    message.includes("epipe") ||
+    message.includes("socket hang up") ||
+    message.includes("network socket disconnected") ||
+    message.includes("aborted")
+  );
+}
+
+function withBakeOffTimeout<T>(
+  run: (ctx: {
+    isCancelled: () => boolean;
+    onCancel: (fn: () => void) => void;
+  }) => Promise<T>,
+  ms: number,
+  label: string,
+): Promise<T> {
+  let cancelled = false;
+  const cancelHooks: Array<() => void> = [];
+
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
-    promise.then(
+    const timer = setTimeout(() => {
+      cancelled = true;
+      for (const hook of cancelHooks) {
+        try {
+          hook();
+        } catch {
+          /* ignore */
+        }
+      }
+      reject(new Error(`${label} timed out after ${ms}ms`));
+    }, ms);
+
+    void run({
+      isCancelled: () => cancelled,
+      onCancel: (fn) => {
+        cancelHooks.push(fn);
+      },
+    }).then(
       (value) => {
         clearTimeout(timer);
-        resolve(value);
+        if (!cancelled) resolve(value);
       },
       (err) => {
         clearTimeout(timer);
-        reject(err);
+        if (!cancelled) reject(err);
+        else {
+          logger.debug(
+            { label, err: errorMessage(err) },
+            "[stt-bake-off] late failure after timeout (ignored)",
+          );
+        }
       },
     );
   });
@@ -49,7 +105,6 @@ export async function speechToTextAssemblyAi(wav: Buffer): Promise<string> {
   const pcm = pcmFromWav(wav);
   if (pcm.length === 0) return "";
 
-  // Dynamic import keeps cold-start / missing-key paths light.
   const { AssemblyAI } = await import("assemblyai");
   const client = new AssemblyAI({ apiKey: config.assemblyAiApiKey });
   const transcriber = client.streaming.transcriber({
@@ -61,8 +116,48 @@ export async function speechToTextAssemblyAi(wav: Buffer): Promise<string> {
   let lastFinal = "";
   let lastPartial = "";
 
-  return withTimeout(
-    (async () => {
+  const safeClose = async (): Promise<void> => {
+    try {
+      const raw = transcriber as unknown as {
+        socket?: {
+          readyState: number;
+          OPEN: number;
+          CONNECTING: number;
+          on?: (event: string, fn: (...args: unknown[]) => void) => void;
+        };
+      };
+      const socket = raw.socket;
+      if (!socket) return;
+
+      // SDK close() removes listeners then calls socket.close(). Doing that
+      // while CONNECTING emits "WebSocket was closed before the connection
+      // was established" with no handler → uncaughtException.
+      if (socket.readyState === socket.CONNECTING) {
+        socket.on?.("error", () => undefined);
+        logger.debug("[stt-bake-off] AssemblyAI skip close while CONNECTING");
+        return;
+      }
+
+      if (socket.readyState !== socket.OPEN) return;
+
+      await Promise.race([
+        transcriber.close(false),
+        new Promise<void>((r) => setTimeout(r, 500)),
+      ]);
+    } catch (err) {
+      logger.debug(
+        { err: errorMessage(err) },
+        "[stt-bake-off] AssemblyAI close ignored",
+      );
+    }
+  };
+
+  return withBakeOffTimeout(
+    async ({ isCancelled, onCancel }) => {
+      onCancel(() => {
+        void safeClose();
+      });
+
       await new Promise<void>((resolve, reject) => {
         let settled = false;
         const settle = (fn: () => void) => {
@@ -77,42 +172,66 @@ export async function speechToTextAssemblyAi(wav: Buffer): Promise<string> {
           if (event.end_of_turn) lastFinal = text;
           else lastPartial = text;
         });
-        transcriber.on("error", (err) => settle(() => reject(err)));
-        transcriber.on("close", () => settle(() => resolve()));
+        transcriber.on("error", (err) => {
+          logger.warn(
+            { err: errorMessage(err) },
+            "[stt-bake-off] AssemblyAI WebSocket error",
+          );
+          settle(() => reject(err instanceof Error ? err : new Error(errorMessage(err))));
+        });
+        transcriber.on("close", () => {
+          logger.debug("[stt-bake-off] AssemblyAI WebSocket closed");
+          settle(() => resolve());
+        });
 
         void (async () => {
           try {
             await transcriber.connect();
+            if (isCancelled()) {
+              await safeClose();
+              settle(() => resolve());
+              return;
+            }
+
             for (let offset = 0; offset < pcm.length; offset += PCM_CHUNK_BYTES) {
+              if (isCancelled() || settled) break;
               const chunk = pcm.subarray(offset, offset + PCM_CHUNK_BYTES);
               const copy = chunk.buffer.slice(
                 chunk.byteOffset,
                 chunk.byteOffset + chunk.byteLength,
               );
-              transcriber.sendAudio(copy);
+              try {
+                transcriber.sendAudio(copy);
+              } catch (err) {
+                logger.debug(
+                  { err: errorMessage(err) },
+                  "[stt-bake-off] AssemblyAI sendAudio skipped (socket not open)",
+                );
+                break;
+              }
             }
-            try {
-              transcriber.forceEndpoint();
-            } catch {
-              /* optional mid-stream flush */
+
+            if (!isCancelled() && !settled) {
+              try {
+                transcriber.forceEndpoint();
+              } catch {
+                /* optional mid-stream flush */
+              }
+              await new Promise((r) => setTimeout(r, 400));
             }
-            // Brief settle so the final Turn can arrive before Terminate.
-            await new Promise((r) => setTimeout(r, 400));
-            await transcriber.close();
+
+            await safeClose();
             settle(() => resolve());
           } catch (err) {
-            try {
-              await transcriber.close();
-            } catch {
-              /* ignore close errors after failure */
-            }
-            settle(() => reject(err));
+            await safeClose();
+            settle(() => reject(err instanceof Error ? err : new Error(errorMessage(err))));
           }
         })();
       });
 
+      if (isCancelled()) return "";
       return (lastFinal || lastPartial).trim();
-    })(),
+    },
     BAKE_OFF_TIMEOUT_MS,
     "AssemblyAI",
   );
@@ -134,44 +253,133 @@ export async function speechToTextSpeechmatics(wav: Buffer): Promise<string> {
   const client = new RealtimeClient();
   let finalText = "";
 
-  return withTimeout(
-    (async () => {
+  const safeStop = (): void => {
+    try {
+      // Never call close while CONNECTING — that is exactly the fatal ws error.
+      if (client.socketState === "open") {
+        try {
+          void client.stopRecognition({ noTimeout: true });
+        } catch {
+          /* ignore */
+        }
+        const raw = client as unknown as {
+          socket?: { readyState: number; OPEN: number; close: () => void };
+        };
+        if (raw.socket && raw.socket.readyState === raw.socket.OPEN) {
+          raw.socket.close();
+        }
+      }
+    } catch (err) {
+      logger.debug(
+        { err: errorMessage(err) },
+        "[stt-bake-off] Speechmatics stop ignored",
+      );
+    }
+  };
+
+  return withBakeOffTimeout(
+    async ({ isCancelled, onCancel }) => {
+      onCancel(() => {
+        safeStop();
+      });
+
       const done = new Promise<void>((resolve, reject) => {
-        client.addEventListener("receiveMessage", ({ data }) => {
+        client.addEventListener("receiveMessage", (({ data }: {
+          data: {
+            message?: string;
+            metadata?: { transcript?: string };
+            reason?: string;
+            type?: string;
+          };
+        }) => {
           if (data.message === "AddTranscript") {
             const piece = (data.metadata?.transcript ?? "").trim();
-            if (piece) finalText += (finalText && !finalText.endsWith(" ") ? " " : "") + piece;
+            if (piece) {
+              finalText += (finalText && !finalText.endsWith(" ") ? " " : "") + piece;
+            }
           } else if (data.message === "EndOfTranscript") {
             resolve();
           } else if (data.message === "Error") {
-            reject(new Error(`Speechmatics error: ${data.reason ?? data.type ?? "unknown"}`));
+            reject(
+              new Error(`Speechmatics error: ${data.reason ?? data.type ?? "unknown"}`),
+            );
           }
+        }) as never);
+
+        client.addEventListener("socketStateChange", ((event: { socketState?: string }) => {
+          const state = event.socketState;
+          logger.debug({ state }, "[stt-bake-off] Speechmatics socket state");
+          if (state === "closed") {
+            resolve();
+          }
+        }) as never);
+      });
+
+      try {
+        const jwt = await createSpeechmaticsJWT({
+          type: "rt",
+          apiKey: config.speechmaticsApiKey,
+          ttl: 120,
         });
-      });
 
-      const jwt = await createSpeechmaticsJWT({
-        type: "rt",
-        apiKey: config.speechmaticsApiKey,
-        ttl: 120,
-      });
+        if (isCancelled()) return "";
 
-      await client.start(jwt, {
-        transcription_config: {
-          language: "en",
-          model: "enhanced",
-          enable_partials: false,
-        },
-        audio_format: { type: "file" },
-      });
+        await client.start(jwt, {
+          transcription_config: {
+            language: "en",
+            model: "enhanced",
+            enable_partials: false,
+          },
+          audio_format: { type: "file" },
+        });
 
-      const CHUNK = 4096;
-      for (let offset = 0; offset < wav.length; offset += CHUNK) {
-        client.sendAudio(wav.subarray(offset, offset + CHUNK));
+        if (isCancelled()) {
+          safeStop();
+          return "";
+        }
+
+        const CHUNK = 4096;
+        for (let offset = 0; offset < wav.length; offset += CHUNK) {
+          if (isCancelled()) break;
+          if (client.socketState !== "open") {
+            logger.debug(
+              { state: client.socketState },
+              "[stt-bake-off] Speechmatics sendAudio skipped (socket not open)",
+            );
+            break;
+          }
+          try {
+            client.sendAudio(wav.subarray(offset, offset + CHUNK));
+          } catch (err) {
+            logger.debug(
+              { err: errorMessage(err) },
+              "[stt-bake-off] Speechmatics sendAudio failed",
+            );
+            break;
+          }
+        }
+
+        if (!isCancelled() && client.socketState === "open") {
+          try {
+            await client.stopRecognition({ noTimeout: true });
+          } catch (err) {
+            logger.debug(
+              { err: errorMessage(err) },
+              "[stt-bake-off] Speechmatics stopRecognition failed",
+            );
+          }
+          await Promise.race([
+            done,
+            new Promise<void>((r) => setTimeout(r, 2_000)),
+          ]);
+        }
+
+        return finalText.trim();
+      } catch (err) {
+        safeStop();
+        throw err instanceof Error ? err : new Error(errorMessage(err));
       }
-      await client.stopRecognition({ noTimeout: true });
-      await done;
-      return finalText.trim();
-    })(),
+    },
     BAKE_OFF_TIMEOUT_MS,
     "Speechmatics",
   );
@@ -192,7 +400,8 @@ export async function safeBakeOffTranscribe(
     logger.warn(
       {
         provider,
-        err: err instanceof Error ? err.message : String(err),
+        err: errorMessage(err),
+        transient: isTransientNetworkError(err),
       },
       `[fire-dispatch] STT bake-off ${provider.toUpperCase()} failed — Deepgram path unaffected`,
     );
