@@ -18,7 +18,12 @@ import { TorontoFireCadPoller } from "./engine/pollers/torontoFireCadPoller";
 import { WazeTrafficPoller } from "./engine/pollers/wazePoller";
 import { RadioIngestionWorker } from "./engine/workers/radioIngestionWorker";
 import { logger } from "./logger";
+import { closeNotificationQueue } from "./queue/notificationQueue";
 import { IncidentStore } from "./store/incidentStore";
+import {
+  startNotificationWorker,
+  stopNotificationWorker,
+} from "./workers/notificationWorker";
 
 const PROGRESSIER_SW_SOURCE = [
   'importScripts("https://progressier.app/Bv9Rb1Vm5PkATyh6w0wG/sw.js");',
@@ -179,14 +184,23 @@ server.listen(config.port, config.host, () => {
   logger.info("AlertNav server listening", { port: config.port, host: config.host });
   store.start();
   engine.start();
+  try {
+    startNotificationWorker();
+  } catch (error) {
+    logger.error("Failed to start notification worker", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 });
 
 function shutdown(signal: string): void {
   logger.info("Shutting down", { signal });
   engine.stop();
   store.stop();
-  server.close(() => {
-    process.exit(0);
+  void Promise.allSettled([stopNotificationWorker(), closeNotificationQueue()]).finally(() => {
+    server.close(() => {
+      process.exit(0);
+    });
   });
   setTimeout(() => process.exit(1), 5_000).unref();
 }

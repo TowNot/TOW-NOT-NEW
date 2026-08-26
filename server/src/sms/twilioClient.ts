@@ -51,33 +51,45 @@ async function sendOne(to: string, body: string): Promise<void> {
   });
 }
 
-/** Fire-and-forget SMS to every opted-in number. Never throws to the caller. */
-export function notifySmsSubscribers(incident: Incident): void {
+/** Build the SMS text for an incident (shared by queue producer + legacy callers). */
+export function buildSmsBody(incident: Incident): string {
+  return smsBody(incident);
+}
+
+/**
+ * Awaitable SMS fan-out for the notification worker.
+ * Individual recipient failures are logged; does not throw (push already sent).
+ */
+export async function dispatchSmsBody(
+  body: string,
+  incidentId?: string,
+): Promise<void> {
   if (!isTwilioConfigured()) return;
   const recipients = listSmsSubscribers();
   if (recipients.length === 0) return;
 
-  const body = smsBody(incident);
-  void Promise.allSettled(recipients.map((to) => sendOne(to, body)))
-    .then((results) => {
-      const failed = results.filter((r) => r.status === "rejected").length;
-      logger.info("Twilio SMS dispatch finished", {
-        incidentId: incident.id,
-        sent: results.length - failed,
-        failed,
+  const results = await Promise.allSettled(recipients.map((to) => sendOne(to, body)));
+  const failed = results.filter((r) => r.status === "rejected").length;
+  logger.info("Twilio SMS dispatch finished", {
+    incidentId,
+    sent: results.length - failed,
+    failed,
+  });
+  results.forEach((result, i) => {
+    if (result.status === "rejected") {
+      logger.warn("Twilio SMS failed", {
+        to: recipients[i],
+        error: result.reason instanceof Error ? result.reason.message : String(result.reason),
       });
-      results.forEach((result, i) => {
-        if (result.status === "rejected") {
-          logger.warn("Twilio SMS failed", {
-            to: recipients[i],
-            error: result.reason instanceof Error ? result.reason.message : String(result.reason),
-          });
-        }
-      });
-    })
-    .catch((error: unknown) => {
-      logger.warn("Twilio SMS dispatch aborted", {
-        error: error instanceof Error ? error.message : String(error),
-      });
+    }
+  });
+}
+
+/** Fire-and-forget SMS to every opted-in number. Never throws to the caller. */
+export function notifySmsSubscribers(incident: Incident): void {
+  void dispatchSmsBody(buildSmsBody(incident), incident.id).catch((error: unknown) => {
+    logger.warn("Twilio SMS dispatch aborted", {
+      error: error instanceof Error ? error.message : String(error),
     });
+  });
 }
