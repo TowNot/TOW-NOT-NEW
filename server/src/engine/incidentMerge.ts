@@ -4,8 +4,17 @@ import { mergeGoogleMapsRawType, mergeGoogleMapsZoom } from "./googleMaps/google
 import { distanceKm } from "./geo";
 import { isBreakdown, isPoliceType, isTrueCrash } from "./wazeAggregator";
 
-/** Cross-provider crash merge + push dedup radius (200 m). */
-export const CROSS_SOURCE_MERGE_RADIUS_KM = 0.2;
+/** Confirmed crash merge + push dedup radius (200 m). */
+export const CONFIRMED_ACCIDENT_MERGE_RADIUS_KM = 0.2;
+
+/** @deprecated Use CONFIRMED_ACCIDENT_MERGE_RADIUS_KM — kept for existing imports. */
+export const CROSS_SOURCE_MERGE_RADIUS_KM = CONFIRMED_ACCIDENT_MERGE_RADIUS_KM;
+
+/** Road closure / construction cluster radius (~40 m). */
+export const ROAD_HAZARD_MERGE_RADIUS_KM = 0.04;
+
+/** Generic Google Maps incident pins (~75 m — about one short block). */
+export const GENERIC_ACCIDENT_MERGE_RADIUS_KM = 0.075;
 
 /**
  * Strict merge categories — proximity alone is never enough.
@@ -40,6 +49,44 @@ export function mergeCategory(incident: Incident): MergeCategory {
   return "other";
 }
 
+/**
+ * True for explicit crash/collision rows — not generic OpenWebNinja incident pins.
+ * Used for asymmetric 200 m merge/push vs tighter generic/closure radii.
+ */
+export function isConfirmedAccident(incident: Incident): boolean {
+  if (mergeCategory(incident) !== "accident") return false;
+  if (incident.subtype === "GOOGLE_MAPS_INCIDENT") return false;
+  const raw = (incident.rawType ?? "").toLowerCase().trim();
+  if (raw === "incident" || raw === "other") return false;
+
+  const type = (incident.type ?? "").toUpperCase();
+  return (
+    type.startsWith("ACCIDENT") ||
+    type.includes("CRASH") ||
+    type.includes("COLLISION") ||
+    isTrueCrash(incident.type, incident.subtype ?? null)
+  );
+}
+
+/** Pair-aware merge radius — closures never use the 200 m crash radius. */
+export function mergeProximityRadiusKm(a: Incident, b: Incident): number {
+  const catA = mergeCategory(a);
+  const catB = mergeCategory(b);
+
+  if (catA === "road_hazard" && catB === "road_hazard") {
+    return ROAD_HAZARD_MERGE_RADIUS_KM;
+  }
+
+  if (catA === "accident" && catB === "accident") {
+    if (isConfirmedAccident(a) && isConfirmedAccident(b)) {
+      return CONFIRMED_ACCIDENT_MERGE_RADIUS_KM;
+    }
+    return GENERIC_ACCIDENT_MERGE_RADIUS_KM;
+  }
+
+  return CONFIRMED_ACCIDENT_MERGE_RADIUS_KM;
+}
+
 /** True when both rows share a mergeable category (never accident vs road_hazard). */
 export function sameMergeCategory(a: Incident, b: Incident): boolean {
   const left = mergeCategory(a);
@@ -48,7 +95,7 @@ export function sameMergeCategory(a: Incident, b: Incident): boolean {
   return left === right;
 }
 
-/** Eligible for 200 m same-type proximity merge. */
+/** Eligible for same-type proximity merge (radius varies by category). */
 export function isMergeableTrafficIncident(incident: Incident): boolean {
   const category = mergeCategory(incident);
   return (
@@ -107,7 +154,6 @@ export function withSourceDetections(incident: Incident): Incident {
 export function findNearbyMergeableIncident(
   store: IncidentStore,
   incoming: Incident,
-  radiusKm = CROSS_SOURCE_MERGE_RADIUS_KM,
 ): Incident | undefined {
   if (!isMergeableTrafficIncident(incoming)) return undefined;
 
@@ -116,6 +162,7 @@ export function findNearbyMergeableIncident(
     if (!isMergeableTrafficIncident(existing)) return false;
     // Type-aware: accident≠road_closed, accident≠breakdown, etc.
     if (!sameMergeCategory(existing, incoming)) return false;
+    const radiusKm = mergeProximityRadiusKm(existing, incoming);
     return (
       distanceKm(
         existing.coordinates.latitude,

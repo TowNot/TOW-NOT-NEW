@@ -231,6 +231,28 @@ function classify(rawType: string): {
   return null;
 }
 
+/** Generic incident/other rows whose text is closure/construction → road_hazard. */
+function mapGenericClosureToRoadHazard(keyword: string): {
+  type: string;
+  subtype: string | null;
+  title: string;
+  severity: IncidentSeverity;
+} {
+  const lower = keyword.toLowerCase();
+  const isConstruction = /construction|roadwork|road work|paving|maintenance/.test(lower);
+  return {
+    type: isConstruction ? "CONSTRUCTION" : "ROAD_CLOSED",
+    subtype: "GOOGLE_MAPS_CLOSURE",
+    title: isConstruction ? "Construction zone" : "Road closed",
+    severity: "medium",
+  };
+}
+
+function isGenericOpenWebNinjaType(rawType: string): boolean {
+  const key = rawType.toLowerCase().trim();
+  return key === "incident" || key === "other";
+}
+
 // ROLLBACK: remove EXCLUDED_KEYWORDS + findExcludedKeyword match below to disable filter.
 const EXCLUDED_KEYWORDS = [
   "construction",
@@ -423,13 +445,8 @@ function toIncident(
     return null;
   }
 
-  const mapped = classify(rawType);
-  const labels = formatLocationLabel(raw, city, lat, lng, mapped?.title ?? "");
-  const description =
-    asString(raw.description) || labels.description || asString(raw.snippet) || "";
-  const title = mapped?.title ?? asString(raw.title) ?? "";
-
-  if (!mapped) {
+  const mappedBase = classify(rawType);
+  if (!mappedBase) {
     logRawGoogleMapsItem({
       rawId,
       incidentId: "n/a",
@@ -437,8 +454,12 @@ function toIncident(
       lat,
       lng,
       zoom,
-      title,
-      desc: description,
+      title: asString(raw.title) ?? "",
+      desc:
+        asString(raw.description) ??
+        asString(raw.snippet) ??
+        asString(raw.details) ??
+        "",
     });
     logGoogleMapsNotificationGate(
       rawId || `${lat.toFixed(5)},${lng.toFixed(5)}`,
@@ -447,6 +468,24 @@ function toIncident(
     );
     return null;
   }
+
+  const preliminaryDescription =
+    asString(raw.description) ?? asString(raw.snippet) ?? asString(raw.details) ?? "";
+  const alertText = collectRawAlertText(raw, mappedBase.title, preliminaryDescription);
+  const closureKeyword = findExcludedKeyword(alertText);
+  let mapped = mappedBase;
+
+  // Generic incident/other + closure language → road_hazard (map only), not crash.
+  if (isGenericOpenWebNinjaType(rawType) && closureKeyword) {
+    mapped = mapGenericClosureToRoadHazard(closureKeyword);
+    logger.debug(
+      `[GoogleMaps] Reclassified generic ${rawType} as ${mapped.type} | keyword="${closureKeyword}"`,
+    );
+  }
+
+  const labels = formatLocationLabel(raw, city, lat, lng, mapped.title);
+  const resolvedDescription =
+    asString(raw.description) || labels.description || asString(raw.snippet) || "";
 
   const providerId = asString(raw.id) ?? asString(raw.alert_id);
   const normalizedRawType = rawType.toLowerCase().trim() || undefined;
@@ -465,22 +504,19 @@ function toIncident(
     lng,
     zoom,
     title: mapped.title,
-    desc: description,
+    desc: resolvedDescription,
   });
 
-  const excludedKeyword = findExcludedKeyword(
-    collectRawAlertText(raw, mapped.title, description),
-  );
-  if (excludedKeyword) {
+  if (closureKeyword && mappedBase === mapped) {
     if (shouldBypassConstructionKeywordFilter(rawType, mapped)) {
       logger.info(
-        `[Filter] Accident kept despite construction keywords in description | id=${incidentId} | keyword="${excludedKeyword}" | rawType=${normalizedRawType ?? rawType}`,
+        `[Filter] Accident kept despite construction keywords in description | id=${incidentId} | keyword="${closureKeyword}" | rawType=${normalizedRawType ?? rawType}`,
       );
     } else {
       logGoogleMapsNotificationGate(
         incidentId,
         "DROPPED (Keyword filter)",
-        `keyword="${excludedKeyword}" | rawType=${normalizedRawType ?? rawType}`,
+        `keyword="${closureKeyword}" | rawType=${normalizedRawType ?? rawType}`,
       );
       return null;
     }
@@ -494,7 +530,7 @@ function toIncident(
     type: mapped.type,
     subtype: mapped.subtype,
     title: mapped.title,
-    description,
+    description: resolvedDescription,
     coordinates: { latitude: lat, longitude: lng },
     locationLabel: labels.locationLabel,
     severity: mapped.severity,

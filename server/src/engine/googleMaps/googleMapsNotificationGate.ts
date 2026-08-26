@@ -1,8 +1,13 @@
 import type { Incident } from "../../types/incident";
 import type { IncidentStore } from "../../store/incidentStore";
 import { logger } from "../../logger";
-import { GOOGLE_MAPS_PUSH_DEDUP_RADIUS_KM } from "./openWebNinjaGoogleMapsScraper";
-import { mergeCategory, sameMergeCategory } from "../incidentMerge";
+import {
+  CONFIRMED_ACCIDENT_MERGE_RADIUS_KM,
+  GENERIC_ACCIDENT_MERGE_RADIUS_KM,
+  isConfirmedAccident,
+  mergeCategory,
+  sameMergeCategory,
+} from "../incidentMerge";
 import { isIncidentTooOldForPush } from "../pushDedup";
 import { distanceKm } from "../geo";
 
@@ -39,15 +44,30 @@ function isAccidentType(type: string): boolean {
   return type.toUpperCase().startsWith("ACCIDENT");
 }
 
-function nearbySameCategoryAccident(
+function pushBlockRadiusKm(incident: Incident, other: Incident): number {
+  if (isConfirmedAccident(incident) && isConfirmedAccident(other)) {
+    return CONFIRMED_ACCIDENT_MERGE_RADIUS_KM;
+  }
+  return GENERIC_ACCIDENT_MERGE_RADIUS_KM;
+}
+
+function nearbyBlockingAccident(
   incident: Incident,
   store: IncidentStore,
-  radiusKm: number,
 ): Incident | undefined {
   if (mergeCategory(incident) !== "accident") return undefined;
+
   return store.getActive().find((other) => {
     if (other.id === incident.id) return false;
     if (!sameMergeCategory(incident, other)) return false;
+
+    // Confirmed crashes only block on other confirmed crashes within 200 m.
+    // Generic incident / closure pins use the tighter ~75 m radius.
+    if (isConfirmedAccident(incident) && !isConfirmedAccident(other)) {
+      return false;
+    }
+
+    const radiusKm = pushBlockRadiusKm(incident, other);
     return (
       distanceKm(
         other.coordinates.latitude,
@@ -71,13 +91,10 @@ export function googleMapsNotificationBlockReason(
     return "SKIPPED PUSH (Too old)";
   }
 
-  const nearby = nearbySameCategoryAccident(
-    incident,
-    store,
-    GOOGLE_MAPS_PUSH_DEDUP_RADIUS_KM,
-  );
+  const nearby = nearbyBlockingAccident(incident, store);
   if (nearby) {
-    return `same-category cluster within 200m (${nearby.id}, rawType=${nearby.rawType ?? "unknown"})`;
+    const radiusM = Math.round(pushBlockRadiusKm(incident, nearby) * 1000);
+    return `same-category cluster within ${radiusM}m (${nearby.id}, rawType=${nearby.rawType ?? "unknown"})`;
   }
 
   return null;
