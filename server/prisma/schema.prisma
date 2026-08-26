@@ -1,0 +1,40 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SubscriptionStatus {
+  active
+  canceled
+  inactive
+}
+
+model Subscription {
+  email                String             @id
+  status               SubscriptionStatus   @default(inactive)
+  stripeCustomerId     String?              @unique @map("stripe_customer_id")
+  stripeSubscriptionId String?              @unique @map("stripe_subscription_id")
+  clientReferenceId    String?              @map("client_reference_id")
+  createdAt            DateTime             @default(now()) @map("created_at")
+  updatedAt            DateTime             @updatedAt @map("updated_at")
+
+  @@index([clientReferenceId])
+  @@index([status])
+  @@map("subscriptions")
+}
+
+model SmsSubscriber {
+  phone     String   @id
+  active    Boolean  @default(true)
+  zoneId    String?  @map("zone_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([active])
+  @@index([zoneId])
+  @@map("sms_subscribers")
+}

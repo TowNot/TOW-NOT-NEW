@@ -33,7 +33,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session): Promis
   const stripeSubscriptionId = subscriptionIdOf(session.subscription);
   const clientReferenceId = session.client_reference_id?.trim() || null;
 
-  const record = activateSubscription({
+  const record = await activateSubscription({
     email,
     stripeCustomerId,
     stripeSubscriptionId,
@@ -68,7 +68,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription): Pro
     }
   }
 
-  const record = revokeSubscription({
+  const record = await revokeSubscription({
     email,
     stripeCustomerId,
     stripeSubscriptionId: subscription.id,

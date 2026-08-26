@@ -110,6 +110,8 @@ export const config = {
   deepgramApiKey: process.env.DEEPGRAM_API_KEY ?? "",
   /** BullMQ / Redis — notification queue. Empty → local 127.0.0.1:6379. */
   redisUrl: process.env.REDIS_URL?.trim() || "",
+  /** PostgreSQL — subscriptions + SMS opt-ins (Prisma). */
+  databaseUrl: process.env.DATABASE_URL?.trim() || "",
   /**
    * Toronto Fire live CAD vehicle poller. Default OFF — London-only ops.
    * Set TORONTO_FIRE_CAD_ENABLED=1 when ready to tag GTA zones.

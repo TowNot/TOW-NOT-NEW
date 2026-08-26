@@ -20,6 +20,9 @@ import { RadioIngestionWorker } from "./engine/workers/radioIngestionWorker";
 import { logger } from "./logger";
 import { closeNotificationQueue } from "./queue/notificationQueue";
 import { closeSharedRedis } from "./queue/redisClient";
+import { warmSmsSubscriberCache } from "./sms/subscribers";
+import { warmSubscriptionCache } from "./store/subscriptionStore";
+import { connectPrisma, disconnectPrisma } from "./db/prisma";
 import { IncidentStore } from "./store/incidentStore";
 import {
   startNotificationWorker,
@@ -183,15 +186,25 @@ server.on("error", (error: unknown) => {
 // start only after listen — they must not block module eval or port bind.
 server.listen(config.port, config.host, () => {
   logger.info("AlertNav server listening", { port: config.port, host: config.host });
-  store.start();
-  engine.start();
-  try {
-    startNotificationWorker();
-  } catch (error) {
-    logger.error("Failed to start notification worker", {
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
+  void (async () => {
+    try {
+      await connectPrisma();
+      await Promise.all([warmSubscriptionCache(), warmSmsSubscriberCache()]);
+    } catch (error) {
+      logger.error("Database connection failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    store.start();
+    engine.start();
+    try {
+      startNotificationWorker();
+    } catch (error) {
+      logger.error("Failed to start notification worker", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  })();
 });
 
 function shutdown(signal: string): void {
@@ -202,6 +215,7 @@ function shutdown(signal: string): void {
     stopNotificationWorker(),
     closeNotificationQueue(),
     closeSharedRedis(),
+    disconnectPrisma(),
   ]).finally(() => {
     server.close(() => {
       process.exit(0);

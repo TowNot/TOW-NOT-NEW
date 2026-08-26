@@ -66,88 +66,92 @@ export function createSourcesRouter(store: IncidentStore): Router {
     });
   });
 
-  // Operational readiness snapshot: which credentials are present, which
-  // upstream feeds answered last, and how many incidents each has produced.
-  router.get("/status", (_req, res) => {
-    const active = store.getActive();
-    const providers = getProviderRuntimeStats();
-    const blocksinside = providers.blocksinside;
-    res.json({
-      checkedAt: new Date().toISOString(),
-      londonOnly: LONDON_ONLY_INGEST,
-      activeIngestZones: enabledCoverageZones().map((z) => z.id),
-      activeZone: LONDON_ONLY_INGEST ? LONDON_ZONE_ID : null,
-      pollCenter: {
-        lat: config.londonLat,
-        lng: config.londonLng,
-        radiusKm: config.pollRadiusKm,
-        intervalMs: config.pollIntervalMs,
-      },
-      wazeQuery: {
-        endpoint: "https://api.wazeapi.com/v1/alerts",
-        filter: '["ACCIDENT","POLICE"]',
-        limit: "",
-        tiles: 4,
-        tileDivisions: 2,
-        cities: enabledCoverageZones().map((zone) => zone.id),
-        "bottom-left": config.wazeBottomLeft,
-        "top-right": config.wazeTopRight,
-        country: config.wazeApiCountry,
-      },
-      lastTypeCounts: blocksinside.lastTypeCounts,
-      lastDroppedBy: blocksinside.lastDroppedBy,
-      lastReceived: blocksinside.lastReceived,
-      lastRetained: blocksinside.lastRetained,
-      credentials: {
-        wazeApi: Boolean(config.wazeApiKey),
-        apify: Boolean(config.apifyApiToken),
-        deepgram: Boolean(config.deepgramApiKey),
-        redis: Boolean(config.redisUrl) || Boolean(process.env.REDIS_HOST),
-        progressier: Boolean(config.progressierApiKey),
-        twilio: Boolean(config.twilioAccountSid && config.twilioAuthToken),
-        stripe: Boolean(config.stripeSecretKey && config.stripeWebhookSecret),
-        clerk: Boolean(config.clerkPublishableKey && config.clerkSecretKey),
-        openWebNinja: Boolean(config.openWebNinjaApiKey),
-      },
-      googleMapsOpenWebNinja: {
-        ...getOpenWebNinjaGoogleMapsRuntime(),
-        intervalMs: config.googleMapsPollIntervalMs,
-        zooms: GOOGLE_MAPS_ZOOM_LEVELS.join("-"),
-        tilesPerCity: "4 @ Z11–14; dynamic @ Z15",
-        requestsPerPoll: countGoogleMapsFetchJobs(
-          zoneToBoundingBox(enabledCoverageZones().find((z) => z.id === "london")!),
-        ),
-        fetchConcurrency: 8,
-        endpoint: "https://api.openwebninja.com/google-maps-traffic-alerts/traffic-alerts",
-      },
-      subscriptions: subscriptionStoreStats(),
-      liveWazeProvider: "blocksinside",
-      push: {
-        endpoint: config.progressierPushUrl,
-        appId: config.progressierAppId,
-        publicUrl: config.publicUrl,
-        recipients: { users: "all" },
-      },
-      fireDispatch: {
-        ...getFireDispatchRuntime(),
-        streamOverride: Boolean(config.radioHlsUrl),
-      },
-      torontoFireCad: {
-        enabled: config.torontoFireCadEnabled && !LONDON_ONLY_INGEST,
-        blockedByLondonOnly: LONDON_ONLY_INGEST,
-        envFlag: config.torontoFireCadEnabled,
-      },
-      zones: zonePublicSummaries(),
-      providers,
-      incidents: {
-        total: active.length,
-        notified: active.filter((incident) => incident.notified).length,
-        waze: bySource("waze").length,
-        googleMaps: bySource("google_maps").length,
-        fireDispatch: bySource("fire_dispatch").length,
-        ems: bySource("ems").length,
-      },
-    });
+  // Authenticated API surfaces
+  router.get("/status", async (_req, res, next) => {
+    try {
+      const active = store.getActive();
+      const providers = getProviderRuntimeStats();
+      const blocksinside = providers.blocksinside;
+      res.json({
+        checkedAt: new Date().toISOString(),
+        londonOnly: LONDON_ONLY_INGEST,
+        activeIngestZones: enabledCoverageZones().map((z) => z.id),
+        activeZone: LONDON_ONLY_INGEST ? LONDON_ZONE_ID : null,
+        pollCenter: {
+          lat: config.londonLat,
+          lng: config.londonLng,
+          radiusKm: config.pollRadiusKm,
+          intervalMs: config.pollIntervalMs,
+        },
+        wazeQuery: {
+          endpoint: "https://api.wazeapi.com/v1/alerts",
+          filter: '["ACCIDENT","POLICE"]',
+          limit: "",
+          tiles: 4,
+          tileDivisions: 2,
+          cities: enabledCoverageZones().map((zone) => zone.id),
+          "bottom-left": config.wazeBottomLeft,
+          "top-right": config.wazeTopRight,
+          country: config.wazeApiCountry,
+        },
+        lastTypeCounts: blocksinside.lastTypeCounts,
+        lastDroppedBy: blocksinside.lastDroppedBy,
+        lastReceived: blocksinside.lastReceived,
+        lastRetained: blocksinside.lastRetained,
+        credentials: {
+          wazeApi: Boolean(config.wazeApiKey),
+          apify: Boolean(config.apifyApiToken),
+          deepgram: Boolean(config.deepgramApiKey),
+          redis: Boolean(config.redisUrl) || Boolean(process.env.REDIS_HOST),
+          postgres: Boolean(config.databaseUrl),
+          progressier: Boolean(config.progressierApiKey),
+          twilio: Boolean(config.twilioAccountSid && config.twilioAuthToken),
+          stripe: Boolean(config.stripeSecretKey && config.stripeWebhookSecret),
+          clerk: Boolean(config.clerkPublishableKey && config.clerkSecretKey),
+          openWebNinja: Boolean(config.openWebNinjaApiKey),
+        },
+        googleMapsOpenWebNinja: {
+          ...getOpenWebNinjaGoogleMapsRuntime(),
+          intervalMs: config.googleMapsPollIntervalMs,
+          zooms: GOOGLE_MAPS_ZOOM_LEVELS.join("-"),
+          tilesPerCity: "4 @ Z11–14; dynamic @ Z15",
+          requestsPerPoll: countGoogleMapsFetchJobs(
+            zoneToBoundingBox(enabledCoverageZones().find((z) => z.id === "london")!),
+          ),
+          fetchConcurrency: 8,
+          endpoint: "https://api.openwebninja.com/google-maps-traffic-alerts/traffic-alerts",
+        },
+        subscriptions: await subscriptionStoreStats(),
+        liveWazeProvider: "blocksinside",
+        push: {
+          endpoint: config.progressierPushUrl,
+          appId: config.progressierAppId,
+          publicUrl: config.publicUrl,
+          recipients: { users: "all" },
+        },
+        fireDispatch: {
+          ...getFireDispatchRuntime(),
+          streamOverride: Boolean(config.radioHlsUrl),
+        },
+        torontoFireCad: {
+          enabled: config.torontoFireCadEnabled && !LONDON_ONLY_INGEST,
+          blockedByLondonOnly: LONDON_ONLY_INGEST,
+          envFlag: config.torontoFireCadEnabled,
+        },
+        zones: zonePublicSummaries(),
+        providers,
+        incidents: {
+          total: active.length,
+          notified: active.filter((incident) => incident.notified).length,
+          waze: bySource("waze").length,
+          googleMaps: bySource("google_maps").length,
+          fireDispatch: bySource("fire_dispatch").length,
+          ems: bySource("ems").length,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
   });
 
   return router;

@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import path from "node:path";
+import type { Subscription, SubscriptionStatus as PrismaSubscriptionStatus } from "@prisma/client";
+import { prisma } from "../db/prisma";
 import { logger } from "../logger";
 
 export type SubscriptionStatus = "active" | "canceled" | "inactive";
@@ -16,167 +16,105 @@ export interface SubscriptionRecord {
   createdAt: string;
 }
 
-interface SubscriptionStoreFile {
-  byEmail: Record<string, SubscriptionRecord>;
-}
-
-function resolveStorePath(): string {
-  const dir = path.join(process.cwd(), "data");
-  mkdirSync(dir, { recursive: true });
-  return path.join(dir, "subscriptions.json");
-}
-
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-function load(): SubscriptionStoreFile {
-  const file = resolveStorePath();
-  if (!existsSync(file)) return { byEmail: {} };
-  try {
-    const parsed = JSON.parse(readFileSync(file, "utf8")) as Partial<SubscriptionStoreFile>;
-    return { byEmail: parsed.byEmail && typeof parsed.byEmail === "object" ? parsed.byEmail : {} };
-  } catch (error) {
-    logger.warn("Subscription store unreadable — starting empty", {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return { byEmail: {} };
-  }
+function toRecord(row: Subscription): SubscriptionRecord {
+  return {
+    email: row.email,
+    status: row.status,
+    stripeCustomerId: row.stripeCustomerId,
+    stripeSubscriptionId: row.stripeSubscriptionId,
+    clientReferenceId: row.clientReferenceId,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
 }
 
-let store = load();
+/** Hot-path read cache — invalidated on every write. */
+const emailCache = new Map<string, SubscriptionRecord>();
 
-/**
- * Secondary indexes (email → already O(1) via `byEmail`).
- * Maps foreign keys → email so Stripe webhook lookups stay O(1) as we scale.
- */
-const byStripeCustomerId = new Map<string, string>();
-const byStripeSubscriptionId = new Map<string, string>();
-const byClientReferenceId = new Map<string, string>();
-
-function clearSecondaryIndexes(): void {
-  byStripeCustomerId.clear();
-  byStripeSubscriptionId.clear();
-  byClientReferenceId.clear();
+function cacheRecord(record: SubscriptionRecord): void {
+  emailCache.set(record.email, record);
 }
 
-function unindexRecord(row: SubscriptionRecord): void {
-  if (row.stripeCustomerId && byStripeCustomerId.get(row.stripeCustomerId) === row.email) {
-    byStripeCustomerId.delete(row.stripeCustomerId);
-  }
-  if (
-    row.stripeSubscriptionId &&
-    byStripeSubscriptionId.get(row.stripeSubscriptionId) === row.email
-  ) {
-    byStripeSubscriptionId.delete(row.stripeSubscriptionId);
-  }
-  if (
-    row.clientReferenceId &&
-    byClientReferenceId.get(row.clientReferenceId) === row.email
-  ) {
-    byClientReferenceId.delete(row.clientReferenceId);
-  }
+function invalidateEmail(email: string): void {
+  emailCache.delete(normalizeEmail(email));
 }
 
-function indexRecord(row: SubscriptionRecord): void {
-  if (row.stripeCustomerId) byStripeCustomerId.set(row.stripeCustomerId, row.email);
-  if (row.stripeSubscriptionId) {
-    byStripeSubscriptionId.set(row.stripeSubscriptionId, row.email);
-  }
-  if (row.clientReferenceId) byClientReferenceId.set(row.clientReferenceId, row.email);
-}
-
-function rebuildSecondaryIndexes(): void {
-  clearSecondaryIndexes();
-  for (const row of Object.values(store.byEmail)) {
-    indexRecord(row);
-  }
-}
-
-rebuildSecondaryIndexes();
-
-function persist(): void {
-  try {
-    writeFileSync(resolveStorePath(), JSON.stringify(store, null, 2));
-  } catch (error) {
-    logger.warn("Subscription store persist failed", {
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-}
-
-function putRecord(record: SubscriptionRecord, previous?: SubscriptionRecord | null): void {
-  if (previous) {
-    unindexRecord(previous);
-    if (previous.email !== record.email) {
-      delete store.byEmail[previous.email];
-    }
-  }
-  store.byEmail[record.email] = record;
-  indexRecord(record);
-  persist();
-}
-
-export function findSubscriptionByEmail(email: string): SubscriptionRecord | null {
+export async function findSubscriptionByEmail(email: string): Promise<SubscriptionRecord | null> {
   const key = normalizeEmail(email);
   if (!key) return null;
-  return store.byEmail[key] ?? null;
+  const cached = emailCache.get(key);
+  if (cached) return cached;
+  const row = await prisma.subscription.findUnique({ where: { email: key } });
+  if (!row) return null;
+  const record = toRecord(row);
+  cacheRecord(record);
+  return record;
 }
 
-export function findSubscriptionByCustomerId(customerId: string): SubscriptionRecord | null {
+export async function findSubscriptionByCustomerId(
+  customerId: string,
+): Promise<SubscriptionRecord | null> {
   const id = customerId.trim();
   if (!id) return null;
-  const email = byStripeCustomerId.get(id);
-  return email ? (store.byEmail[email] ?? null) : null;
+  const row = await prisma.subscription.findUnique({ where: { stripeCustomerId: id } });
+  return row ? toRecord(row) : null;
 }
 
-export function findSubscriptionBySubscriptionId(subscriptionId: string): SubscriptionRecord | null {
+export async function findSubscriptionBySubscriptionId(
+  subscriptionId: string,
+): Promise<SubscriptionRecord | null> {
   const id = subscriptionId.trim();
   if (!id) return null;
-  const email = byStripeSubscriptionId.get(id);
-  return email ? (store.byEmail[email] ?? null) : null;
+  const row = await prisma.subscription.findUnique({ where: { stripeSubscriptionId: id } });
+  return row ? toRecord(row) : null;
 }
 
-export function findSubscriptionByClientReferenceId(
+export async function findSubscriptionByClientReferenceId(
   clientReferenceId: string,
-): SubscriptionRecord | null {
+): Promise<SubscriptionRecord | null> {
   const id = clientReferenceId.trim();
   if (!id) return null;
-  const email = byClientReferenceId.get(id);
-  return email ? (store.byEmail[email] ?? null) : null;
+  const row = await prisma.subscription.findFirst({ where: { clientReferenceId: id } });
+  return row ? toRecord(row) : null;
 }
 
-export function isSubscriptionActive(email: string): boolean {
-  return findSubscriptionByEmail(email)?.status === "active";
+export async function isSubscriptionActive(email: string): Promise<boolean> {
+  return (await findSubscriptionByEmail(email))?.status === "active";
 }
 
-export function listSubscriptions(): SubscriptionRecord[] {
-  return Object.values(store.byEmail).sort((a, b) => a.email.localeCompare(b.email));
+export async function listSubscriptions(): Promise<SubscriptionRecord[]> {
+  const rows = await prisma.subscription.findMany({ orderBy: { email: "asc" } });
+  return rows.map(toRecord);
 }
 
 /**
  * Activate (or create) a subscriber after checkout.session.completed.
  * Match order: email (required for Payment Links) → existing customer id row.
  */
-export function activateSubscription(input: {
+export async function activateSubscription(input: {
   email?: string | null;
   stripeCustomerId?: string | null;
   stripeSubscriptionId?: string | null;
   clientReferenceId?: string | null;
-}): SubscriptionRecord {
+}): Promise<SubscriptionRecord> {
   const emailRaw = input.email?.trim() ?? "";
   const email = emailRaw ? normalizeEmail(emailRaw) : "";
   const customerId = input.stripeCustomerId?.trim() || null;
   const subscriptionId = input.stripeSubscriptionId?.trim() || null;
   const clientReferenceId = input.clientReferenceId?.trim() || null;
-  const now = new Date().toISOString();
 
   let existing: SubscriptionRecord | null = null;
-  if (email) existing = findSubscriptionByEmail(email);
-  if (!existing && customerId) existing = findSubscriptionByCustomerId(customerId);
-  if (!existing && subscriptionId) existing = findSubscriptionBySubscriptionId(subscriptionId);
+  if (email) existing = await findSubscriptionByEmail(email);
+  if (!existing && customerId) existing = await findSubscriptionByCustomerId(customerId);
+  if (!existing && subscriptionId) {
+    existing = await findSubscriptionBySubscriptionId(subscriptionId);
+  }
   if (!existing && clientReferenceId) {
-    existing = findSubscriptionByClientReferenceId(clientReferenceId);
+    existing = await findSubscriptionByClientReferenceId(clientReferenceId);
   }
 
   if (!email && !existing) {
@@ -186,17 +124,30 @@ export function activateSubscription(input: {
   }
 
   const key = email || existing!.email;
-  const record: SubscriptionRecord = {
-    email: key,
-    status: "active",
-    stripeCustomerId: customerId ?? existing?.stripeCustomerId ?? null,
-    stripeSubscriptionId: subscriptionId ?? existing?.stripeSubscriptionId ?? null,
-    clientReferenceId: clientReferenceId ?? existing?.clientReferenceId ?? null,
-    createdAt: existing?.createdAt ?? now,
-    updatedAt: now,
-  };
+  if (existing && existing.email !== key) {
+    invalidateEmail(existing.email);
+    await prisma.subscription.delete({ where: { email: existing.email } }).catch(() => undefined);
+  }
 
-  putRecord(record, existing);
+  const row = await prisma.subscription.upsert({
+    where: { email: key },
+    create: {
+      email: key,
+      status: "active" satisfies PrismaSubscriptionStatus,
+      stripeCustomerId: customerId,
+      stripeSubscriptionId: subscriptionId,
+      clientReferenceId,
+    },
+    update: {
+      status: "active",
+      stripeCustomerId: customerId ?? undefined,
+      stripeSubscriptionId: subscriptionId ?? undefined,
+      clientReferenceId: clientReferenceId ?? undefined,
+    },
+  });
+
+  const record = toRecord(row);
+  cacheRecord(record);
   return record;
 }
 
@@ -204,37 +155,54 @@ export function activateSubscription(input: {
  * Downgrade on customer.subscription.deleted (or equivalent revoke).
  * Resolves by subscription id, then customer id, then email.
  */
-export function revokeSubscription(input: {
+export async function revokeSubscription(input: {
   email?: string | null;
   stripeCustomerId?: string | null;
   stripeSubscriptionId?: string | null;
-}): SubscriptionRecord | null {
+}): Promise<SubscriptionRecord | null> {
   const email = input.email?.trim() ? normalizeEmail(input.email) : "";
   const customerId = input.stripeCustomerId?.trim() || null;
   const subscriptionId = input.stripeSubscriptionId?.trim() || null;
 
   let existing: SubscriptionRecord | null = null;
-  if (subscriptionId) existing = findSubscriptionBySubscriptionId(subscriptionId);
-  if (!existing && customerId) existing = findSubscriptionByCustomerId(customerId);
-  if (!existing && email) existing = findSubscriptionByEmail(email);
+  if (subscriptionId) existing = await findSubscriptionBySubscriptionId(subscriptionId);
+  if (!existing && customerId) existing = await findSubscriptionByCustomerId(customerId);
+  if (!existing && email) existing = await findSubscriptionByEmail(email);
   if (!existing) return null;
 
-  const now = new Date().toISOString();
-  const record: SubscriptionRecord = {
-    ...existing,
-    status: "canceled",
-    stripeSubscriptionId: subscriptionId ?? existing.stripeSubscriptionId,
-    stripeCustomerId: customerId ?? existing.stripeCustomerId,
-    updatedAt: now,
-  };
-  putRecord(record, existing);
+  const row = await prisma.subscription.update({
+    where: { email: existing.email },
+    data: {
+      status: "canceled",
+      stripeSubscriptionId: subscriptionId ?? existing.stripeSubscriptionId ?? undefined,
+      stripeCustomerId: customerId ?? existing.stripeCustomerId ?? undefined,
+    },
+  });
+
+  const record = toRecord(row);
+  cacheRecord(record);
   return record;
 }
 
-export function subscriptionStoreStats(): { total: number; active: number } {
-  const rows = Object.values(store.byEmail);
-  return {
-    total: rows.length,
-    active: rows.filter((row) => row.status === "active").length,
-  };
+export async function subscriptionStoreStats(): Promise<{ total: number; active: number }> {
+  const [total, active] = await Promise.all([
+    prisma.subscription.count(),
+    prisma.subscription.count({ where: { status: "active" } }),
+  ]);
+  return { total, active };
+}
+
+/** Warm subscription email cache at startup (optional). */
+export async function warmSubscriptionCache(): Promise<void> {
+  try {
+    const rows = await prisma.subscription.findMany();
+    for (const row of rows) {
+      cacheRecord(toRecord(row));
+    }
+    logger.info("Subscription cache warmed", { count: rows.length });
+  } catch (error) {
+    logger.warn("Subscription cache warm skipped", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }

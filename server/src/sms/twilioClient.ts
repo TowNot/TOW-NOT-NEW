@@ -65,7 +65,7 @@ export async function dispatchSmsBody(
   incidentId?: string,
 ): Promise<void> {
   if (!isTwilioConfigured()) return;
-  const recipients = listSmsSubscribers();
+  const recipients = await listSmsSubscribers();
   if (recipients.length === 0) return;
 
   const results = await Promise.allSettled(recipients.map((to) => sendOne(to, body)));

@@ -9,17 +9,22 @@ import {
 export function createSmsRouter(): Router {
   const router = Router();
 
-  router.get("/status", (_req, res) => {
-    res.json({
-      configured: isTwilioConfigured(),
-      subscribers: smsSubscriberCount(),
-    });
+  router.get("/status", async (_req, res, next) => {
+    try {
+      res.json({
+        configured: isTwilioConfigured(),
+        subscribers: await smsSubscriberCount(),
+      });
+    } catch (error) {
+      next(error);
+    }
   });
 
-  router.post("/opt-in", (req, res) => {
+  router.post("/opt-in", async (req, res) => {
     const phone = typeof req.body?.phone === "string" ? req.body.phone : "";
+    const zoneId = typeof req.body?.zoneId === "string" ? req.body.zoneId : undefined;
     try {
-      const result = addSmsSubscriber(phone);
+      const result = await addSmsSubscriber(phone, zoneId);
       res.status(result.created ? 201 : 200).json({
         ok: true,
         phone: result.phone,
@@ -32,10 +37,10 @@ export function createSmsRouter(): Router {
     }
   });
 
-  router.delete("/opt-in", (req, res) => {
+  router.delete("/opt-in", async (req, res) => {
     const phone = typeof req.body?.phone === "string" ? req.body.phone : "";
     try {
-      const result = removeSmsSubscriber(phone);
+      const result = await removeSmsSubscriber(phone);
       res.json({ ok: true, phone: result.phone, removed: result.removed });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to remove phone number";
