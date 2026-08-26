@@ -8,6 +8,7 @@ import {
 } from "../dispatchLocation";
 import {
   classifyPriority,
+  findConfiguredKeywordTriggers,
   findCrashKeywords,
   findEmsKeywords,
   findNegativeKeywords,
@@ -35,6 +36,10 @@ export interface FireDispatchContext {
   zoneId: string;
   sourceType: FireAudioSourceType;
   label: string;
+  /** When set, prefer this agency path (dedicated EMS vs Fire stream). */
+  agency?: "fire" | "ems";
+  /** Extra STT gate phrases for this feed (in addition to global lists). */
+  keywordTriggers?: string[];
 }
 
 const SILENCE_RMS_DBFS = -50;
@@ -227,12 +232,25 @@ export class FireDispatchProcessor {
     }
 
     // Fire crash path first (unchanged). EMS only when no crash hit and the
-    // zone's stream includes EMS (CYKF Waterloo Region).
-    const crashKeywords = findCrashKeywords(transcript);
+    // zone's stream includes EMS (CYKF Waterloo Region) — or this listener is
+    // a dedicated EMS feed.
+    const triggerHits = findConfiguredKeywordTriggers(
+      transcript,
+      this.ctx.keywordTriggers,
+    );
+    const crashKeywords = [
+      ...findCrashKeywords(transcript),
+      ...(this.ctx.agency === "ems" ? [] : triggerHits),
+    ].filter((label, index, all) => all.indexOf(label) === index);
     const zone = getCoverageZone(this.ctx.zoneId);
+    const allowEms =
+      this.ctx.agency === "ems" || (this.ctx.agency !== "fire" && Boolean(zone?.hasEmsFeed));
     const emsKeywords =
-      crashKeywords.length === 0 && zone?.hasEmsFeed
-        ? findEmsKeywords(transcript)
+      crashKeywords.length === 0 && allowEms
+        ? [
+            ...findEmsKeywords(transcript),
+            ...(this.ctx.agency === "ems" ? triggerHits : []),
+          ].filter((label, index, all) => all.indexOf(label) === index)
         : [];
 
     if (crashKeywords.length === 0 && emsKeywords.length === 0) {
@@ -250,7 +268,12 @@ export class FireDispatchProcessor {
       return;
     }
 
-    const agency: "fire" | "ems" = crashKeywords.length > 0 ? "fire" : "ems";
+    const agency: "fire" | "ems" =
+      this.ctx.agency === "ems" && crashKeywords.length === 0
+        ? "ems"
+        : crashKeywords.length > 0
+          ? "fire"
+          : "ems";
     const keywords = agency === "fire" ? crashKeywords : emsKeywords;
     const priority =
       agency === "fire" ? classifyPriority(transcript) : "high";

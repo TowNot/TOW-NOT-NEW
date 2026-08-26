@@ -105,6 +105,8 @@ export interface IcecastFireListenerOptions {
   zoneId: string;
   url: string;
   description: string;
+  agency?: "fire" | "ems";
+  keywordTriggers?: string[];
 }
 
 /**
@@ -112,7 +114,7 @@ export interface IcecastFireListenerOptions {
  * Never throws out of the loop — dropouts reconnect with exponential backoff.
  */
 export function startIcecastFireListener(opts: IcecastFireListenerOptions): () => void {
-  const { zoneId, url, description } = opts;
+  const { zoneId, url, description, agency, keywordTriggers } = opts;
   const label = `${description}`;
 
   if (!config.deepgramApiKey) {
@@ -126,6 +128,8 @@ export function startIcecastFireListener(opts: IcecastFireListenerOptions): () =
     zoneId,
     sourceType: "stream",
     label,
+    agency,
+    keywordTriggers,
   });
 
   let stopped = false;

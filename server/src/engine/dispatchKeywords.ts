@@ -41,6 +41,23 @@ function keywordBoundaryRe(keyword: string): RegExp {
   return new RegExp(`\\b${escaped}s?\\b`, "i");
 }
 
+/** Match configured feed-specific phrases (e.g. Waterloo Region triggers). */
+export function findConfiguredKeywordTriggers(
+  transcript: string,
+  triggers: string[] | undefined,
+): string[] {
+  if (!triggers?.length) return [];
+  const hits: string[] = [];
+  for (const keyword of triggers) {
+    const label = keyword.trim();
+    if (!label) continue;
+    if (keywordBoundaryRe(label).test(transcript) && !hits.includes(label)) {
+      hits.push(label);
+    }
+  }
+  return hits;
+}
+
 export function findNegativeKeywords(transcript: string): string[] {
   const hits: string[] = [];
   for (const keyword of negativeKeywords) {
@@ -208,6 +225,10 @@ export function classifyPriority(transcript: string): DispatchPriority {
  * these same phrases so they never post as fire_dispatch.
  */
 const EMS_PATTERNS: { label: string; re: RegExp }[] = [
+  { label: "Code 4", re: /\bcode\s*(?:4|four)\b/i },
+  { label: "Code 3", re: /\bcode\s*(?:3|three)\b/i },
+  { label: "MVC", re: /\bM\.?\s?V\.?\s?C\.?\b/i },
+  { label: "collision", re: /\bcollisions?\b/i },
   { label: "ambulance", re: /\bambulances?\b/i },
   { label: "EMS", re: /\bEMS\b/ },
   { label: "paramedic", re: /\bparamedics?\b/i },

@@ -17,6 +17,10 @@ export interface ZoneStreamAudio {
   type: "stream";
   url: string;
   description: string;
+  /** Optional agency hint when a zone stream is dedicated (fire vs ems). */
+  agency?: "fire" | "ems";
+  /** Optional extra STT gate phrases for this stream. */
+  keywordTriggers?: string[];
 }
 
 export type ZoneAudio = ZoneHlsAudio | ZoneStreamAudio;
@@ -146,11 +150,15 @@ const ZONE_SEEDS: ZoneSeed[] = [
     name: "Kitchener",
     center: { lat: 43.4587, lng: -80.5129 },
     enabled: false,
+    // Regional Fire/EMS Icecast mounts live in waterlooRegionRadio.ts (disabled).
+    // Keep a disabled stream stub so the desk can show Fire/EMS agencies later.
     audio: {
-      enabled: true,
+      enabled: false,
       type: "stream",
-      url: "http://cykf.net:8000/scanner",
-      description: "Waterloo Region (CYKF)",
+      url: "https://cast5.asurahosting.com/proxy/fire12/stream?type=.mp3",
+      description: "Waterloo Region Fire Dispatch (CYKF)",
+      agency: "fire",
+      keywordTriggers: ["MVC", "motor vehicle collision", "extrication", "pump"],
     },
     hasEmsFeed: true,
     scannedAgencies: ["Fire", "EMS"],
@@ -161,10 +169,12 @@ const ZONE_SEEDS: ZoneSeed[] = [
     center: { lat: 43.4643, lng: -80.5204 },
     enabled: false,
     audio: {
-      enabled: true,
+      enabled: false,
       type: "stream",
-      url: "http://cykf.net:8000/scanner",
-      description: "Waterloo Region (CYKF)",
+      url: "https://cast5.asurahosting.com/proxy/fire12/stream?type=.mp3",
+      description: "Waterloo Region Fire Dispatch (CYKF)",
+      agency: "fire",
+      keywordTriggers: ["MVC", "motor vehicle collision", "extrication", "pump"],
     },
     hasEmsFeed: true,
     scannedAgencies: ["Fire", "EMS"],
@@ -175,10 +185,12 @@ const ZONE_SEEDS: ZoneSeed[] = [
     center: { lat: 43.3972, lng: -80.3114 },
     enabled: false,
     audio: {
-      enabled: true,
+      enabled: false,
       type: "stream",
-      url: "http://cykf.net:8000/scanner",
-      description: "Waterloo Region (CYKF)",
+      url: "https://cast5.asurahosting.com/proxy/fire12/stream?type=.mp3",
+      description: "Waterloo Region Fire Dispatch (CYKF)",
+      agency: "fire",
+      keywordTriggers: ["MVC", "motor vehicle collision", "extrication", "pump"],
     },
     hasEmsFeed: true,
     scannedAgencies: ["Fire", "EMS"],
