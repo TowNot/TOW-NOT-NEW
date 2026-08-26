@@ -1,6 +1,7 @@
 import { prisma } from "../db/prisma";
 import { logger } from "../logger";
 import { toE164 } from "./e164";
+import { invalidateActiveMonitoredCitiesCache } from "../engine/activeMonitoredCities";
 
 const MAX_SUBSCRIBERS = 50;
 
@@ -44,7 +45,7 @@ export async function smsSubscriberCount(): Promise<number> {
 
 export async function addSmsSubscriber(
   raw: string,
-  zoneId?: string | null,
+  selectedCity?: string | null,
 ): Promise<{ phone: string; created: boolean }> {
   const phone = toE164(raw);
   if (!phone) {
@@ -61,20 +62,23 @@ export async function addSmsSubscriber(
     throw new Error("SMS opt-in list is full");
   }
 
+  const city = selectedCity?.trim().toLowerCase() || "london";
+
   await prisma.smsSubscriber.upsert({
     where: { phone },
     create: {
       phone,
       active: true,
-      zoneId: zoneId?.trim() || null,
+      selectedCity: city,
     },
     update: {
       active: true,
-      ...(zoneId?.trim() ? { zoneId: zoneId.trim() } : {}),
+      ...(selectedCity?.trim() ? { selectedCity: city } : {}),
     },
   });
 
   invalidateSmsCache();
+  invalidateActiveMonitoredCitiesCache();
   return { phone, created: !existing?.active };
 }
 
@@ -97,5 +101,6 @@ export async function removeSmsSubscriber(
   });
 
   invalidateSmsCache();
+  invalidateActiveMonitoredCitiesCache();
   return { phone, removed: true };
 }

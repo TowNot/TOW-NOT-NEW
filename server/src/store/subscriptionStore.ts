@@ -1,5 +1,6 @@
 import type { Subscription, SubscriptionStatus as PrismaSubscriptionStatus } from "@prisma/client";
 import { prisma } from "../db/prisma";
+import { invalidateActiveMonitoredCitiesCache } from "../engine/activeMonitoredCities";
 import { logger } from "../logger";
 
 export type SubscriptionStatus = "active" | "canceled" | "inactive";
@@ -148,6 +149,7 @@ export async function activateSubscription(input: {
 
   const record = toRecord(row);
   cacheRecord(record);
+  invalidateActiveMonitoredCitiesCache();
   return record;
 }
 
@@ -181,6 +183,7 @@ export async function revokeSubscription(input: {
 
   const record = toRecord(row);
   cacheRecord(record);
+  invalidateActiveMonitoredCitiesCache();
   return record;
 }
 

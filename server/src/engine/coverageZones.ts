@@ -1,4 +1,5 @@
 import type { BoundingBox } from "./geo";
+import { getActiveMonitoredCities, normalizeCityId } from "./activeMonitoredCities";
 import { isIngestZoneAllowed } from "./londonOnly";
 import {
   COVERAGE_ZONES,
@@ -55,4 +56,15 @@ export function zonePushTag(zoneId: string): string {
 /** Progressier tag for devices that opted into Waze police alerts in a city. */
 export function zonePolicePushTag(zoneId: string): string {
   return `zone-${zoneId}-waze-police`;
+}
+
+/** Coverage zones that are both ingest-enabled and selected by active users. */
+export async function getMonitoredCoverageZones(): Promise<CoverageZoneDef[]> {
+  const active = new Set(await getActiveMonitoredCities());
+  return enabledCoverageZones().filter((zone) => active.has(zone.id));
+}
+
+/** Validate a client-provided city id against the full catalog. */
+export function isKnownCityId(cityId: string): boolean {
+  return normalizeCityId(cityId) !== null;
 }

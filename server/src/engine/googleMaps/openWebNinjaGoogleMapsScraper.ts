@@ -2,6 +2,7 @@ import { config } from "../../config";
 import { boundingBox, distanceKm, splitBoundingBox, type BoundingBox } from "../geo";
 import {
   enabledCoverageZones,
+  getMonitoredCoverageZones,
   zoneCenter,
   zoneToBoundingBox,
 } from "../coverageZones";
@@ -80,20 +81,32 @@ export interface GoogleMapsCity {
 /** OpenWebNinja Google Maps is London-only, even if other zones are enabled. */
 const GOOGLE_MAPS_ZONE_IDS = new Set(["london"]);
 
+function coverageZoneToGoogleMapsCity(
+  zone: ReturnType<typeof enabledCoverageZones>[number],
+): GoogleMapsCity {
+  const box = zoneToBoundingBox(zone);
+  const center = zoneCenter(zone);
+  return {
+    id: zone.id,
+    name: `${zone.name}, ON`,
+    lat: center.lat,
+    lng: center.lng,
+    radiusKm: config.pollRadiusKm,
+    box,
+  };
+}
+
 export const GOOGLE_MAPS_CITIES: GoogleMapsCity[] = enabledCoverageZones()
   .filter((zone) => GOOGLE_MAPS_ZONE_IDS.has(zone.id))
-  .map((zone) => {
-    const box = zoneToBoundingBox(zone);
-    const center = zoneCenter(zone);
-    return {
-      id: zone.id,
-      name: `${zone.name}, ON`,
-      lat: center.lat,
-      lng: center.lng,
-      radiusKm: config.pollRadiusKm,
-      box,
-    };
-  });
+  .map(coverageZoneToGoogleMapsCity);
+
+/** Cities selected by active users that OpenWebNinja supports. */
+export async function getMonitoredGoogleMapsCities(): Promise<GoogleMapsCity[]> {
+  const zones = await getMonitoredCoverageZones();
+  return zones
+    .filter((zone) => GOOGLE_MAPS_ZONE_IDS.has(zone.id))
+    .map(coverageZoneToGoogleMapsCity);
+}
 
 export interface OpenWebNinjaGoogleMapsRuntime {
   lastFetchAt: string | null;

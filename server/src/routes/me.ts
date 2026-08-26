@@ -1,7 +1,8 @@
 import { clerkClient, getAuth } from "@clerk/express";
 import { Router } from "express";
-import { enabledCoverageZones } from "../engine/coverageZones";
+import { enabledCoverageZones, isKnownCityId } from "../engine/coverageZones";
 import { logger } from "../logger";
+import { upsertUserSelectedCity } from "../store/userPreferenceStore";
 
 /** Only zones that are ingest-enabled (London-only today). */
 const ENABLED_ZONE_IDS = new Set(enabledCoverageZones().map((zone) => zone.id));
@@ -25,6 +26,10 @@ export function createMeRouter(): Router {
           allowed: [...ENABLED_ZONE_IDS],
         });
         return;
+      }
+
+      if (isKnownCityId(selectedZoneId)) {
+        await upsertUserSelectedCity(auth.userId, selectedZoneId);
       }
 
       const existing = await clerkClient.users.getUser(auth.userId);

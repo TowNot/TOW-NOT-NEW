@@ -1,5 +1,6 @@
 import { logger } from "../../logger";
 import { IncidentStore } from "../../store/incidentStore";
+import { getActiveMonitoredCities } from "../activeMonitoredCities";
 import { isIngestZoneAllowed } from "../londonOnly";
 import { WATERLOO_REGION_RADIO_FEEDS } from "../waterlooRegionRadio";
 import { COVERAGE_ZONES } from "../zones.config";
@@ -19,7 +20,10 @@ function streamKey(audio: { type: string; feedId?: number | null; url?: string }
   return `${audio.type}:unknown`;
 }
 
-export function startRadioOrchestrator(store: IncidentStore): void {
+export function startRadioOrchestrator(
+  store: IncidentStore,
+  allowedZoneIds?: ReadonlySet<string>,
+): void {
   attachFireDispatchStore(store);
 
   const startedStreams = new Set<string>();
@@ -27,8 +31,10 @@ export function startRadioOrchestrator(store: IncidentStore): void {
   const skippedInactive: string[] = [];
 
   for (const zone of COVERAGE_ZONES) {
-    // zone.enabled + audio.enabled; London-only lock also applied via enabledCoverageZones
-    // for Waze/GMaps — radio uses the same enabled flags here.
+    if (allowedZoneIds && !allowedZoneIds.has(zone.id)) {
+      skippedInactive.push(`${zone.id}(not-monitored)`);
+      continue;
+    }
     if (!zone.enabled || !zone.audio?.enabled) {
       if (zone.audio?.type === "stream" && zone.audio.url) {
         skippedInactive.push(`${zone.id}:stream(disabled)`);
@@ -84,8 +90,11 @@ export function startRadioOrchestrator(store: IncidentStore): void {
     }
   }
 
-  // Dedicated Waterloo Region Fire + EMS mounts (kept off during London-only).
   for (const feed of WATERLOO_REGION_RADIO_FEEDS) {
+    if (allowedZoneIds && !allowedZoneIds.has(feed.zoneId)) {
+      skippedInactive.push(`${feed.id}(not-monitored)`);
+      continue;
+    }
     if (!feed.enabled) {
       skippedInactive.push(`${feed.id}(disabled)`);
       continue;
@@ -123,10 +132,20 @@ export function startRadioOrchestrator(store: IncidentStore): void {
   logger.info("[fire-dispatch] radio orchestrator started", {
     sources: active,
     skippedInactive,
+    monitoredOnly: Boolean(allowedZoneIds),
+    monitoredCities: allowedZoneIds ? [...allowedZoneIds].sort() : undefined,
   });
 }
 
 export function stopRadioOrchestrator(): void {
   for (const stop of stopFns) stop();
   stopFns.length = 0;
+}
+
+export async function reconcileRadioOrchestrator(
+  store: IncidentStore,
+): Promise<void> {
+  const cities = await getActiveMonitoredCities();
+  stopRadioOrchestrator();
+  startRadioOrchestrator(store, new Set(cities));
 }

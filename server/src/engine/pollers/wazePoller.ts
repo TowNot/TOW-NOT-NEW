@@ -3,7 +3,7 @@ import { claimIncidentIngest } from "../incidentIngestDedup";
 import { logger } from "../../logger";
 import { IncidentStore } from "../../store/incidentStore";
 import type { Incident, IncidentSeverity, IncidentSource } from "../../types/incident";
-import { enabledCoverageZones, type CoverageZoneDef } from "../coverageZones";
+import { getMonitoredCoverageZones } from "../coverageZones";
 import {
   findNearbyMergeableIncident,
   isMergeableTrafficIncident,
@@ -20,10 +20,10 @@ import {
   type WazeAlert,
 } from "../wazeAggregator";
 import {
-  startStaggeredZoneSchedulers,
+  startMonitoredZoneScheduler,
   ZONE_SCHEDULER_STAGGER_MS,
   type ZoneSchedulerHandle,
-} from "./staggeredZoneScheduler";
+} from "./monitoredZoneScheduler";
 
 export type { WazeAlert };
 
@@ -97,29 +97,25 @@ export class WazeTrafficPoller {
 
   start(): void {
     if (this.scheduler) return;
-    const enabled = enabledCoverageZones();
     logger.info("Live traffic aggregator started", {
       intervalMs: config.pollIntervalMs,
       staggerMs: ZONE_SCHEDULER_STAGGER_MS,
       independentZoneTimers: true,
+      userMonitoredCities: true,
       providers: LIVE_WAZE_PROVIDERS.filter((p) => p === "blocksinside" && config.wazeApiKey),
       wazeApiConfigured: Boolean(config.wazeApiKey),
       filter: '["ACCIDENT","POLICE"]',
       country: config.wazeApiCountry,
       tiles: 4,
-      cities: enabled.map((zone) => zone.id),
     });
     if (!config.wazeApiKey) {
       logger.warn("Skipping live traffic poll; WAZEAPI_KEY is unset");
       return;
     }
-    const zones: Array<{ id: string; name: string }> =
-      enabled.length > 0 ? enabled : [{ id: "london", name: "London" } as CoverageZoneDef];
-    this.scheduler = startStaggeredZoneSchedulers({
+    this.scheduler = startMonitoredZoneScheduler({
       label: "Waze",
-      zones,
       intervalMs: config.pollIntervalMs,
-      zoneId: (zone) => zone.id,
+      resolveZones: getMonitoredCoverageZones,
       run: async (zone) => {
         await this.pollZone(zone);
       },

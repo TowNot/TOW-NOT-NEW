@@ -14,27 +14,41 @@ enum SubscriptionStatus {
 }
 
 model Subscription {
-  email                String             @id
+  email                String               @id
   status               SubscriptionStatus   @default(inactive)
   stripeCustomerId     String?              @unique @map("stripe_customer_id")
   stripeSubscriptionId String?              @unique @map("stripe_subscription_id")
   clientReferenceId    String?              @map("client_reference_id")
+  selectedCity         String               @default("london") @map("selected_city")
   createdAt            DateTime             @default(now()) @map("created_at")
   updatedAt            DateTime             @updatedAt @map("updated_at")
 
   @@index([clientReferenceId])
   @@index([status])
+  @@index([selectedCity])
   @@map("subscriptions")
 }
 
+model UserPreference {
+  clerkUserId           String   @id @map("clerk_user_id")
+  selectedCity          String   @default("london") @map("selected_city")
+  notificationsEnabled  Boolean  @default(true) @map("notifications_enabled")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@index([selectedCity])
+  @@index([notificationsEnabled])
+  @@map("user_preferences")
+}
+
 model SmsSubscriber {
-  phone     String   @id
-  active    Boolean  @default(true)
-  zoneId    String?  @map("zone_id")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  phone        String   @id
+  active       Boolean  @default(true)
+  selectedCity String   @default("london") @map("zone_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@index([active])
-  @@index([zoneId])
+  @@index([selectedCity])
   @@map("sms_subscribers")
 }

@@ -9,9 +9,8 @@ import {
   withSourceDetections,
 } from "../incidentMerge";
 import {
-  countGoogleMapsFetchJobs,
   fetchOpenWebNinjaGoogleMapsForCity,
-  GOOGLE_MAPS_CITIES,
+  getMonitoredGoogleMapsCities,
   GOOGLE_MAPS_ZOOM_LEVELS,
   type GoogleMapsCity,
 } from "../googleMaps/openWebNinjaGoogleMapsScraper";
@@ -21,10 +20,10 @@ import {
 } from "../googleMaps/clusterUpgrade";
 import { logGoogleMapsNotificationGate } from "../googleMaps/googleMapsNotificationGate";
 import {
-  startStaggeredZoneSchedulers,
+  startMonitoredZoneScheduler,
   ZONE_SCHEDULER_STAGGER_MS,
   type ZoneSchedulerHandle,
-} from "./staggeredZoneScheduler";
+} from "./monitoredZoneScheduler";
 
 /** Extreme field-test cadence (15s). Waze uses config.pollIntervalMs (10s). */
 const GOOGLE_MAPS_POLL_INTERVAL_MS = 15_000;
@@ -55,21 +54,16 @@ export class GoogleMapsTrafficPoller {
       intervalMs: GOOGLE_MAPS_POLL_INTERVAL_MS,
       staggerMs: ZONE_SCHEDULER_STAGGER_MS,
       independentZoneTimers: true,
+      userMonitoredCities: true,
       zooms: GOOGLE_MAPS_ZOOM_LEVELS.join("-"),
       tilesPerCity: "4 @ Z11–14; dynamic @ Z15",
-      requestsPerPoll: GOOGLE_MAPS_CITIES.reduce(
-        (total, city) => total + countGoogleMapsFetchJobs(city.box!),
-        0,
-      ),
       fetchConcurrency: 8,
-      cities: GOOGLE_MAPS_CITIES.map((c) => c.id),
       endpoint: "https://api.openwebninja.com/google-maps-traffic-alerts/traffic-alerts",
     });
-    this.scheduler = startStaggeredZoneSchedulers({
+    this.scheduler = startMonitoredZoneScheduler({
       label: "OpenWebNinja Google Maps",
-      zones: GOOGLE_MAPS_CITIES,
       intervalMs: GOOGLE_MAPS_POLL_INTERVAL_MS,
-      zoneId: (city) => city.id,
+      resolveZones: getMonitoredGoogleMapsCities,
       run: async (city) => {
         await this.pollCity(city);
       },
