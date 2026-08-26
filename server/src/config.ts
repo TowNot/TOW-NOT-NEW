@@ -108,9 +108,6 @@ export const config = {
   wazeTopRight: process.env.WAZE_TOP_RIGHT?.trim() || "43.0749, -81.1223",
   apifyApiToken: process.env.APIFY_API_TOKEN ?? "",
   deepgramApiKey: process.env.DEEPGRAM_API_KEY ?? "",
-  /** Optional STT bake-off — failures never affect Deepgram. */
-  assemblyAiApiKey: process.env.ASSEMBLYAI_API_KEY?.trim() || "",
-  speechmaticsApiKey: process.env.SPEECHMATICS_API_KEY?.trim() || "",
   /**
    * Toronto Fire live CAD vehicle poller. Default OFF — London-only ops.
    * Set TORONTO_FIRE_CAD_ENABLED=1 when ready to tag GTA zones.

@@ -16,11 +16,6 @@ import {
 } from "../dispatchKeywords";
 import { speechToText } from "../deepgramClient";
 import { fireDispatchDisplayLabel } from "../fireDispatchLabel";
-import {
-  safeBakeOffTranscribe,
-  STT_PUSH_PREFIX,
-  type SttBakeOffProvider,
-} from "../sttBakeOffClients";
 import { getCoverageZone } from "../zones.config";
 import type { Incident, IncidentSource } from "../../types/incident";
 import type { IncidentStore } from "../../store/incidentStore";
@@ -44,6 +39,7 @@ export interface FireDispatchContext {
 
 const SILENCE_RMS_DBFS = -50;
 const DEDUP_TTL_MS = 30 * 60 * 1000;
+const STT_PUSH_PREFIX = "[DG]";
 
 function zoneCenter(zoneId: string): { lat: number; lng: number } {
   const zone = getCoverageZone(zoneId);
@@ -159,12 +155,6 @@ export class FireDispatchProcessor {
       return;
     }
 
-    // Tee: kick AssemblyAI + Speechmatics in parallel without blocking Deepgram.
-    // Each path is try/caught inside safeBakeOffTranscribe.
-    const tee = Buffer.from(wav);
-    void this.runBakeOffProvider("aai", tee);
-    void this.runBakeOffProvider("sm", tee);
-
     const startedAt = Date.now();
     const transcript = (await speechToText(wav)).trim();
     noteFireDispatchTranscript(transcript);
@@ -180,53 +170,19 @@ export class FireDispatchProcessor {
       `[fire-dispatch] ${this.ctx.label} STT complete in ${Date.now() - startedAt}ms`,
     );
 
-    await this.processTranscript(transcript, wav, "dg");
+    await this.processTranscript(transcript, wav);
   }
 
-  private async runBakeOffProvider(
-    provider: "aai" | "sm",
-    wav: Buffer,
-  ): Promise<void> {
-    try {
-      if (provider === "aai" && !config.assemblyAiApiKey) return;
-      if (provider === "sm" && !config.speechmaticsApiKey) return;
-
-      const transcript = await safeBakeOffTranscribe(provider, wav);
-      if (transcript == null) return;
-      logger.debug(
-        {
-          provider,
-          chars: transcript.length,
-          preview: transcript.slice(0, 160),
-        },
-        `[FIRE SCANNER] Bake-off ${provider.toUpperCase()} transcript`,
-      );
-      await this.processTranscript(transcript, wav, provider);
-    } catch (err) {
-      logger.warn(
-        {
-          provider,
-          err: err instanceof Error ? err.message : String(err),
-        },
-        `[fire-dispatch] STT bake-off ${provider.toUpperCase()} pipeline error — Deepgram unaffected`,
-      );
-    }
-  }
-
-  async processTranscript(
-    transcript: string,
-    wav?: Buffer,
-    sttProvider: SttBakeOffProvider = "dg",
-  ): Promise<void> {
+  async processTranscript(transcript: string, wav?: Buffer): Promise<void> {
     if (transcript.length < 5) {
-      if (sttProvider === "dg") noteFireDispatchSkip("empty_transcript");
+      noteFireDispatchSkip("empty_transcript");
       return;
     }
 
-    const sigKey = `${this.ctx.zoneId}:${sttProvider}:${transcriptSignature(transcript)}`;
+    const sigKey = `${this.ctx.zoneId}:dg:${transcriptSignature(transcript)}`;
     if (this.seenRecently(sigKey, this.recentTranscriptSignatures)) {
       logger.info(
-        `[fire-dispatch] ${this.ctx.label} DEDUPED (${sttProvider}): overlapping transcript`,
+        `[fire-dispatch] ${this.ctx.label} DEDUPED: overlapping transcript`,
       );
       return;
     }
@@ -255,15 +211,13 @@ export class FireDispatchProcessor {
 
     if (crashKeywords.length === 0 && emsKeywords.length === 0) {
       const blocked = findNegativeKeywords(transcript);
-      if (sttProvider === "dg") {
-        if (blocked.length > 0) {
-          noteFireDispatchSkip(`negative_keyword:${blocked.join(",")}`);
-          logger.debug(
-            `[fire-dispatch] ${this.ctx.label} DROPPED: blacklist hit [${blocked.join(", ")}]`,
-          );
-        } else {
-          noteFireDispatchSkip("no_keyword");
-        }
+      if (blocked.length > 0) {
+        noteFireDispatchSkip(`negative_keyword:${blocked.join(",")}`);
+        logger.debug(
+          `[fire-dispatch] ${this.ctx.label} DROPPED: blacklist hit [${blocked.join(", ")}]`,
+        );
+      } else {
+        noteFireDispatchSkip("no_keyword");
       }
       return;
     }
@@ -307,7 +261,6 @@ export class FireDispatchProcessor {
       priority,
       unverifiedAddress,
       wav,
-      sttProvider,
     );
   }
 
@@ -320,7 +273,6 @@ export class FireDispatchProcessor {
     priority: DispatchPriority,
     unverifiedAddress: boolean,
     wav?: Buffer,
-    sttProvider: SttBakeOffProvider = "dg",
   ): Promise<void> {
     if (!this.incidentStore) {
       logger.error("[fire-dispatch] incident store is not attached");
@@ -332,15 +284,14 @@ export class FireDispatchProcessor {
     const slug = locationSlug(location, timeBucket);
     const source: IncidentSource = agency === "ems" ? "ems" : "fire_dispatch";
     const idPrefix = agency === "ems" ? "ems" : "fire-dispatch";
-    const providerSuffix = agency === "ems" ? "ems" : `fire_dispatch_${sttProvider}`;
-    // Distinct IDs per STT engine so bake-off pushes are not collapsed.
+    const providerSuffix = agency === "ems" ? "ems" : "fire_dispatch_dg";
     const id = unverifiedAddress
-      ? `${idPrefix}-${sttProvider}-${this.ctx.zoneId}-unverified-${slug}`
-      : `${idPrefix}-${sttProvider}-${this.ctx.zoneId}-${coords.lat.toFixed(3)},${coords.lng.toFixed(3)}-${timeBucket}`;
+      ? `${idPrefix}-dg-${this.ctx.zoneId}-unverified-${slug}`
+      : `${idPrefix}-dg-${this.ctx.zoneId}-${coords.lat.toFixed(3)},${coords.lng.toFixed(3)}-${timeBucket}`;
 
     if (!this.incidentStore.getById(id) && this.seenRecently(id, this.recentAlertIds)) {
       logger.info(
-        `[fire-dispatch] ${this.ctx.label} DEDUPED (${sttProvider}): alertId ${id} already dispatched within 30min`,
+        `[fire-dispatch] ${this.ctx.label} DEDUPED: alertId ${id} already dispatched within 30min`,
       );
       return;
     }
@@ -356,7 +307,6 @@ export class FireDispatchProcessor {
 
     const zoneName = getCoverageZone(this.ctx.zoneId)?.name ?? "Ontario";
     const existing = this.incidentStore.getById(id);
-    const tag = STT_PUSH_PREFIX[sttProvider];
     const titlePrefix =
       agency === "ems" ? "EMS" : fireDispatchDisplayLabel(this.ctx.zoneId);
     const typeLabel =
@@ -367,10 +317,10 @@ export class FireDispatchProcessor {
       type: agency === "ems" ? "EMS" : "ACCIDENT",
       subtype: agency === "ems" ? "EMS_CALL" : "ACCIDENT_MAJOR",
       title: keywords[0]
-        ? `${tag} ${titlePrefix} · ${keywords[0]}`
-        : `${tag} ${titlePrefix}`,
+        ? `${STT_PUSH_PREFIX} ${titlePrefix} · ${keywords[0]}`
+        : `${STT_PUSH_PREFIX} ${titlePrefix}`,
       description:
-        `${typeLabel} (${keywords.join(", ")}) [${sttProvider.toUpperCase()}]` +
+        `${typeLabel} (${keywords.join(", ")}) [DG]` +
         (unverifiedAddress ? ` [UNVERIFIED ADDRESS — heard: "${location}"]` : "") +
         `: ${transcript.slice(0, 800)}`,
       coordinates: { latitude: coords.lat, longitude: coords.lng },
@@ -384,15 +334,15 @@ export class FireDispatchProcessor {
     };
 
     this.incidentStore.upsert(incident);
-    if (sttProvider === "dg") noteFireDispatchPosted();
+    noteFireDispatchPosted();
 
     if (existing) {
       logger.info(
-        `[fire-dispatch] ${this.ctx.label} DEDUPED (${sttProvider}): refreshed existing row ${id} — no re-notify`,
+        `[fire-dispatch] ${this.ctx.label} DEDUPED: refreshed existing row ${id} — no re-notify`,
       );
     } else {
       logger.info(
-        `[fire-dispatch] ${this.ctx.label} SAVED ${agency} [${sttProvider}] at "${location}" (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)})`,
+        `[fire-dispatch] ${this.ctx.label} SAVED ${agency} at "${location}" (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)})`,
       );
     }
   }

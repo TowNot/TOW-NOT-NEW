@@ -44,12 +44,6 @@ export function shouldNotifyIncident(incident: Incident, store: IncidentStore): 
   if (incident.source === "fire_dispatch") {
     const nearby = store.getActive().find((other) => {
       if (other.id === incident.id) return false;
-      // STT bake-off: allow [DG]/[AAI]/[SM] siblings at the same scene to all notify.
-      if (other.source === "fire_dispatch") {
-        const a = incident.provider?.match(/_fire_dispatch_(dg|aai|sm)$/)?.[1];
-        const b = other.provider?.match(/_fire_dispatch_(dg|aai|sm)$/)?.[1];
-        if (a && b && a !== b) return false;
-      }
       if (!isNotifiableCrash(other.type, other.subtype ?? null)) return false;
       if (isPoliceType(other.type, other.subtype ?? null)) return false;
       return (

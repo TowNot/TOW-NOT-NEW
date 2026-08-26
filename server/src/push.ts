@@ -149,13 +149,13 @@ export function incidentToPushPayload(incident: Incident): PushPayload {
   const providerLabel = labelForIncident(incident);
   const zoneId = resolveIncidentZoneId(incident);
   const note = incident.description?.trim();
-  // STT bake-off: keep [DG]/[AAI]/[SM] at the front of the Progressier title
-  // so the 50-char cap doesn't strip the engine tag.
-  const bakeOffTitle = /^\[(DG|AAI|SM)\]/.test(incident.title);
+  // Keep [DG] at the front of the Progressier title so the 50-char cap
+  // doesn't strip the engine tag.
+  const deepgramTitle = /^\[DG\]/.test(incident.title);
   return {
     title: police
       ? "AlertNav · Waze (Police)"
-      : bakeOffTitle
+      : deepgramTitle
         ? truncate(incident.title, TITLE_MAX)
         : `AlertNav · ${providerLabel} · ${incident.title}`,
     body: police

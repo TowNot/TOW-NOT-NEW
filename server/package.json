@@ -12,12 +12,9 @@
   "dependencies": {
     "@clerk/express": "^2.1.61",
     "@deepgram/sdk": "^5.8.0",
-    "@speechmatics/auth": "^0.1.0",
-    "@speechmatics/real-time-client": "^8.5.1",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/node": "^22.13.10",
-    "assemblyai": "^4.36.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
