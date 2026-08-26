@@ -1,6 +1,12 @@
 import { config } from "./config";
 import { zoneIdForCoordinates, zonePolicePushTag, zonePushTag } from "./engine/coverageZones";
 import { formatOpenWebNinjaGoogleMapsLabel } from "./engine/googleMaps/googleMapsDisplay";
+import {
+  isTorontoFireCadProvider,
+  TORONTO_FIRE_CAD_PROVIDER,
+  zoneIdFromTorontoFireCadProvider,
+} from "./engine/pollers/torontoFireCadPoller";
+import { torontoZoneIdForCoordinates } from "./engine/torontoFire/zoneAssign";
 import { getCoverageZone } from "./engine/zones.config";
 import { isPoliceType } from "./engine/wazeAggregator";
 import { logger } from "./logger";
@@ -46,11 +52,15 @@ const PROVIDER_LABELS: Record<string, string> = {
   openwebninja_google_maps: "Google Maps",
   google_maps: "Google Maps",
   london_fire_dispatch: "Fire dispatch",
+  [TORONTO_FIRE_CAD_PROVIDER]: "Toronto Fire",
 };
 
 function labelForIncident(incident: Incident): string {
   if (isPoliceType(incident.type, incident.subtype ?? null)) {
     return "Waze (Police)";
+  }
+  if (incident.provider === TORONTO_FIRE_CAD_PROVIDER || isTorontoFireCadProvider(incident.provider)) {
+    return "Toronto Fire";
   }
   if (incident.provider === "openwebninja_google_maps") {
     return formatOpenWebNinjaGoogleMapsLabel(incident.googleMapsZoom, incident.rawType);
@@ -109,6 +119,17 @@ export function buildProgressierPayload(
 }
 
 export function resolveIncidentZoneId(incident: Incident): string | null {
+  // Toronto Fire CAD: always tag to torontoCore / scarborough / northYork /
+  // etobicoke — even when those zones are not yet enabled for Waze polling.
+  if (isTorontoFireCadProvider(incident.provider)) {
+    return (
+      zoneIdFromTorontoFireCadProvider(incident.provider) ??
+      torontoZoneIdForCoordinates(
+        incident.coordinates.latitude,
+        incident.coordinates.longitude,
+      )
+    );
+  }
   if (incident.source === "fire_dispatch" || incident.source === "ems") {
     const m = incident.provider?.match(
       /^([a-zA-Z]+)_(?:fire_dispatch(?:_(?:hls|stream|dg|aai|sm))?|ems)$/,

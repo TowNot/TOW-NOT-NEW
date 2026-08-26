@@ -14,6 +14,7 @@ import {
 } from "./engine/googleMaps/googleMapsNotificationGate";
 import { shouldNotifyIncident } from "./engine/notifyGate";
 import { GoogleMapsTrafficPoller } from "./engine/pollers/googleMapsPoller";
+import { TorontoFireCadPoller } from "./engine/pollers/torontoFireCadPoller";
 import { WazeTrafficPoller } from "./engine/pollers/wazePoller";
 import { RadioIngestionWorker } from "./engine/workers/radioIngestionWorker";
 import { logger } from "./logger";
@@ -59,7 +60,8 @@ const dispatcher = new PushDispatcher();
 const waze = new WazeTrafficPoller(store);
 const googleMaps = new GoogleMapsTrafficPoller(store);
 const radio = new RadioIngestionWorker(store);
-const engine = new DataAggregatorEngine(waze, googleMaps, radio);
+const torontoFireCad = new TorontoFireCadPoller(store);
+const engine = new DataAggregatorEngine(waze, googleMaps, radio, torontoFireCad);
 
 store.on("created", (incident) => {
   if (!shouldNotifyIncident(incident, store)) {
