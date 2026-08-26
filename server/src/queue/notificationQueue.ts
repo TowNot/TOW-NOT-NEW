@@ -25,6 +25,15 @@ const DEFAULT_JOB_OPTIONS = {
 
 let queue: Queue<DispatchNotificationJobData> | null = null;
 
+/**
+ * BullMQ custom job IDs cannot contain `:` (Redis key separator) or be
+ * pure integers. Incident ids like `gmaps:ACCIDENT:42.9:-81.1` must be mapped.
+ */
+export function bullMqJobIdForIncident(incidentId: string): string {
+  const safe = incidentId.trim().replace(/[:/]/g, "_");
+  return safe.startsWith("inc-") ? safe : `inc-${safe}`;
+}
+
 export function getNotificationQueue(): Queue<DispatchNotificationJobData> {
   if (!queue) {
     queue = new Queue<DispatchNotificationJobData>(DISPATCH_NOTIFICATIONS_QUEUE, {
@@ -44,7 +53,7 @@ export async function enqueueDispatchNotification(
 ): Promise<string> {
   const q = getNotificationQueue();
   const jobId = data.push.incidentId
-    ? `incident:${data.push.incidentId}`
+    ? bullMqJobIdForIncident(data.push.incidentId)
     : undefined;
   const job = await q.add("notify", data, {
     ...DEFAULT_JOB_OPTIONS,
