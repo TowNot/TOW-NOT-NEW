@@ -253,6 +253,21 @@ function isGenericOpenWebNinjaType(rawType: string): boolean {
   return key === "incident" || key === "other";
 }
 
+/** Crowd-sourced crash language — do not reclassify these as road_hazard. */
+const CRASH_LANGUAGE_RE =
+  /\b(accident|accidents|crash|crashed|collision|collisions|mvc|pileup|pile-up|stalled|disabled|vehicle)\b/i;
+
+/**
+ * Only reclassify generic incident/other rows when closure language dominates
+ * and there is no crash language (accidents posted beside road closed must stay pushable).
+ */
+function shouldReclassifyGenericAsRoadHazard(rawType: string, alertText: string): boolean {
+  if (!isGenericOpenWebNinjaType(rawType)) return false;
+  if (!findExcludedKeyword(alertText)) return false;
+  if (CRASH_LANGUAGE_RE.test(alertText)) return false;
+  return true;
+}
+
 // ROLLBACK: remove EXCLUDED_KEYWORDS + findExcludedKeyword match below to disable filter.
 const EXCLUDED_KEYWORDS = [
   "construction",
@@ -475,10 +490,10 @@ function toIncident(
   const closureKeyword = findExcludedKeyword(alertText);
   let mapped = mappedBase;
 
-  // Generic incident/other + closure language → road_hazard (map only), not crash.
-  if (isGenericOpenWebNinjaType(rawType) && closureKeyword) {
+  // Generic incident/other + closure-only language → road_hazard (map only), not crash.
+  if (shouldReclassifyGenericAsRoadHazard(rawType, alertText) && closureKeyword) {
     mapped = mapGenericClosureToRoadHazard(closureKeyword);
-    logger.debug(
+    logger.info(
       `[GoogleMaps] Reclassified generic ${rawType} as ${mapped.type} | keyword="${closureKeyword}"`,
     );
   }
