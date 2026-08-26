@@ -67,16 +67,43 @@ const CRASH_PATTERNS: { label: string; re: RegExp }[] = [
   { label: "rollover", re: /\broll[- ]?overs?\b/i },
   { label: "t-bone", re: /\bt[- ]?bones?d?\b/i },
   { label: "rear end", re: /\brear[- ]?end(?:ed|s)?\b/i },
+  // Manner-of-crash / how the accident happened (common LFD phrasing).
+  { label: "head-on", re: /\bhead[\s-]?ons?\b/i },
+  { label: "sideswipe", re: /\bside[\s-]?swipes?d?\b/i },
+  { label: "broadside", re: /\bbroadsides?d?\b/i },
+  { label: "chain reaction", re: /\bchain[\s-]?reactions?\b/i },
+  { label: "flipped", re: /\b(?:flipped|flipping|flip(?:ped)?\s+over)\b/i },
+  {
+    label: "hit parked",
+    re: /\b(?:hit|struck|into)\s+(?:a\s+|the\s+)?parked\s+(?:car|vehicle|truck|van)\b/i,
+  },
+  {
+    label: "into the median",
+    re: /\b(?:into|in)\s+(?:the\s+)?median\b/i,
+  },
+  {
+    label: "ran off road",
+    re: /\b(?:(?:ran|run)\s+off\s+(?:the\s+)?(?:road|roadway|highway)|left\s+(?:the\s+)?roadway|off\s+(?:the\s+)?roadway)\b/i,
+  },
   { label: "extrication", re: /\bextricat(?:ion|e|ed|ing)\b/i },
   { label: "trapped", re: /\btrapped\b/i },
-  { label: "patients", re: /\bpatients?\s+total\b/i },
+  // Dispatch phrasing "two patients total" / "patient total" — not bare "patients".
+  { label: "patients total", re: /\bpatients?\s+total\b/i },
   { label: "personal injury", re: /\bpersonal\s+injur(?:y|ies)\b/i },
   { label: "vehicle fire", re: /\b(?:vehicle|car|auto|truck|pickup|van|bus)\s+fires?\b/i },
   { label: "vehicle fire", re: /\b(?:vehicle|car|auto|truck|pickup|van|bus)s?\s+on\s+fire\b/i },
+  // Strong: "multi-vehicle" / "multiple vehicles" posts on its own (common LFD phrasing).
   {
     label: "multi-vehicle",
-    re: /\b(?:\d+|one|two|three|four|five|single|multi(?:ple)?)[\s-]?(?:car|vehicle)s?\b/i,
+    re: /\bmulti(?:ple)?[\s-]?vehicles?\b/i,
   },
+  // Weak: "two cars" / "one vehicle" — too common alone; gated below.
+  {
+    label: "vehicle count",
+    re: /\b(?:\d+|one|two|three|four|five|six|seven|single)[\s-]?(?:cars?|vehicles?)\b/i,
+  },
+  // Clear multi-car crash language (often without saying MVC in the same buffer).
+  { label: "pile-up", re: /\bpile[\s-]?ups?\b/i },
   // Pole / hydro / tractor-trailer scenes. London Fire often never says MVC
   // ("Engine 7, tractor trailer hit the pole, pole is down, wires across
   // the street") — those still have to post.
@@ -102,7 +129,11 @@ const CRASH_PATTERNS: { label: string; re: RegExp }[] = [
   { label: "ejected", re: /\bejected\b/i },
   { label: "overturned", re: /\boverturn(?:ed|s)?\b/i },
   { label: "jackknife", re: /\bjack[\s-]?knif(?:ed|e|ing)\b/i },
-  { label: "in the ditch", re: /\b(?:in|into)\s+(?:the\s+)?ditch\b/i },
+  // "into the ditch" / "vehicle in the ditch" / bare "ditch"
+  {
+    label: "ditch",
+    re: /\b(?:(?:vehicle|car|truck|van|auto)s?\s+(?:is\s+|was\s+|are\s+|were\s+)?(?:in|into)\s+(?:the\s+)?ditch|(?:in|into)\s+(?:the\s+)?ditch|ditch(?:es)?)\b/i,
+  },
   { label: "guardrail", re: /\bguard[\s-]?rails?\b/i },
   {
     label: "struck building",
@@ -132,8 +163,6 @@ const CODE4_RE = /\bcode\s*(?:4|four)\b/i;
 const CODE3_RE = /\bcode\s*(?:3|three)\b/i;
 const BLOCKING_LANES_RE =
   /\b(?:blocking|blocked)\s+(?:the\s+)?(?:(?:\d+|one|two|three|four|five)\s+)?lanes?\b/i;
-const VEHICLE_CONTEXT_RE =
-  /\b(?:vehicle|car|truck|trailer|semi|MVC|MVA|accident|collision|motor\s+vehicle)s?\b/i;
 
 export function findCrashKeywords(transcript: string): string[] {
   if (findNegativeKeywords(transcript).length > 0) return [];
@@ -151,16 +180,13 @@ export function findCrashKeywords(transcript: string): string[] {
   ) {
     hits.push("code 4 vehicle");
   }
-  if (
-    BLOCKING_LANES_RE.test(transcript) &&
-    VEHICLE_CONTEXT_RE.test(transcript) &&
-    !hits.includes("blocking lanes")
-  ) {
+  // "Blocking lanes" alone is enough — LFD often says this on MVCs without
+  // repeating "vehicle"/"MVC" in the same buffer.
+  if (BLOCKING_LANES_RE.test(transcript) && !hits.includes("blocking lanes")) {
     hits.push("blocking lanes");
   }
-  // The multi-vehicle count pattern alone ("two vehicles on scene") is too
-  // weak to declare a crash — require at least one substantive crash term.
-  if (hits.length === 1 && hits[0] === "multi-vehicle") return [];
+  // "Two cars on scene" alone is too weak; multi-vehicle / MVC / etc. still post.
+  if (hits.length === 1 && hits[0] === "vehicle count") return [];
   return hits;
 }
 

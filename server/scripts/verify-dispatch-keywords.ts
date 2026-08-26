@@ -133,7 +133,10 @@ const checks: Array<[string, () => void]> = [
       assert.ok(findCrashKeywords("patient ejected on the 401").includes("ejected"));
       assert.ok(findCrashKeywords("vehicle overturned on Wellington").includes("overturned"));
       assert.ok(findCrashKeywords("tractor jackknifed on highway").includes("jackknife"));
-      assert.ok(findCrashKeywords("into the ditch on Oxford").includes("in the ditch"));
+      assert.ok(findCrashKeywords("into the ditch on Oxford").includes("ditch"));
+      assert.ok(findCrashKeywords("vehicle in the ditch on Highbury").includes("ditch"));
+      assert.ok(findCrashKeywords("car in the ditch at Wonderland").includes("ditch"));
+      assert.ok(findCrashKeywords("ditch on the 401").includes("ditch"));
       assert.ok(findCrashKeywords("hit the guardrail on the 401").includes("guardrail"));
       assert.ok(findCrashKeywords("struck a building on Dundas").includes("struck building"));
       assert.ok(findCrashKeywords("pinned in the vehicle at Oxford").includes("vehicle pinning"));
@@ -157,7 +160,21 @@ const checks: Array<[string, () => void]> = [
       assert.ok(
         findCrashKeywords("MVC Oxford, vehicle blocking two lanes").includes("blocking lanes"),
       );
-      assert.deepEqual(findCrashKeywords("blocking two lanes, standby"), []);
+      assert.ok(findCrashKeywords("blocking two lanes, standby").includes("blocking lanes"));
+      assert.ok(findCrashKeywords("Engine 3 multi-vehicle on Oxford").includes("multi-vehicle"));
+      assert.ok(findCrashKeywords("pile-up on the 401").includes("pile-up"));
+      assert.ok(findCrashKeywords("pileup rear end on Highbury").includes("pile-up"));
+      assert.ok(findCrashKeywords("head-on on Wonderland").includes("head-on"));
+      assert.ok(findCrashKeywords("sideswipe at Richmond").includes("sideswipe"));
+      assert.ok(findCrashKeywords("broadsided at Oxford").includes("broadside"));
+      assert.ok(findCrashKeywords("chain reaction on the 401").includes("chain reaction"));
+      assert.ok(findCrashKeywords("vehicle flipped on Highbury").includes("flipped"));
+      assert.ok(findCrashKeywords("hit a parked car on Dundas").includes("hit parked"));
+      assert.ok(findCrashKeywords("into the median on the 401").includes("into the median"));
+      assert.ok(findCrashKeywords("ran off the road at Hyde Park").includes("ran off road"));
+      assert.ok(findCrashKeywords("t-bone at Wharncliffe").includes("t-bone"));
+      assert.ok(findCrashKeywords("rear ended on Wellington").includes("rear end"));
+      assert.deepEqual(findCrashKeywords("two vehicles on scene, standby"), []);
     },
   ],
   [
