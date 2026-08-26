@@ -33,6 +33,11 @@ export function IncidentCard({ incident }: { incident: Incident }) {
         <h3 className="text-base font-semibold text-gray-900">{incident.title}</h3>
         <p className="mt-1 text-sm text-gray-600">{incident.description}</p>
         <p className="mt-2 font-mono text-[11px] text-gray-500">{incident.locationLabel}</p>
+        {incident.reporterName ? (
+          <p className="mt-1 text-[11px] text-gray-400">
+            Reported by: {incident.reporterName}
+          </p>
+        ) : null}
         <SourceDetectionTimeline detections={detections} incident={incident} />
         {incident.audioUrl ? (
           <div className="mt-3">

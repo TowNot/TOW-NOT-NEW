@@ -3,6 +3,7 @@ import { config } from "../config";
 import { boundingBox, distanceKm, splitBoundingBox, type BoundingBox } from "./geo";
 import { enabledCoverageZones, zoneToBoundingBox } from "./coverageZones";
 import { logger } from "./pinoCompat";
+import { extractReporterName } from "./reporterName";
 
 /** Every provider the aggregator can pull live accidents from. */
 export type ProviderSource =
@@ -53,6 +54,8 @@ export interface WazeAlert {
   numThumbsUp: number | null;
   description: string | null;
   reportedAt: Date;
+  /** Reporter / publisher username when the feed provides one. */
+  reporterName?: string;
 }
 
 /**
@@ -732,6 +735,7 @@ export function parseRawAlerts(
         const t = extractEventMillis(raw);
         return t !== null ? new Date(t) : new Date();
       })(),
+      reporterName: extractReporterName(raw),
     });
   }
   // One line per provider per poll. The per-row detail above is debug-only, so

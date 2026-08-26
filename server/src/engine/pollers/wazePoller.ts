@@ -82,6 +82,7 @@ export function mapWazeAlert(alert: WazeAlert): Incident {
     timestamp: alert.reportedAt.toISOString(),
     expiresAt: new Date(reported + config.incidentTtlMs).toISOString(),
     provider: alert.provider,
+    ...(alert.reporterName ? { reporterName: alert.reporterName } : {}),
   };
 }
 

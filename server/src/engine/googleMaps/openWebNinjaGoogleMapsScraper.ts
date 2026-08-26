@@ -7,6 +7,7 @@ import {
 } from "../coverageZones";
 import { logger } from "../../logger";
 import type { Incident, IncidentSeverity } from "../../types/incident";
+import { extractReporterName } from "../reporterName";
 import { mergeGoogleMapsRawType, mergeGoogleMapsZoom } from "./googleMapsDisplay";
 import { logGoogleMapsNotificationGate } from "./googleMapsNotificationGate";
 
@@ -143,6 +144,19 @@ interface RawAlert {
   crossStreet?: unknown;
   details?: unknown;
   snippet?: unknown;
+  reported_by?: unknown;
+  reportedBy?: unknown;
+  reporter?: unknown;
+  reporterName?: unknown;
+  reporter_name?: unknown;
+  username?: unknown;
+  userName?: unknown;
+  nickname?: unknown;
+  author?: unknown;
+  publisher?: unknown;
+  sourceName?: unknown;
+  source_name?: unknown;
+  user?: unknown;
 }
 
 interface TaggedRawAlert {
@@ -458,6 +472,8 @@ function toIncident(
     }
   }
 
+  const reporterName = extractReporterName(raw as Record<string, unknown>);
+
   return {
     id: incidentId,
     source: "google_maps",
@@ -473,6 +489,7 @@ function toIncident(
     provider: "openwebninja_google_maps",
     googleMapsZoom: zoom,
     rawType: normalizedRawType,
+    ...(reporterName ? { reporterName } : {}),
   };
 }
 

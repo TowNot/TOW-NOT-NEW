@@ -32,6 +32,8 @@ export interface Incident {
   googleMapsZoom?: number;
   /** Raw OpenWebNinja `type` string before we classify it (field test). */
   rawType?: string;
+  /** Waze / Google Maps reporter username when the API provides one. */
+  reporterName?: string;
   /** Per-source first-seen timestamps when multiple providers confirm the same wreck. */
   sourceDetections?: SourceDetection[];
   unverifiedAddress?: boolean;

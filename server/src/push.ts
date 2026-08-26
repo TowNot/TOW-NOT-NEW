@@ -165,12 +165,21 @@ export function incidentToPushPayload(incident: Incident): PushPayload {
             .join(" — ") || incident.locationLabel,
           BODY_MAX,
         )
-      : `${incident.locationLabel} — caught by ${providerLabel}`,
+      : truncate(
+          [
+            `${incident.locationLabel} — caught by ${providerLabel}`,
+            incident.reporterName ? `Reported by ${incident.reporterName}` : null,
+          ]
+            .filter(Boolean)
+            .join(" · "),
+          BODY_MAX,
+        ),
     severity: incident.severity,
     incidentId: incident.id,
     url: `/desk?incident=${encodeURIComponent(incident.id)}`,
     zoneId: zoneId ?? undefined,
     audience: police ? "zone_police" : "zone",
+    ...(incident.reporterName ? { reporterName: incident.reporterName } : {}),
   };
 }
 

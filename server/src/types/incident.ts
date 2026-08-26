@@ -33,6 +33,8 @@ export interface Incident {
   googleMapsZoom?: number;
   /** Raw OpenWebNinja `type` string before we classify it (field test). */
   rawType?: string;
+  /** Waze / Google Maps reporter username when the API provides one. */
+  reporterName?: string;
   /** Per-source first-seen timestamps when multiple providers confirm the same wreck. */
   sourceDetections?: SourceDetection[];
   unverifiedAddress?: boolean;
@@ -52,6 +54,8 @@ export interface PushPayload {
   zoneId?: string;
   /** Opt-in police audience uses `zone-<id>-waze-police` instead of the zone tag. */
   audience?: "zone" | "zone_police";
+  /** Optional Waze / Google Maps reporter for clients that read push data. */
+  reporterName?: string;
 }
 
 export interface PushReceipt {

@@ -156,6 +156,7 @@ export function mergeIntoExistingIncident(
     provider: primary.provider ?? existing.provider,
     googleMapsZoom: mergeGoogleMapsZoom(existing.googleMapsZoom, incoming.googleMapsZoom),
     rawType: mergeGoogleMapsRawType(existing.rawType, incoming.rawType),
+    reporterName: existing.reporterName ?? incoming.reporterName,
     expiresAt:
       new Date(existing.expiresAt).getTime() >= new Date(incoming.expiresAt).getTime()
         ? existing.expiresAt
