@@ -111,6 +111,13 @@ export const config = {
   /** Optional STT bake-off — failures never affect Deepgram. */
   assemblyAiApiKey: process.env.ASSEMBLYAI_API_KEY?.trim() || "",
   speechmaticsApiKey: process.env.SPEECHMATICS_API_KEY?.trim() || "",
+  /**
+   * Toronto Fire live CAD vehicle poller. Default OFF — London-only ops.
+   * Set TORONTO_FIRE_CAD_ENABLED=1 when ready to tag GTA zones.
+   */
+  torontoFireCadEnabled:
+    process.env.TORONTO_FIRE_CAD_ENABLED === "1" ||
+    process.env.TORONTO_FIRE_CAD_ENABLED === "true",
   residentialProxyUrl: process.env.RESIDENTIAL_PROXY_URL ?? "",
   // Downtown London, ON (same pin the fire-dispatch geocoder uses). A 15 km
   // radius covers Western campus, the 401, and Hyde Park without overflowing

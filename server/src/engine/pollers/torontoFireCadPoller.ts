@@ -122,6 +122,12 @@ export class TorontoFireCadPoller {
 
   start(): void {
     if (this.timer) return;
+    if (!config.torontoFireCadEnabled) {
+      logger.info(
+        "[Toronto Fire CAD] skipped — TORONTO_FIRE_CAD_ENABLED not set (London-only mode)",
+      );
+      return;
+    }
     logger.info("[Toronto Fire CAD] starting active-incidents poller", {
       intervalMs: TORONTO_FIRE_CAD_INTERVAL_MS,
       endpoint: "https://www.toronto.ca/data/fire/livecad.xml",
