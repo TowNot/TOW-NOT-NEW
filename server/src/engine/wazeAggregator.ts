@@ -737,6 +737,17 @@ export function parseRawAlerts(
       })(),
       reporterName: extractReporterName(raw),
     });
+    if (alerts[alerts.length - 1]?.reporterName) {
+      logger.debug(
+        {
+          provider,
+          street: streetLabel,
+          type: tUp || null,
+          reporterName: alerts[alerts.length - 1]!.reporterName,
+        },
+        "[Aggregator] reporter username captured",
+      );
+    }
   }
   // One line per provider per poll. The per-row detail above is debug-only, so
   // this summary is where dropped volume stays visible without flooding logs.

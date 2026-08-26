@@ -54,15 +54,18 @@ function toTitle(alert: WazeAlert): string {
 
 function toDescription(alert: WazeAlert, street: string): string {
   const note = alert.description?.trim();
+  const by = alert.reporterName?.trim();
   if (isPoliceType(alert.type, alert.subtype)) {
     const subtype = alert.subtype?.trim();
     const parts = [note, subtype && subtype.toUpperCase() !== "POLICE" ? subtype : null].filter(
       Boolean,
     ) as string[];
-    if (parts.length > 0) return parts.join(" · ");
-    return `Police reported on ${street}.`;
+    const base =
+      parts.length > 0 ? parts.join(" · ") : `Police reported on ${street}.`;
+    return by ? `${base}${base.endsWith(".") ? "" : "."} Reported by ${by}.` : base;
   }
-  return note || `${toTitle(alert)} reported on ${street}.`;
+  const base = note || `${toTitle(alert)} reported on ${street}.`;
+  return by ? `${base}${base.endsWith(".") ? "" : "."} Reported by ${by}.` : base;
 }
 
 export function mapWazeAlert(alert: WazeAlert): Incident {

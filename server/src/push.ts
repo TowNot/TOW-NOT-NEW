@@ -160,7 +160,11 @@ export function incidentToPushPayload(incident: Incident): PushPayload {
         : `AlertNav · ${providerLabel} · ${incident.title}`,
     body: police
       ? truncate(
-          [incident.locationLabel, note && note !== incident.locationLabel ? note : null]
+          [
+            incident.locationLabel,
+            note && note !== incident.locationLabel ? note : null,
+            incident.reporterName ? `Reported by ${incident.reporterName}` : null,
+          ]
             .filter(Boolean)
             .join(" — ") || incident.locationLabel,
           BODY_MAX,

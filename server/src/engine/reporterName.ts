@@ -13,7 +13,8 @@ export function normalizeReporterName(value: unknown): string | undefined {
       lower === "null" ||
       lower === "undefined" ||
       lower === "user" ||
-      lower === "guest"
+      lower === "guest" ||
+      lower === "google maps driver"
     ) {
       return undefined;
     }
@@ -22,6 +23,8 @@ export function normalizeReporterName(value: unknown): string | undefined {
   if (value && typeof value === "object") {
     const obj = value as Record<string, unknown>;
     return (
+      normalizeReporterName(obj.reportByNickname) ??
+      normalizeReporterName(obj.report_by_nickname) ??
       normalizeReporterName(obj.username) ??
       normalizeReporterName(obj.userName) ??
       normalizeReporterName(obj.nickname) ??
@@ -33,9 +36,17 @@ export function normalizeReporterName(value: unknown): string | undefined {
   return undefined;
 }
 
-/** Pull reporter / publisher from common Waze / Maps / BlocksInside field shapes. */
+/**
+ * Pull reporter / publisher from Waze / BlocksInside / Maps field shapes.
+ * Waze Partners feed uses `reportByNickname` (and sometimes `reportBy`).
+ */
 export function extractReporterName(raw: Record<string, unknown>): string | undefined {
-  return (
+  const direct =
+    normalizeReporterName(raw.reportByNickname) ??
+    normalizeReporterName(raw.report_by_nickname) ??
+    normalizeReporterName(raw.reportedByNickname) ??
+    normalizeReporterName(raw.reportBy) ??
+    normalizeReporterName(raw.report_by) ??
     normalizeReporterName(raw.reported_by) ??
     normalizeReporterName(raw.reportedBy) ??
     normalizeReporterName(raw.reporter) ??
@@ -49,6 +60,23 @@ export function extractReporterName(raw: Record<string, unknown>): string | unde
     normalizeReporterName(raw.sourceName) ??
     normalizeReporterName(raw.source_name) ??
     normalizeReporterName(raw.user) ??
-    normalizeReporterName(raw.reportBy)
-  );
+    normalizeReporterName(raw.reportBy);
+
+  if (direct) return direct;
+
+  // BlocksInside / mirrors sometimes rename fields — scan keys once.
+  for (const [key, value] of Object.entries(raw)) {
+    const k = key.toLowerCase();
+    if (
+      k === "reportbynickname" ||
+      k === "report_by_nickname" ||
+      k === "reportedbynickname" ||
+      k === "reportby" ||
+      (k.includes("nickname") && k.includes("report"))
+    ) {
+      const hit = normalizeReporterName(value);
+      if (hit) return hit;
+    }
+  }
+  return undefined;
 }
