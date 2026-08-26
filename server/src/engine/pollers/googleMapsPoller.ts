@@ -39,8 +39,6 @@ interface IngestStats {
  */
 export class GoogleMapsTrafficPoller {
   private scheduler: ZoneSchedulerHandle | null = null;
-  /** First successful poll per city is silent (cold-start burst suppression). */
-  private readonly bootstrappedCities = new Set<string>();
 
   constructor(private readonly store: IncidentStore) {}
 
@@ -85,20 +83,11 @@ export class GoogleMapsTrafficPoller {
   async pollCity(city: GoogleMapsCity): Promise<Incident[]> {
     if (!config.openWebNinjaApiKey) return [];
     const started = Date.now();
-    const isBootstrapping = !this.bootstrappedCities.has(city.id);
     try {
       const fetchResult = await fetchOpenWebNinjaGoogleMapsForCity(city);
-      const { incidents, stats } = this.ingestIncidents(fetchResult.incidents, {
-        suppressPush: isBootstrapping,
-      });
-      if (isBootstrapping) {
-        this.bootstrappedCities.add(city.id);
-        logger.info(
-          `[GoogleMaps Poll] city=${city.id} | bootstrapping=true | suppressPush=true | retained=${fetchResult.retained}`,
-        );
-      }
+      const { incidents, stats } = this.ingestIncidents(fetchResult.incidents);
       logger.info(
-        `[GoogleMaps Poll] city=${city.id} | tiles=${fetchResult.tiles} | fetched=${fetchResult.fetched} | retained=${fetchResult.retained} | pushed=${isBootstrapping ? 0 : stats.pushed} | merged=${stats.merged} | duration=${fetchResult.latencyMs || Date.now() - started}ms`,
+        `[GoogleMaps Poll] city=${city.id} | tiles=${fetchResult.tiles} | fetched=${fetchResult.fetched} | retained=${fetchResult.retained} | pushed=${stats.pushed} | merged=${stats.merged} | duration=${fetchResult.latencyMs || Date.now() - started}ms`,
       );
       return incidents;
     } catch (error) {
@@ -110,14 +99,10 @@ export class GoogleMapsTrafficPoller {
     }
   }
 
-  private ingestIncidents(
-    incidents: Incident[],
-    options?: { suppressPush?: boolean },
-  ): {
+  private ingestIncidents(incidents: Incident[]): {
     incidents: Incident[];
     stats: IngestStats;
   } {
-    const suppressPush = Boolean(options?.suppressPush);
     const ingested: Incident[] = [];
     let pushed = 0;
     let merged = 0;
@@ -125,29 +110,26 @@ export class GoogleMapsTrafficPoller {
     for (const incident of incidents) {
       if (!isMergeableTrafficIncident(incident)) {
         const existed = this.store.getById(incident.id);
-        this.store.upsert(incident, { suppressPush });
+        this.store.upsert(incident);
         ingested.push(incident);
-        if (!existed && !suppressPush) pushed += 1;
+        if (!existed) pushed += 1;
         continue;
       }
 
       const nearby = findNearbyMergeableIncident(this.store, incident);
       if (nearby) {
         const cluster = mergeGoogleMapsIntoCluster(nearby, incident);
-        const upserted = this.store.upsert(cluster, { suppressPush });
+        const upserted = this.store.upsert(cluster);
         ingested.push(upserted);
         merged += 1;
-        if (
-          !suppressPush &&
-          isGoogleMapsClusterUpgrade(nearby, incident, upserted)
-        ) {
+        if (isGoogleMapsClusterUpgrade(nearby, incident, upserted)) {
           pushed += 1;
           this.store.emitClusterUpgrade({
             previous: nearby,
             incoming: incident,
             merged: upserted,
           });
-        } else if (!suppressPush) {
+        } else {
           logGoogleMapsNotificationGate(
             incident.id,
             "MERGED WITHOUT PUSH (Existing cluster)",
@@ -163,19 +145,15 @@ export class GoogleMapsTrafficPoller {
       }
 
       const existed = this.store.getById(incident.id);
-      const created = this.store.upsert(withSourceDetections(incident), {
-        suppressPush,
-      });
+      const created = this.store.upsert(withSourceDetections(incident));
       ingested.push(created);
       if (existed) {
-        if (!suppressPush) {
-          logGoogleMapsNotificationGate(
-            incident.id,
-            "SKIPPED PUSH (Existing ID refresh)",
-            `rawType=${incident.rawType ?? "unknown"}`,
-          );
-        }
-      } else if (!suppressPush) {
+        logGoogleMapsNotificationGate(
+          incident.id,
+          "SKIPPED PUSH (Existing ID refresh)",
+          `rawType=${incident.rawType ?? "unknown"}`,
+        );
+      } else {
         pushed += 1;
       }
     }
@@ -185,7 +163,6 @@ export class GoogleMapsTrafficPoller {
       ingested: ingested.length,
       pushed,
       merged,
-      suppressPush,
     });
     return { incidents: ingested, stats: { pushed, merged } };
   }

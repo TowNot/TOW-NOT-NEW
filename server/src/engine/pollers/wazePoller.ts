@@ -87,8 +87,6 @@ export function mapWazeAlert(alert: WazeAlert): Incident {
 
 export class WazeTrafficPoller {
   private scheduler: ZoneSchedulerHandle | null = null;
-  /** First successful poll per zone is silent (cold-start burst suppression). */
-  private readonly bootstrappedZones = new Set<string>();
 
   constructor(private readonly store: IncidentStore) {}
 
@@ -136,17 +134,9 @@ export class WazeTrafficPoller {
 
   async pollZone(zone: { id: string; name: string }): Promise<Incident[]> {
     if (this.liveProviders().length === 0) return [];
-    const isBootstrapping = !this.bootstrappedZones.has(zone.id);
     try {
       const alerts = await fetchBlocksInsideForZone(zone);
-      const ingested = this.ingestAlerts(alerts, { suppressPush: isBootstrapping });
-      if (isBootstrapping) {
-        this.bootstrappedZones.add(zone.id);
-        logger.info(
-          `[Waze Poll] zone=${zone.id} | bootstrapping=true | suppressPush=true | retained=${ingested.length}`,
-        );
-      }
-      return ingested;
+      return this.ingestAlerts(alerts);
     } catch (error) {
       logger.error("Live traffic poll failed", {
         zone: zone.id,
@@ -156,11 +146,7 @@ export class WazeTrafficPoller {
     }
   }
 
-  private ingestAlerts(
-    alerts: WazeAlert[],
-    options?: { suppressPush?: boolean },
-  ): Incident[] {
-    const suppressPush = Boolean(options?.suppressPush);
+  private ingestAlerts(alerts: WazeAlert[]): Incident[] {
     const ingested: Incident[] = [];
     for (const alert of alerts) {
       const incident = mapWazeAlert(alert);
@@ -169,7 +155,6 @@ export class WazeTrafficPoller {
         if (nearby) {
           const merged = this.store.upsert(
             mergeIntoExistingIncident(nearby, withSourceDetections(incident)),
-            { suppressPush },
           );
           ingested.push(merged);
           logger.debug("Waze alert merged into nearby active incident", {
@@ -185,12 +170,11 @@ export class WazeTrafficPoller {
         isMergeableTrafficIncident(incident)
           ? withSourceDetections(incident)
           : incident,
-        { suppressPush },
       );
       ingested.push(created);
     }
     logger.debug(
-      `Live traffic poll complete fetched=${alerts.length} ingested=${ingested.length} suppressPush=${suppressPush}`,
+      `Live traffic poll complete fetched=${alerts.length} ingested=${ingested.length}`,
     );
     return ingested;
   }

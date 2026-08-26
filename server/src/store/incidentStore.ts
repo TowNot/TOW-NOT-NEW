@@ -81,7 +81,8 @@ export class IncidentStore extends EventEmitter {
       rawType: mergeGoogleMapsRawType(existing?.rawType, incident.rawType),
       expiresAt: incident.expiresAt || new Date(Date.now() + config.incidentTtlMs).toISOString(),
       severity: existing ? higherSeverity(existing.severity, incident.severity) : incident.severity,
-      // Cold-start ingest marks notified so a later refresh cannot re-push.
+      // suppressPush (e.g. CAD merge into an existing card) marks notified so
+      // a later refresh cannot re-push the same row.
       notified:
         options?.suppressPush && isNew
           ? true

@@ -1,7 +1,7 @@
 import type { Incident } from "../types/incident";
 import { logger } from "../logger";
 
-/** Do not push incidents older than this (cold-start / stale API rows). */
+/** Do not push incidents older than this (stale API rows / late ingest). */
 export const PUSH_MAX_AGE_MS = 7 * 60 * 1000;
 
 /** Hold concurrent / recent push locks this long. */

@@ -114,8 +114,6 @@ function locationLabel(event: TorontoFireCadEvent, zoneId: TorontoFireCadZoneId)
 export class TorontoFireCadPoller {
   private timer: NodeJS.Timeout | null = null;
   private inFlight = false;
-  /** First successful fetch is silent (avoid cold-start push spam). */
-  private bootstrapped = false;
   /** Incident numbers already pushed / upserted this process life. */
   private readonly seenEventNums = new Set<string>();
 
@@ -167,29 +165,25 @@ export class TorontoFireCadPoller {
   private async poll(): Promise<void> {
     const events = await fetchTorontoFireCadEvents();
     const vehicle = events.filter((e) => isTorontoFireVehicleCollision(e.eventType));
-    const silent = !this.bootstrapped;
     let created = 0;
     let skipped = 0;
 
     for (const event of vehicle) {
-      const result = await this.ingestEvent(event, silent);
+      const result = await this.ingestEvent(event);
       if (result === "created") created += 1;
       else skipped += 1;
     }
 
-    this.bootstrapped = true;
     logger.info("[Toronto Fire CAD] poll complete", {
       total: events.length,
       vehicle: vehicle.length,
       created,
       skipped,
-      silentBootstrap: silent,
     });
   }
 
   private async ingestEvent(
     event: TorontoFireCadEvent,
-    silent: boolean,
   ): Promise<"created" | "skipped"> {
     const id = `tfs:${event.eventNum}`;
     if (this.seenEventNums.has(event.eventNum) || this.store.getById(id)) {
@@ -245,13 +239,12 @@ export class TorontoFireCadPoller {
       }
     }
 
-    this.store.upsert(incident, { suppressPush: silent });
+    this.store.upsert(incident);
     this.seenEventNums.add(event.eventNum);
     logger.info("[Toronto Fire CAD] ingested vehicle collision", {
       eventNum: event.eventNum,
       zoneId,
       type: event.eventType,
-      silent,
       dispatchMs,
     });
     return "created";
