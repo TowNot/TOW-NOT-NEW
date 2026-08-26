@@ -78,7 +78,19 @@ export const config = {
     if (!Number.isFinite(raw) || raw <= 0 || raw >= 60_000) return 10_000;
     return raw;
   })(),
+  /** Soft TTL used when setting expiresAt on ingest / refresh. */
   incidentTtlMs: Number(process.env.INCIDENT_TTL_MS ?? 3 * 60 * 60 * 1000),
+  /**
+   * Hard-delete sweeper: drop in-memory incidents whose `timestamp` (first seen)
+   * is older than this, regardless of a refreshed expiresAt. Default 24h.
+   */
+  incidentHardDeleteMs: Number(
+    process.env.INCIDENT_HARD_DELETE_MS ?? 24 * 60 * 60 * 1000,
+  ),
+  /** How often the hard-delete sweeper runs. Default 1 hour. */
+  incidentHardDeleteIntervalMs: Number(
+    process.env.INCIDENT_HARD_DELETE_INTERVAL_MS ?? 60 * 60 * 1000,
+  ),
   radioHlsUrl: process.env.RADIO_HLS_URL ?? "",
   progressierApiKey: process.env.PROGRESSIER_API_KEY ?? "",
   progressierAppId,

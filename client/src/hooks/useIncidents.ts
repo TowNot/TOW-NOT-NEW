@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { isIncidentVisibleOnDesk } from "../lib/incidentAge";
 import type { HealthStatus, Incident } from "../types";
 
 interface IncidentState {
@@ -7,10 +8,14 @@ interface IncidentState {
   health: HealthStatus | null;
 }
 
+const AGE_TICK_MS = 60_000;
+
 export function useIncidents(): IncidentState {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [connected, setConnected] = useState(false);
   const [health, setHealth] = useState<HealthStatus | null>(null);
+  /** Re-render every minute so the 3h age gate advances without waiting for SSE. */
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const sourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
@@ -73,6 +78,11 @@ export function useIncidents(): IncidentState {
         if (!cancelled) setHealth(null);
       }
     }, 10_000);
+
+    const ageTimer = window.setInterval(() => {
+      if (!cancelled) setNowMs(Date.now());
+    }, AGE_TICK_MS);
+
     void fetch("/api/health")
       .then((response) => response.json())
       .then((body: HealthStatus) => {
@@ -84,8 +94,14 @@ export function useIncidents(): IncidentState {
       cancelled = true;
       source.close();
       window.clearInterval(healthTimer);
+      window.clearInterval(ageTimer);
     };
   }, []);
 
-  return { incidents, connected, health };
+  const visibleIncidents = useMemo(
+    () => incidents.filter((incident) => isIncidentVisibleOnDesk(incident, nowMs)),
+    [incidents, nowMs],
+  );
+
+  return { incidents: visibleIncidents, connected, health };
 }

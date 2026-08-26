@@ -28,17 +28,34 @@ function higherSeverity(current: IncidentSeverity, incoming: IncidentSeverity): 
 export class IncidentStore extends EventEmitter {
   private readonly incidents = new Map<string, Incident>();
   private pruneTimer: NodeJS.Timeout | null = null;
+  private hardDeleteTimer: NodeJS.Timeout | null = null;
 
   start(): void {
     if (this.pruneTimer) return;
     this.pruneTimer = setInterval(() => this.pruneExpired(), 30_000);
     this.pruneTimer.unref();
+    // Hourly hard-delete of stale rows (by first-seen timestamp). Does not
+    // await I/O and must not block pollers / SSE — setInterval callback only.
+    this.hardDeleteTimer = setInterval(() => {
+      try {
+        this.hardDeleteOlderThan(config.incidentHardDeleteMs);
+      } catch (err) {
+        logger.warn("Incident hard-delete sweeper failed", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }, config.incidentHardDeleteIntervalMs);
+    this.hardDeleteTimer.unref();
   }
 
   stop(): void {
     if (this.pruneTimer) {
       clearInterval(this.pruneTimer);
       this.pruneTimer = null;
+    }
+    if (this.hardDeleteTimer) {
+      clearInterval(this.hardDeleteTimer);
+      this.hardDeleteTimer = null;
     }
   }
 
@@ -120,5 +137,31 @@ export class IncidentStore extends EventEmitter {
       logger.info("Expired incidents pruned", { count: expired.length });
     }
     return expired;
+  }
+
+  /**
+   * Hard-delete incidents whose first-seen `timestamp` is older than maxAgeMs.
+   * Uses UTC epoch ms from ISO-8601 timestamps (consistent across zones).
+   * Emits `expire` so SSE clients drop the row without blocking the event loop.
+   * (There is no SQL DB — this is the in-memory store equivalent of
+   * DELETE WHERE created_at < NOW() - INTERVAL '24 hours'.)
+   */
+  hardDeleteOlderThan(maxAgeMs: number, now = Date.now()): Incident[] {
+    const cutoff = now - maxAgeMs;
+    const removed: Incident[] = [];
+    for (const [id, incident] of this.incidents) {
+      const createdMs = Date.parse(incident.timestamp);
+      if (!Number.isFinite(createdMs) || createdMs > cutoff) continue;
+      this.incidents.delete(id);
+      removed.push(incident);
+      this.emit("expire", incident);
+    }
+    if (removed.length > 0) {
+      logger.info("Hard-deleted stale incidents", {
+        count: removed.length,
+        maxAgeHours: Math.round(maxAgeMs / 3_600_000),
+      });
+    }
+    return removed;
   }
 }
