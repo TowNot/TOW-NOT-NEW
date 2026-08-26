@@ -1,7 +1,8 @@
-import { ProxyAgent, fetch as undiciFetch } from "undici";
+import { fetch as undiciFetch } from "undici";
 import { config } from "../config";
 import { boundingBox, distanceKm, splitBoundingBox, type BoundingBox } from "./geo";
 import { enabledCoverageZones, zoneToBoundingBox } from "./coverageZones";
+import { getProxyAgent, keepAliveFetch } from "./httpFetch";
 import { logger } from "./pinoCompat";
 import { extractReporterName } from "./reporterName";
 
@@ -826,12 +827,12 @@ async function timedProviderFetch(
     // undici's fetch — Node's global fetch rejects dispatchers from a
     // different undici instance with an opaque "fetch failed".
     const res =
-      "dispatcher" in init
+      "dispatcher" in init && init.dispatcher
         ? ((await undiciFetch(
             url,
             init as unknown as Parameters<typeof undiciFetch>[1],
           )) as unknown as Response)
-        : await fetch(url, init);
+        : await keepAliveFetch(url, init as Parameters<typeof keepAliveFetch>[1]);
     if (isLatest()) {
       s.lastLatencyMs = Date.now() - started;
       s.lastStatus = res.status;
@@ -1065,7 +1066,7 @@ async function fetchWazeDirect(
   // Waze blocks. undici's ProxyAgent is the fetch-native equivalent of
   // https-proxy-agent (Node's global fetch ignores http.Agent instances).
   const proxyUrl = process.env.RESIDENTIAL_PROXY_URL;
-  const dispatcher = proxyUrl ? new ProxyAgent(proxyUrl) : undefined;
+  const dispatcher = proxyUrl ? getProxyAgent(proxyUrl) : undefined;
   const res = await timedProviderFetch("waze_direct", url, {
     // Cast: the installed undici's Dispatcher type differs nominally from the
     // undici-types version bundled with Node, but they're runtime-compatible.

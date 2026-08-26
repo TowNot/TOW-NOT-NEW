@@ -1,4 +1,5 @@
 import { config } from "../../config";
+import { claimIncidentIngest } from "../incidentIngestDedup";
 import { logger } from "../../logger";
 import { IncidentStore } from "../../store/incidentStore";
 import type { Incident } from "../../types/incident";
@@ -85,7 +86,7 @@ export class GoogleMapsTrafficPoller {
     const started = Date.now();
     try {
       const fetchResult = await fetchOpenWebNinjaGoogleMapsForCity(city);
-      const { incidents, stats } = this.ingestIncidents(fetchResult.incidents);
+      const { incidents, stats } = await this.ingestIncidents(fetchResult.incidents);
       logger.info(
         `[GoogleMaps Poll] city=${city.id} | tiles=${fetchResult.tiles} | fetched=${fetchResult.fetched} | retained=${fetchResult.retained} | pushed=${stats.pushed} | merged=${stats.merged} | duration=${fetchResult.latencyMs || Date.now() - started}ms`,
       );
@@ -99,16 +100,25 @@ export class GoogleMapsTrafficPoller {
     }
   }
 
-  private ingestIncidents(incidents: Incident[]): {
+  private async ingestIncidents(incidents: Incident[]): Promise<{
     incidents: Incident[];
     stats: IngestStats;
-  } {
+  }> {
     const ingested: Incident[] = [];
     let pushed = 0;
     let merged = 0;
 
     for (const incident of incidents) {
       if (!isMergeableTrafficIncident(incident)) {
+        if (!this.store.getById(incident.id)) {
+          const claimed = await claimIncidentIngest(incident.id);
+          if (!claimed) {
+            logger.debug("Skipping Google Maps ingest — cluster dedup lock held", {
+              incidentId: incident.id,
+            });
+            continue;
+          }
+        }
         const existed = this.store.getById(incident.id);
         this.store.upsert(incident);
         ingested.push(incident);
@@ -142,6 +152,16 @@ export class GoogleMapsTrafficPoller {
           sources: upserted.sourceDetections?.map((detection) => detection.source),
         });
         continue;
+      }
+
+      if (!this.store.getById(incident.id)) {
+        const claimed = await claimIncidentIngest(incident.id);
+        if (!claimed) {
+          logger.debug("Skipping Google Maps ingest — cluster dedup lock held", {
+            incidentId: incident.id,
+          });
+          continue;
+        }
       }
 
       const existed = this.store.getById(incident.id);

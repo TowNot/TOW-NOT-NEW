@@ -7,6 +7,7 @@ import {
 } from "../coverageZones";
 import { logger } from "../../logger";
 import type { Incident, IncidentSeverity } from "../../types/incident";
+import { keepAliveFetch } from "../httpFetch";
 import { extractReporterName } from "../reporterName";
 import { mergeGoogleMapsRawType, mergeGoogleMapsZoom } from "./googleMapsDisplay";
 import { logGoogleMapsNotificationGate } from "./googleMapsNotificationGate";
@@ -549,7 +550,7 @@ async function fetchZoom(
   // Rollback (accident only): `${ENDPOINT}?${params.toString()}&alert_types=accident`
   // Rollback (incident only): `${ENDPOINT}?${params.toString()}&alert_types=incident`
   const url = `${ENDPOINT}?${params.toString()}&alert_types=accident,incident`;
-  const res = await fetch(url, {
+  const res = await keepAliveFetch(url, {
     headers: {
       "X-API-Key": apiKey,
       Accept: "application/json",

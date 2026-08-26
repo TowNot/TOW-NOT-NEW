@@ -46,6 +46,55 @@ function load(): SubscriptionStoreFile {
 
 let store = load();
 
+/**
+ * Secondary indexes (email → already O(1) via `byEmail`).
+ * Maps foreign keys → email so Stripe webhook lookups stay O(1) as we scale.
+ */
+const byStripeCustomerId = new Map<string, string>();
+const byStripeSubscriptionId = new Map<string, string>();
+const byClientReferenceId = new Map<string, string>();
+
+function clearSecondaryIndexes(): void {
+  byStripeCustomerId.clear();
+  byStripeSubscriptionId.clear();
+  byClientReferenceId.clear();
+}
+
+function unindexRecord(row: SubscriptionRecord): void {
+  if (row.stripeCustomerId && byStripeCustomerId.get(row.stripeCustomerId) === row.email) {
+    byStripeCustomerId.delete(row.stripeCustomerId);
+  }
+  if (
+    row.stripeSubscriptionId &&
+    byStripeSubscriptionId.get(row.stripeSubscriptionId) === row.email
+  ) {
+    byStripeSubscriptionId.delete(row.stripeSubscriptionId);
+  }
+  if (
+    row.clientReferenceId &&
+    byClientReferenceId.get(row.clientReferenceId) === row.email
+  ) {
+    byClientReferenceId.delete(row.clientReferenceId);
+  }
+}
+
+function indexRecord(row: SubscriptionRecord): void {
+  if (row.stripeCustomerId) byStripeCustomerId.set(row.stripeCustomerId, row.email);
+  if (row.stripeSubscriptionId) {
+    byStripeSubscriptionId.set(row.stripeSubscriptionId, row.email);
+  }
+  if (row.clientReferenceId) byClientReferenceId.set(row.clientReferenceId, row.email);
+}
+
+function rebuildSecondaryIndexes(): void {
+  clearSecondaryIndexes();
+  for (const row of Object.values(store.byEmail)) {
+    indexRecord(row);
+  }
+}
+
+rebuildSecondaryIndexes();
+
 function persist(): void {
   try {
     writeFileSync(resolveStorePath(), JSON.stringify(store, null, 2));
@@ -54,6 +103,18 @@ function persist(): void {
       error: error instanceof Error ? error.message : String(error),
     });
   }
+}
+
+function putRecord(record: SubscriptionRecord, previous?: SubscriptionRecord | null): void {
+  if (previous) {
+    unindexRecord(previous);
+    if (previous.email !== record.email) {
+      delete store.byEmail[previous.email];
+    }
+  }
+  store.byEmail[record.email] = record;
+  indexRecord(record);
+  persist();
 }
 
 export function findSubscriptionByEmail(email: string): SubscriptionRecord | null {
@@ -65,13 +126,24 @@ export function findSubscriptionByEmail(email: string): SubscriptionRecord | nul
 export function findSubscriptionByCustomerId(customerId: string): SubscriptionRecord | null {
   const id = customerId.trim();
   if (!id) return null;
-  return Object.values(store.byEmail).find((row) => row.stripeCustomerId === id) ?? null;
+  const email = byStripeCustomerId.get(id);
+  return email ? (store.byEmail[email] ?? null) : null;
 }
 
 export function findSubscriptionBySubscriptionId(subscriptionId: string): SubscriptionRecord | null {
   const id = subscriptionId.trim();
   if (!id) return null;
-  return Object.values(store.byEmail).find((row) => row.stripeSubscriptionId === id) ?? null;
+  const email = byStripeSubscriptionId.get(id);
+  return email ? (store.byEmail[email] ?? null) : null;
+}
+
+export function findSubscriptionByClientReferenceId(
+  clientReferenceId: string,
+): SubscriptionRecord | null {
+  const id = clientReferenceId.trim();
+  if (!id) return null;
+  const email = byClientReferenceId.get(id);
+  return email ? (store.byEmail[email] ?? null) : null;
 }
 
 export function isSubscriptionActive(email: string): boolean {
@@ -103,6 +175,9 @@ export function activateSubscription(input: {
   if (email) existing = findSubscriptionByEmail(email);
   if (!existing && customerId) existing = findSubscriptionByCustomerId(customerId);
   if (!existing && subscriptionId) existing = findSubscriptionBySubscriptionId(subscriptionId);
+  if (!existing && clientReferenceId) {
+    existing = findSubscriptionByClientReferenceId(clientReferenceId);
+  }
 
   if (!email && !existing) {
     throw new Error(
@@ -121,13 +196,7 @@ export function activateSubscription(input: {
     updatedAt: now,
   };
 
-  // If we remapped to a new email key, drop a stale customer-id-only row.
-  if (existing && existing.email !== key) {
-    delete store.byEmail[existing.email];
-  }
-
-  store.byEmail[key] = record;
-  persist();
+  putRecord(record, existing);
   return record;
 }
 
@@ -158,8 +227,7 @@ export function revokeSubscription(input: {
     stripeCustomerId: customerId ?? existing.stripeCustomerId,
     updatedAt: now,
   };
-  store.byEmail[existing.email] = record;
-  persist();
+  putRecord(record, existing);
   return record;
 }
 

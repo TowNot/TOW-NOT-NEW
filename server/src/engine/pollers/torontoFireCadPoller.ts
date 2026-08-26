@@ -1,4 +1,6 @@
 import { config } from "../../config";
+import { claimIncidentIngest } from "../incidentIngestDedup";
+import { keepAliveFetch } from "../httpFetch";
 import { logger } from "../../logger";
 import type { IncidentStore } from "../../store/incidentStore";
 import type { Incident } from "../../types/incident";
@@ -60,7 +62,7 @@ function buildLocationQuery(event: TorontoFireCadEvent): string | null {
 
 async function geocodeToronto(query: string): Promise<{ lat: number; lng: number } | null> {
   const q = encodeURIComponent(query);
-  const res = await fetch(
+  const res = await keepAliveFetch(
     `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1&countrycodes=ca`,
     {
       headers: { "User-Agent": "AlertNav-TorontoFireCad/1.0" },
@@ -237,6 +239,15 @@ export class TorontoFireCadPoller {
         });
         return "skipped";
       }
+    }
+
+    if (!(await claimIncidentIngest(id))) {
+      this.seenEventNums.add(event.eventNum);
+      logger.debug("[Toronto Fire CAD] Skipping ingest — cluster dedup lock held", {
+        eventNum: event.eventNum,
+        id,
+      });
+      return "skipped";
     }
 
     this.store.upsert(incident);

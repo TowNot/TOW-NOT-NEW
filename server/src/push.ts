@@ -2,6 +2,7 @@ import { config } from "./config";
 import { zoneIdForCoordinates, zonePolicePushTag, zonePushTag } from "./engine/coverageZones";
 import { fireDispatchDisplayLabel } from "./engine/fireDispatchLabel";
 import { formatOpenWebNinjaGoogleMapsLabel } from "./engine/googleMaps/googleMapsDisplay";
+import { keepAliveFetch } from "./engine/httpFetch";
 import {
   isTorontoFireCadProvider,
   TORONTO_FIRE_CAD_PROVIDER,
@@ -200,7 +201,7 @@ async function postProgressier(
     url: body.url,
   });
 
-  const response = await fetch(config.progressierPushUrl, {
+  const response = await keepAliveFetch(config.progressierPushUrl, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,

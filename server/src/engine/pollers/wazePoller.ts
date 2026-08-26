@@ -1,4 +1,5 @@
 import { config } from "../../config";
+import { claimIncidentIngest } from "../incidentIngestDedup";
 import { logger } from "../../logger";
 import { IncidentStore } from "../../store/incidentStore";
 import type { Incident, IncidentSeverity, IncidentSource } from "../../types/incident";
@@ -140,7 +141,7 @@ export class WazeTrafficPoller {
     if (this.liveProviders().length === 0) return [];
     try {
       const alerts = await fetchBlocksInsideForZone(zone);
-      return this.ingestAlerts(alerts);
+      return await this.ingestAlerts(alerts);
     } catch (error) {
       logger.error("Live traffic poll failed", {
         zone: zone.id,
@@ -150,7 +151,7 @@ export class WazeTrafficPoller {
     }
   }
 
-  private ingestAlerts(alerts: WazeAlert[]): Incident[] {
+  private async ingestAlerts(alerts: WazeAlert[]): Promise<Incident[]> {
     const ingested: Incident[] = [];
     for (const alert of alerts) {
       const incident = mapWazeAlert(alert);
@@ -165,6 +166,16 @@ export class WazeTrafficPoller {
             incomingId: incident.id,
             mergedIntoId: nearby.id,
             sources: merged.sourceDetections?.map((detection) => detection.source),
+          });
+          continue;
+        }
+      }
+
+      if (!this.store.getById(incident.id)) {
+        const claimed = await claimIncidentIngest(incident.id);
+        if (!claimed) {
+          logger.debug("Skipping Waze ingest — cluster dedup lock held", {
+            incidentId: incident.id,
           });
           continue;
         }

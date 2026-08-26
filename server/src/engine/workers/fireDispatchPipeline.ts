@@ -15,7 +15,9 @@ import {
   type DispatchPriority,
 } from "../dispatchKeywords";
 import { speechToText } from "../deepgramClient";
+import { claimIncidentIngest } from "../incidentIngestDedup";
 import { fireDispatchDisplayLabel } from "../fireDispatchLabel";
+import { keepAliveFetch } from "../httpFetch";
 import { getCoverageZone } from "../zones.config";
 import type { Incident, IncidentSource } from "../../types/incident";
 import type { IncidentStore } from "../../store/incidentStore";
@@ -112,7 +114,7 @@ async function geocodeZoneLocation(
   const zone = getCoverageZone(zoneId);
   const city = zone?.name ?? "Ontario";
   const q = encodeURIComponent(`${location}, ${city}, Ontario, Canada`);
-  const res = await fetch(
+  const res = await keepAliveFetch(
     `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`,
     { headers: { "User-Agent": "AlertNav-FireDispatch/1.0" } },
   );
@@ -294,6 +296,14 @@ export class FireDispatchProcessor {
         `[fire-dispatch] ${this.ctx.label} DEDUPED: alertId ${id} already dispatched within 30min`,
       );
       return;
+    }
+
+    if (!this.incidentStore.getById(id)) {
+      const claimed = await claimIncidentIngest(id);
+      if (!claimed) {
+        logger.debug({ alertId: id }, "[fire-dispatch] Skipping ingest — cluster dedup lock held");
+        return;
+      }
     }
 
     let audioUrl = this.incidentStore.getById(id)?.audioUrl;

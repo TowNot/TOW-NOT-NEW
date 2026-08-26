@@ -1,4 +1,5 @@
 import { config } from "../config";
+import { keepAliveFetch } from "./httpFetch";
 import { STT_RETRY_POLICY, withTransientRetry } from "./retryPolicy";
 
 /** Minimal surface used by the dry-run script. Live STT uses fetch, not the SDK. */
@@ -93,7 +94,7 @@ async function transcribeOnce(wav: Buffer): Promise<string> {
 
   // Copy off the Buffer pool so Blob/undici cannot see extra pooled bytes.
   const body = new Blob([Uint8Array.from(wav)], { type: "audio/wav" });
-  const response = await fetch(`https://api.deepgram.com/v1/listen?${params.toString()}`, {
+  const response = await keepAliveFetch(`https://api.deepgram.com/v1/listen?${params.toString()}`, {
     method: "POST",
     headers: {
       Authorization: `Token ${config.deepgramApiKey}`,

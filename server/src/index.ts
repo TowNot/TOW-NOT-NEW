@@ -19,6 +19,7 @@ import { WazeTrafficPoller } from "./engine/pollers/wazePoller";
 import { RadioIngestionWorker } from "./engine/workers/radioIngestionWorker";
 import { logger } from "./logger";
 import { closeNotificationQueue } from "./queue/notificationQueue";
+import { closeSharedRedis } from "./queue/redisClient";
 import { IncidentStore } from "./store/incidentStore";
 import {
   startNotificationWorker,
@@ -197,7 +198,11 @@ function shutdown(signal: string): void {
   logger.info("Shutting down", { signal });
   engine.stop();
   store.stop();
-  void Promise.allSettled([stopNotificationWorker(), closeNotificationQueue()]).finally(() => {
+  void Promise.allSettled([
+    stopNotificationWorker(),
+    closeNotificationQueue(),
+    closeSharedRedis(),
+  ]).finally(() => {
     server.close(() => {
       process.exit(0);
     });

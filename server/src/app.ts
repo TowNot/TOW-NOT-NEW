@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { clerkMiddleware } from "@clerk/express";
+import compression from "compression";
 import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
 import helmet from "helmet";
@@ -51,6 +52,17 @@ export function createApp(store: IncidentStore, dispatcher: PushDispatcher): exp
       origin: [config.clientOrigin, "http://127.0.0.1:5173"],
       methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
       credentials: true,
+    }),
+  );
+
+  // gzip/br JSON and static responses for high-concurrency desk polling.
+  app.use(
+    compression({
+      threshold: 1024,
+      filter(req, res) {
+        if (req.headers["x-no-compression"]) return false;
+        return compression.filter(req, res);
+      },
     }),
   );
 

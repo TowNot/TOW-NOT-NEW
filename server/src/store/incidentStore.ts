@@ -26,6 +26,7 @@ function higherSeverity(current: IncidentSeverity, incoming: IncidentSeverity): 
 }
 
 export class IncidentStore extends EventEmitter {
+  /** Primary index: incident id → row (dedup / getById are O(1)). */
   private readonly incidents = new Map<string, Incident>();
   private pruneTimer: NodeJS.Timeout | null = null;
   private hardDeleteTimer: NodeJS.Timeout | null = null;
