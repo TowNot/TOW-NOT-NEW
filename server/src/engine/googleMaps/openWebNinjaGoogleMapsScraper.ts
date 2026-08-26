@@ -214,6 +214,23 @@ const EXCLUDED_KEYWORDS = [
   "closed",
 ];
 
+/**
+ * True crashes / high-severity ACCIDENT rows must not be killed because the
+ * payload mentions nearby construction (e.g. Wellington & Baseline).
+ * Pure construction / closure *types* are already hard-dropped in classify().
+ */
+function shouldBypassConstructionKeywordFilter(
+  rawType: string,
+  mapped: { type: string; severity: IncidentSeverity },
+): boolean {
+  const key = rawType.toLowerCase().trim();
+  if (ACCIDENT_TYPE_WHITELIST.has(key)) return true;
+  if (mapped.type === "ACCIDENT" && (mapped.severity === "high" || mapped.severity === "critical")) {
+    return true;
+  }
+  return false;
+}
+
 function collectRawAlertText(raw: RawAlert, mappedTitle: string, mappedDescription: string): string {
   const parts = [
     mappedTitle,
@@ -427,12 +444,18 @@ function toIncident(
     collectRawAlertText(raw, mapped.title, description),
   );
   if (excludedKeyword) {
-    logGoogleMapsNotificationGate(
-      incidentId,
-      "DROPPED (Keyword filter)",
-      `keyword="${excludedKeyword}" | rawType=${normalizedRawType ?? rawType}`,
-    );
-    return null;
+    if (shouldBypassConstructionKeywordFilter(rawType, mapped)) {
+      logger.info(
+        `[Filter] Accident kept despite construction keywords in description | id=${incidentId} | keyword="${excludedKeyword}" | rawType=${normalizedRawType ?? rawType}`,
+      );
+    } else {
+      logGoogleMapsNotificationGate(
+        incidentId,
+        "DROPPED (Keyword filter)",
+        `keyword="${excludedKeyword}" | rawType=${normalizedRawType ?? rawType}`,
+      );
+      return null;
+    }
   }
 
   return {
