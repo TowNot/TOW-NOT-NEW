@@ -30,7 +30,7 @@ let queue: Queue<DispatchNotificationJobData> | null = null;
  * pure integers. Incident ids like `gmaps:ACCIDENT:42.9:-81.1` must be mapped.
  */
 export function bullMqJobIdForIncident(incidentId: string): string {
-  const safe = incidentId.trim().replace(/[:/]/g, "_");
+  const safe = incidentId.trim().replace(/[:/]/g, "-");
   return safe.startsWith("inc-") ? safe : `inc-${safe}`;
 }
 
