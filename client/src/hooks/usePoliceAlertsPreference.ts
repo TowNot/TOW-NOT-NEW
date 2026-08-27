@@ -4,9 +4,7 @@ import {
   writePoliceAlertsEnabled,
 } from "../lib/policeAlerts";
 import {
-  DEFAULT_ZONE_ID,
-  readLocalZoneId,
-  syncProgressierPushTags,
+  syncProgressierTagsFromStorage,
 } from "../lib/zones";
 
 /**
@@ -25,9 +23,7 @@ export function usePoliceAlertsPreference() {
   const setPoliceAlertsEnabled = useCallback((next: boolean) => {
     writePoliceAlertsEnabled(next);
     setEnabled(next);
-    syncProgressierPushTags(readLocalZoneId() ?? DEFAULT_ZONE_ID, {
-      policeAlertsEnabled: next,
-    });
+    syncProgressierTagsFromStorage();
   }, []);
 
   const togglePoliceAlerts = useCallback(() => {

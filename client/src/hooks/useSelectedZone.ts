@@ -5,7 +5,7 @@ import {
   isZoneEnabledForDesk,
   isZoneId,
   readLocalZoneId,
-  syncProgressierPushTags,
+  syncProgressierTagsFromStorage,
   writeLocalZoneId,
   type CoverageZone,
   type ZoneId,
@@ -88,7 +88,7 @@ export function useSelectedZone(user?: ZoneUser | null) {
   }, [localZoneId]);
 
   useEffect(() => {
-    syncProgressierPushTags(selectedZoneId);
+    syncProgressierTagsFromStorage(selectedZoneId);
   }, [selectedZoneId]);
 
   const saveZone = useCallback(
@@ -98,7 +98,7 @@ export function useSelectedZone(user?: ZoneUser | null) {
       setLocalZoneId(zoneId);
       setSavedCityId(zoneId);
       // Overwrite Progressier tags immediately so the previous city stops receiving.
-      syncProgressierPushTags(zoneId);
+      syncProgressierTagsFromStorage(zoneId);
       if (user) {
         try {
           if (user.update) {

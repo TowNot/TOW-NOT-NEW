@@ -1,4 +1,9 @@
 import { useEffect, useRef } from "react";
+import {
+  passesDeskFilters,
+  readDeskFilterPreferences,
+  type DeskFilterPreferences,
+} from "../lib/deskFilterPreferences";
 import { showIncidentNotification } from "../lib/showIncidentNotification";
 import type { Incident } from "../types";
 
@@ -17,13 +22,17 @@ async function hasActivePushSubscription(): Promise<boolean> {
 }
 
 /**
- * In-app / OS banner for new SSE incidents.
- * Skipped when Progressier push is active — the service worker already banners,
- * and a second `new Notification()` would duplicate.
+ * In-app / OS banner for new SSE incidents when Progressier push is inactive.
+ * Respects persisted desk filter toggles (sources + Accidents/Incidents).
  */
-export function useAlertOnNewIncidents(incidents: Incident[]): void {
+export function useAlertOnNewIncidents(
+  incidents: Incident[],
+  preferences: DeskFilterPreferences,
+): void {
   const seen = useRef<Set<string>>(new Set());
   const primed = useRef(false);
+  const prefsRef = useRef(preferences);
+  prefsRef.current = preferences;
 
   useEffect(() => {
     if (!primed.current) {
@@ -32,13 +41,19 @@ export function useAlertOnNewIncidents(incidents: Incident[]): void {
       return;
     }
 
-    const newcomers = incidents.filter((incident) => !seen.current.has(incident.id));
+    const prefs = prefsRef.current;
+    const newcomers = incidents.filter(
+      (incident) =>
+        !seen.current.has(incident.id) && passesDeskFilters(incident, prefs),
+    );
     newcomers.forEach((incident) => seen.current.add(incident.id));
     if (newcomers.length === 0) return;
 
     void hasActivePushSubscription().then((pushActive) => {
       if (pushActive) return;
+      const livePrefs = readDeskFilterPreferences();
       for (const incident of newcomers) {
+        if (!passesDeskFilters(incident, livePrefs)) continue;
         showIncidentNotification({
           id: incident.id,
           title: incident.title,
@@ -46,5 +61,5 @@ export function useAlertOnNewIncidents(incidents: Incident[]): void {
         });
       }
     });
-  }, [incidents]);
+  }, [incidents, preferences]);
 }

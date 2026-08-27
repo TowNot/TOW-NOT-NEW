@@ -1,3 +1,5 @@
+import type { PushCategory } from "../engine/pushCategories";
+
 export type IncidentSource = "waze" | "google_maps" | "fire_dispatch" | "ems";
 
 export type IncidentSeverity = "low" | "medium" | "high" | "critical";
@@ -52,9 +54,11 @@ export interface PushPayload {
   severity?: IncidentSeverity;
   incidentId?: string;
   url?: string;
-  /** When set, Progressier targets only devices tagged `zone-<id>`. */
+  /** When set, Progressier targets only devices tagged for this city + category. */
   zoneId?: string;
-  /** Opt-in police audience uses `zone-<id>-waze-police` instead of the zone tag. */
+  /** Category tag for this push — must match a tag on the subscriber device. */
+  pushCategory?: PushCategory;
+  /** @deprecated Prefer pushCategory. Manual sends may still pass zone / zone_police. */
   audience?: "zone" | "zone_police";
   /** Optional Waze / Google Maps reporter for clients that read push data. */
   reporterName?: string;

@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  DEFAULT_ZONE_ID,
-  readLocalZoneId,
-  syncProgressierPushTags,
+  syncProgressierTagsFromStorage,
 } from "../lib/zones";
 
 const LOAD_TIMEOUT_MS = 8_000;
@@ -44,7 +42,7 @@ async function getSubscription(): Promise<PushSubscription | null> {
 }
 
 function syncZoneTags(): void {
-  syncProgressierPushTags(readLocalZoneId() ?? DEFAULT_ZONE_ID);
+  syncProgressierTagsFromStorage();
 }
 
 export function useProgressier() {

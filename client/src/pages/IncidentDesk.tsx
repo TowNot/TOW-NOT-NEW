@@ -1,13 +1,16 @@
+import { useEffect } from "react";
 import { Header } from "../components/Header";
 import { IncidentFeed } from "../components/IncidentFeed";
 import { PoliceAlertsSettings } from "../components/PoliceAlertsSettings";
 import { SmsSettings } from "../components/SmsSettings";
 import { useAlertOnNewIncidents } from "../hooks/useAlertOnNewIncidents";
+import { useDeskFilterPreferences } from "../hooks/useDeskFilterPreferences";
 import { useIncidents } from "../hooks/useIncidents";
 import { usePoliceAlertsPreference } from "../hooks/usePoliceAlertsPreference";
 import { useProgressier } from "../hooks/useProgressier";
 import { usePushAlertBridge } from "../hooks/usePushAlertBridge";
 import { useSelectedZone, type ZoneUser } from "../hooks/useSelectedZone";
+import { syncIncidentRegistry } from "../lib/incidentRegistry";
 import { isPoliceIncident } from "../lib/policeAlerts";
 import { getZone, incidentInZone } from "../lib/zones";
 
@@ -20,7 +23,18 @@ export function IncidentDesk({ user }: { user?: ZoneUser | null }) {
   const { incidents, connected, health } = useIncidents();
   const { selectedZoneId, saveZone, fallbackZone } = useSelectedZone(user);
   const { enabled: policeAlertsEnabled, togglePoliceAlerts } = usePoliceAlertsPreference();
+  const {
+    preferences: deskFilters,
+    toggleAccidents,
+    toggleIncidents,
+    toggleSource,
+  } = useDeskFilterPreferences();
   const activeZone = getZone(selectedZoneId) ?? fallbackZone;
+
+  useEffect(() => {
+    syncIncidentRegistry(incidents);
+  }, [incidents]);
+
   const zoneIncidents = incidents.filter((incident) => {
     if (
       !policeAlertsEnabled &&
@@ -36,7 +50,7 @@ export function IncidentDesk({ user }: { user?: ZoneUser | null }) {
   });
 
   useProgressier();
-  useAlertOnNewIncidents(zoneIncidents);
+  useAlertOnNewIncidents(zoneIncidents, deskFilters);
   usePushAlertBridge();
 
   return (
@@ -56,6 +70,10 @@ export function IncidentDesk({ user }: { user?: ZoneUser | null }) {
       </div>
       <IncidentFeed
         incidents={zoneIncidents}
+        preferences={deskFilters}
+        onToggleAccidents={toggleAccidents}
+        onToggleIncidents={toggleIncidents}
+        onToggleSource={toggleSource}
         zoneName={activeZone.name}
         hasFireFeed={activeZone.hasFireFeed}
         hasEmsFeed={activeZone.hasEmsFeed}

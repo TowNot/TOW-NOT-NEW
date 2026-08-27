@@ -58,6 +58,26 @@ export function zonePolicePushTag(zoneId: string): string {
   return `zone-${zoneId}-waze-police`;
 }
 
+/** Opt-in tag for non-police Waze pushes in a city. */
+export function zoneWazePushTag(zoneId: string): string {
+  return `zone-${zoneId}-waze`;
+}
+
+/** Opt-in tag for Google Maps accident / closure pushes in a city. */
+export function zoneGoogleMapsAccidentsPushTag(zoneId: string): string {
+  return `zone-${zoneId}-google-maps-accidents`;
+}
+
+/** Opt-in tag for generic Google Maps incident pushes in a city. */
+export function zoneGoogleMapsIncidentsPushTag(zoneId: string): string {
+  return `zone-${zoneId}-google-maps-incidents`;
+}
+
+/** Opt-in tag for fire-dispatch pushes in a city. */
+export function zoneFirePushTag(zoneId: string): string {
+  return `zone-${zoneId}-fire`;
+}
+
 /** Coverage zones that are both ingest-enabled and selected by active users. */
 export async function getMonitoredCoverageZones(): Promise<CoverageZoneDef[]> {
   const active = new Set(await getActiveMonitoredCities());

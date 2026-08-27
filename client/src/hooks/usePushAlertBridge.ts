@@ -1,5 +1,10 @@
 import { useEffect } from "react";
 import { markPushAlerted } from "../lib/dispatchAlerts";
+import {
+  passesDeskFilters,
+  readDeskFilterPreferences,
+} from "../lib/deskFilterPreferences";
+import { getIncidentById } from "../lib/incidentRegistry";
 import { showIncidentNotification } from "../lib/showIncidentNotification";
 
 interface AlertNavAlertMessage {
@@ -22,7 +27,7 @@ function incidentIdFromUrl(url: string | undefined): string | null {
  * Foreground bridge for Progressier push messages.
  * OS banner is owned by Progressier's SW (background). When a /desk tab is
  * visible, Progressier may skip showNotification — then we banner once here.
- * Never banner again on top of Progressier's background display.
+ * Skips banners when desk filter toggles block the incident category.
  */
 export function usePushAlertBridge(): void {
   useEffect(() => {
@@ -34,6 +39,10 @@ export function usePushAlertBridge(): void {
 
       const incidentId = incidentIdFromUrl(data.url);
       if (incidentId) markPushAlerted(incidentId);
+
+      const incident = incidentId ? getIncidentById(incidentId) : undefined;
+      const prefs = readDeskFilterPreferences();
+      if (incident && !passesDeskFilters(incident, prefs)) return;
 
       if (document.visibilityState === "visible") {
         showIncidentNotification({

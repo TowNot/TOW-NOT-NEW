@@ -1,5 +1,10 @@
 import { config } from "./config";
-import { zoneIdForCoordinates, zonePolicePushTag, zonePushTag } from "./engine/coverageZones";
+import { zoneIdForCoordinates } from "./engine/coverageZones";
+import {
+  pushCategoryForIncident,
+  pushTagForCategory,
+  type PushCategory,
+} from "./engine/pushCategories";
 import { fireDispatchDisplayLabel } from "./engine/fireDispatchLabel";
 import { formatOpenWebNinjaGoogleMapsLabel } from "./engine/googleMaps/googleMapsDisplay";
 import { keepAliveFetch } from "./engine/httpFetch";
@@ -93,15 +98,18 @@ export function resolvePushDestination(payload: PushPayload): string {
   return absoluteUrl("/desk");
 }
 
-/** Single-city recipients — only devices tagged for this zone (or police opt-in). */
+function resolvePushCategory(payload: PushPayload): PushCategory {
+  if (payload.pushCategory) return payload.pushCategory;
+  if (payload.audience === "zone_police") return "waze_police";
+  return "zone";
+}
+
+/** Single-city recipients — only devices tagged for this zone + category. */
 export function recipientsForIncidentZone(
   zoneId: string,
-  audience: PushPayload["audience"] = "zone",
+  pushCategory: PushCategory = "zone",
 ): Record<string, string> {
-  if (audience === "zone_police") {
-    return { tags: zonePolicePushTag(zoneId) };
-  }
-  return { tags: zonePushTag(zoneId) };
+  return { tags: pushTagForCategory(zoneId, pushCategory) };
 }
 
 export function buildProgressierPayload(
@@ -183,7 +191,7 @@ export function incidentToPushPayload(incident: Incident): PushPayload {
     incidentId: incident.id,
     url: `/desk?incident=${encodeURIComponent(incident.id)}`,
     zoneId: zoneId ?? undefined,
-    audience: police ? "zone_police" : "zone",
+    pushCategory: pushCategoryForIncident(incident),
     ...(incident.reporterName ? { reporterName: incident.reporterName } : {}),
   };
 }
@@ -250,8 +258,7 @@ async function postProgressier(
 
 /**
  * Strict single-city Progressier send.
- * Accidents → only `zone-<id>` (one send even if device also has police tag).
- * Police → only `zone-<id>-waze-police` (never also zone tag — no double-send).
+ * Each incident targets one category tag (waze, gmaps, fire, police, etc.).
  * Incidents outside known boxes are skipped. Test pushes still broadcast.
  */
 export async function sendProgressierPush(payload: PushPayload): Promise<void> {
@@ -269,7 +276,7 @@ export async function sendProgressierPush(payload: PushPayload): Promise<void> {
   }
 
   const recipients = zoneId
-    ? recipientsForIncidentZone(zoneId, payload.audience ?? "zone")
+    ? recipientsForIncidentZone(zoneId, resolvePushCategory(payload))
     : { ...PROGRESSIER_RECIPIENTS };
 
   await postProgressier(apiKey, buildProgressierPayload(payload, recipients), payload.incidentId);

@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
 import type { Incident, IncidentSource } from "../types";
 import { fireDispatchDisplayLabel } from "../lib/fireDispatchLabel";
-import { passesMapAlertFilters } from "../lib/mapAlertFilters";
+import type { DeskFilterPreferences } from "../lib/deskFilterPreferences";
+import { passesDeskFilters } from "../lib/deskFilterPreferences";
 import { IncidentCard } from "./IncidentCard";
 
 const SOURCE_ORDER: IncidentSource[] = ["waze", "google_maps", "fire_dispatch", "ems"];
@@ -15,6 +15,10 @@ const SOURCE_SHORT: Record<IncidentSource, string> = {
 
 interface IncidentFeedProps {
   incidents: Incident[];
+  preferences: DeskFilterPreferences;
+  onToggleAccidents: () => void;
+  onToggleIncidents: () => void;
+  onToggleSource: (source: IncidentSource) => void;
   /** Display name of the active coverage city (for Fire coming-soon copy). */
   zoneName: string;
   /** When false, Fire pillar is grayed out (audio feed TBD / pending). */
@@ -25,42 +29,40 @@ interface IncidentFeedProps {
 
 export function IncidentFeed({
   incidents,
+  preferences,
+  onToggleAccidents,
+  onToggleIncidents,
+  onToggleSource,
   zoneName,
   hasFireFeed,
   hasEmsFeed,
 }: IncidentFeedProps) {
-  const [activeSources, setActiveSources] = useState<Set<IncidentSource>>(
-    () => new Set(SOURCE_ORDER),
+  const { showAccidents, showIncidents, waze, google_maps, fire_dispatch } = preferences;
+
+  const activeSources = new Set<IncidentSource>(
+    SOURCE_ORDER.filter((source) => {
+      if (source === "waze") return waze;
+      if (source === "google_maps") return google_maps;
+      if (source === "fire_dispatch") return fire_dispatch;
+      return true;
+    }),
   );
-  /** Default both on — show accidents/construction and general incidents. */
-  const [showAccidents, setShowAccidents] = useState(true);
-  const [showIncidents, setShowIncidents] = useState(true);
 
   const counts = SOURCE_ORDER.map((source) => ({
     source,
     count: incidents.filter((incident) => incident.source === source).length,
   }));
 
-  const filtered = useMemo(
-    () =>
-      incidents.filter((incident) => {
-        if (incident.source === "ems" && !hasEmsFeed) return false;
-        if (incident.source === "fire_dispatch" && !hasFireFeed) return false;
-        if (!activeSources.has(incident.source)) return false;
-        return passesMapAlertFilters(incident, showAccidents, showIncidents);
-      }),
-    [incidents, activeSources, hasEmsFeed, hasFireFeed, showAccidents, showIncidents],
-  );
+  const filtered = incidents.filter((incident) => {
+    if (incident.source === "ems" && !hasEmsFeed) return false;
+    if (incident.source === "fire_dispatch" && !hasFireFeed) return false;
+    return passesDeskFilters(incident, preferences);
+  });
 
   function toggleSource(source: IncidentSource) {
     if (source === "ems" && !hasEmsFeed) return;
     if (source === "fire_dispatch" && !hasFireFeed) return;
-    setActiveSources((prev) => {
-      const next = new Set(prev);
-      if (next.has(source)) next.delete(source);
-      else next.add(source);
-      return next;
-    });
+    onToggleSource(source);
   }
 
   return (
@@ -134,14 +136,14 @@ export function IncidentFeed({
           label="Accidents"
           description="Crashes and construction / road closures"
           enabled={showAccidents}
-          onToggle={() => setShowAccidents((v) => !v)}
+          onToggle={onToggleAccidents}
           onClass="border-rose-300 bg-rose-50 text-rose-800"
         />
         <MapTypeToggle
           label="Incidents"
           description="General Google Maps incident pins"
           enabled={showIncidents}
-          onToggle={() => setShowIncidents((v) => !v)}
+          onToggle={onToggleIncidents}
           onClass="border-amber-300 bg-amber-50 text-amber-900"
         />
       </div>

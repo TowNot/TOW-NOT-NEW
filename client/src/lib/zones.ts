@@ -1,4 +1,8 @@
 /** London-proven half-span for every Southern Ontario coverage box. */
+import {
+  readDeskFilterPreferences,
+  type DeskFilterPreferences,
+} from "./deskFilterPreferences";
 import { readPoliceAlertsEnabled } from "./policeAlerts";
 
 const ZONE_LAT_HALF = 0.09;
@@ -314,23 +318,60 @@ export function zonePolicePushTag(zoneId: ZoneId): string {
   return `zone-${zoneId}-waze-police`;
 }
 
+/** Opt-in tag for non-police Waze pushes in this city. */
+export function zoneWazePushTag(zoneId: ZoneId): string {
+  return `zone-${zoneId}-waze`;
+}
+
+/** Opt-in tag for Google Maps accident / closure pushes in this city. */
+export function zoneGoogleMapsAccidentsPushTag(zoneId: ZoneId): string {
+  return `zone-${zoneId}-google-maps-accidents`;
+}
+
+/** Opt-in tag for generic Google Maps incident pushes in this city. */
+export function zoneGoogleMapsIncidentsPushTag(zoneId: ZoneId): string {
+  return `zone-${zoneId}-google-maps-incidents`;
+}
+
+/** Opt-in tag for fire-dispatch pushes in this city. */
+export function zoneFirePushTag(zoneId: ZoneId): string {
+  return `zone-${zoneId}-fire`;
+}
+
 export interface ProgressierTagOptions {
   policeAlertsEnabled?: boolean;
+  deskFilters?: DeskFilterPreferences;
 }
 
 /**
  * Progressier tags for the active city only.
  * Passed as an array so Progressier overwrites prior tags (drops the previous city).
- * When police alerts are enabled, also includes `zone-<id>-waze-police`.
+ * Category tags are added only while the matching desk toggle is ON.
  */
 export function progressierTagsForPush(
   zoneId: ZoneId,
   options?: ProgressierTagOptions,
 ): string[] {
   const tags = ["tow-not", zonePushTag(zoneId)];
-  if (options?.policeAlertsEnabled) {
+  const deskFilters = options?.deskFilters ?? readDeskFilterPreferences();
+  const policeAlertsEnabled = options?.policeAlertsEnabled ?? readPoliceAlertsEnabled();
+
+  if (policeAlertsEnabled) {
     tags.push(zonePolicePushTag(zoneId));
   }
+  if (deskFilters.waze) {
+    tags.push(zoneWazePushTag(zoneId));
+  }
+  if (deskFilters.google_maps && deskFilters.showAccidents) {
+    tags.push(zoneGoogleMapsAccidentsPushTag(zoneId));
+  }
+  if (deskFilters.google_maps && deskFilters.showIncidents) {
+    tags.push(zoneGoogleMapsIncidentsPushTag(zoneId));
+  }
+  if (deskFilters.fire_dispatch) {
+    tags.push(zoneFirePushTag(zoneId));
+  }
+
   return tags;
 }
 
@@ -340,13 +381,17 @@ export function syncProgressierPushTags(
   options?: ProgressierTagOptions,
 ): void {
   try {
-    const policeAlertsEnabled = options?.policeAlertsEnabled ?? readPoliceAlertsEnabled();
     window.progressier?.add?.({
-      tags: progressierTagsForPush(zoneId, { policeAlertsEnabled }),
+      tags: progressierTagsForPush(zoneId, options),
     });
   } catch {
     // Progressier may not be loaded yet.
   }
+}
+
+/** Re-read localStorage prefs and sync Progressier tags for the active city. */
+export function syncProgressierTagsFromStorage(zoneId?: ZoneId): void {
+  syncProgressierPushTags(zoneId ?? readLocalZoneId() ?? DEFAULT_ZONE_ID);
 }
 
 export function isZoneId(value: unknown): value is ZoneId {
