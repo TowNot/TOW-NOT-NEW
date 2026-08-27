@@ -2,14 +2,17 @@ import type { ReactNode } from "react";
 import { SiteFooter } from "./SiteFooter";
 
 interface LegalDocumentLayoutProps {
-  title: string;
+  title?: string;
   effectiveDate?: string;
+  /** When true, omit the layout title/date (document HTML includes its own). */
+  hideTitle?: boolean;
   children: ReactNode;
 }
 
 export function LegalDocumentLayout({
   title,
   effectiveDate = "August 27, 2026",
+  hideTitle = false,
   children,
 }: LegalDocumentLayoutProps) {
   return (
@@ -32,9 +35,19 @@ export function LegalDocumentLayout({
       </header>
 
       <main className="mx-auto max-w-3xl px-5 py-10 pb-16 sm:py-12">
-        <h1 className="text-3xl font-bold tracking-tight text-cobalt sm:text-4xl">{title}</h1>
-        <p className="mt-2 text-sm text-gray-500">Effective date: {effectiveDate}</p>
-        <div className="legal-prose mt-8 space-y-5 text-sm leading-relaxed text-gray-700 sm:text-[15px]">
+        {!hideTitle && title ? (
+          <>
+            <h1 className="text-3xl font-bold tracking-tight text-cobalt sm:text-4xl">{title}</h1>
+            <p className="mt-2 text-sm text-gray-500">Effective date: {effectiveDate}</p>
+          </>
+        ) : null}
+        <div
+          className={
+            hideTitle
+              ? "legal-prose text-sm leading-relaxed text-gray-700 sm:text-[15px]"
+              : "legal-prose mt-8 space-y-5 text-sm leading-relaxed text-gray-700 sm:text-[15px]"
+          }
+        >
           {children}
         </div>
       </main>

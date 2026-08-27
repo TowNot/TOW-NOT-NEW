@@ -1,5 +1,10 @@
 /// <reference types="vite/client" />
 
+declare module "*.html?raw" {
+  const content: string;
+  export default content;
+}
+
 interface ImportMetaEnv {
   readonly VITE_STRIPE_CHECKOUT_URL?: string;
   readonly VITE_CLERK_PUBLISHABLE_KEY?: string;

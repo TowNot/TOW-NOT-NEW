@@ -32,3 +32,19 @@ body {
   font-family: var(--font-sans);
   font-optical-sizing: auto;
 }
+
+/* Termly Privacy Notice embed — keep tables usable on mobile */
+.termly-privacy table {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+
+.termly-privacy h1,
+.termly-privacy h2,
+.termly-privacy h3 {
+  scroll-margin-top: 1.25rem;
+}
+
