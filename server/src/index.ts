@@ -270,7 +270,12 @@ server.on("error", (error: unknown) => {
   process.exit(1);
 });
 
-logger.info("Binding HTTP server", { port: config.port, host: config.host });
+logger.info("Binding HTTP server", {
+  port: config.port,
+  host: config.host,
+  clerkConfigured: Boolean(config.clerkPublishableKey && config.clerkSecretKey),
+  cwd: process.cwd(),
+});
 
 // Bind first so Railway healthchecks can pass. Migrations, pollers, and the
 // fire listener start only after listen — they must not block port bind.

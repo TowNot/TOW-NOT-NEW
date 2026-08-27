@@ -30,21 +30,28 @@ export function createApp(store: IncidentStore, dispatcher: PushDispatcher): exp
   // and must not wait on auth middleware / JWKS.
   app.use("/api", healthRouter);
 
-  // Clerk must run before other middleware so `getAuth()` / requireClerkAuth work.
-  app.use(
-    clerkMiddleware({
-      publishableKey: config.clerkPublishableKey || undefined,
-      secretKey: config.clerkSecretKey || undefined,
-      authorizedParties: [
-        config.publicUrl,
-        config.clientOrigin,
-        "https://alertnav.com",
-        "https://www.alertnav.com",
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-      ].filter((origin, index, list) => Boolean(origin) && list.indexOf(origin) === index),
-    }),
-  );
+  // Clerk 500s the whole app when publishableKey is missing — only mount when configured.
+  if (config.clerkPublishableKey && config.clerkSecretKey) {
+    app.use(
+      clerkMiddleware({
+        publishableKey: config.clerkPublishableKey,
+        secretKey: config.clerkSecretKey,
+        authorizedParties: [
+          config.publicUrl,
+          config.clientOrigin,
+          "https://alertnav.com",
+          "https://www.alertnav.com",
+          "http://localhost:5173",
+          "http://127.0.0.1:5173",
+        ].filter((origin, index, list) => Boolean(origin) && list.indexOf(origin) === index),
+      }),
+    );
+  } else {
+    logger.warn("Clerk keys missing — auth middleware disabled (desk stays public)", {
+      hasPublishableKey: Boolean(config.clerkPublishableKey),
+      hasSecretKey: Boolean(config.clerkSecretKey),
+    });
+  }
 
   app.use(
     helmet({
