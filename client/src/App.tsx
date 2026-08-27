@@ -1,4 +1,5 @@
 import { useUser } from "@clerk/clerk-react";
+import { AcceptableUsePage } from "./pages/AcceptableUsePage";
 import { DisclaimerPage } from "./pages/DisclaimerPage";
 import { IncidentDesk } from "./pages/IncidentDesk";
 import { LandingPage } from "./pages/LandingPage";
@@ -18,6 +19,7 @@ const LEGAL_PATHS = new Set([
   "/terms",
   "/refund-policy",
   "/disclaimer",
+  "/acceptable-use",
 ]);
 
 function LegalRoute({ path }: { path: string }) {
@@ -25,6 +27,7 @@ function LegalRoute({ path }: { path: string }) {
   if (path === "/terms") return <TermsPage />;
   if (path === "/refund-policy") return <RefundPolicyPage />;
   if (path === "/disclaimer") return <DisclaimerPage />;
+  if (path === "/acceptable-use") return <AcceptableUsePage />;
   return null;
 }
 
