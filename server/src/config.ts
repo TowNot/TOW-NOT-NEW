@@ -1,6 +1,6 @@
 import "dotenv/config";
 
-const PRODUCTION_PUBLIC_URL = "https://tow-notserver-production.up.railway.app";
+const PRODUCTION_PUBLIC_URL = "https://alertnav.com";
 
 function resolveClientOrigin(): string {
   if (process.env.CLIENT_ORIGIN) return process.env.CLIENT_ORIGIN;

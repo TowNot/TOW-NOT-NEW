@@ -34,6 +34,8 @@ export function createApp(store: IncidentStore, dispatcher: PushDispatcher): exp
       authorizedParties: [
         config.publicUrl,
         config.clientOrigin,
+        "https://alertnav.com",
+        "https://www.alertnav.com",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
       ].filter((origin, index, list) => Boolean(origin) && list.indexOf(origin) === index),
@@ -50,7 +52,13 @@ export function createApp(store: IncidentStore, dispatcher: PushDispatcher): exp
   );
   app.use(
     cors({
-      origin: [config.clientOrigin, "http://127.0.0.1:5173"],
+      origin: [
+        config.clientOrigin,
+        "https://alertnav.com",
+        "https://www.alertnav.com",
+        "http://127.0.0.1:5173",
+        "http://localhost:5173",
+      ].filter((origin, index, list) => Boolean(origin) && list.indexOf(origin) === index),
       methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       credentials: true,
     }),
