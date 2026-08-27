@@ -1,14 +1,30 @@
-import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from "@clerk/clerk-react";
+import {
+  SignInButton,
+  SignUpButton,
+  UserButton,
+  useAuth,
+} from "@clerk/clerk-react";
 import { isClerkConfigured } from "../lib/clerkKey";
 
-/** Sign-in / sign-up when logged out; profile menu when logged in. */
+/**
+ * Sign-in / sign-up for guests; profile when signed in.
+ * Do not use <SignedOut>/<SignedIn> alone — while Clerk is still resolving
+ * those render nothing, which hid auth buttons after we stopped blocking
+ * the desk on isLoaded.
+ */
 export function AuthControls() {
-  // Avoid Clerk hooks/components when ClerkProvider is not mounted.
   if (!isClerkConfigured()) return null;
 
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <SignedOut>
+  return <AuthControlsInner />;
+}
+
+function AuthControlsInner() {
+  const { isLoaded, isSignedIn } = useAuth();
+
+  // Guests + Clerk-still-loading: always show Sign in / Sign up (instant desk).
+  if (!isLoaded || !isSignedIn) {
+    return (
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
         <SignInButton mode="modal" forceRedirectUrl="/welcome">
           <button
             type="button"
@@ -25,10 +41,13 @@ export function AuthControls() {
             Sign up
           </button>
         </SignUpButton>
-      </SignedOut>
-      <SignedIn>
-        <UserButton afterSignOutUrl="/" />
-      </SignedIn>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex shrink-0 flex-wrap items-center gap-2">
+      <UserButton afterSignOutUrl="/" />
     </div>
   );
 }
