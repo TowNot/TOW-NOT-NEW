@@ -1,5 +1,4 @@
 import { useUser } from "@clerk/clerk-react";
-import { useEffect, useState } from "react";
 import { AcceptableUsePage } from "./pages/AcceptableUsePage";
 import { DisclaimerPage } from "./pages/DisclaimerPage";
 import { IncidentDesk } from "./pages/IncidentDesk";
@@ -10,9 +9,6 @@ import { SelectZonePage } from "./pages/SelectZonePage";
 import { TermsPage } from "./pages/TermsPage";
 import { isClerkConfigured } from "./lib/clerkKey";
 import { resolveSelectedZoneId, type ZoneUser } from "./hooks/useSelectedZone";
-
-/** If Clerk handshake hangs (stale SW / bad cookies), don't trap users on Loading… */
-const CLERK_LOAD_TIMEOUT_MS = 8_000;
 
 function currentPath(): string {
   return window.location.pathname.replace(/\/+$/, "") || "/";
@@ -37,49 +33,30 @@ function LegalRoute({ path }: { path: string }) {
 
 export default function App() {
   if (!isClerkConfigured()) {
-    return <AppShell isLoaded isSignedIn={false} user={null} />;
+    return <AppShell isSignedIn={false} user={null} />;
   }
   return <ClerkAwareApp />;
 }
 
 function ClerkAwareApp() {
   const { isLoaded, isSignedIn, user } = useUser();
-  const [timedOut, setTimedOut] = useState(false);
-
-  useEffect(() => {
-    if (isLoaded) return;
-    const timer = window.setTimeout(() => setTimedOut(true), CLERK_LOAD_TIMEOUT_MS);
-    return () => window.clearTimeout(timer);
-  }, [isLoaded]);
-
-  const ready = isLoaded || timedOut;
+  // Never block the desk on Clerk handshake — show signed-out until auth resolves.
   return (
     <AppShell
-      isLoaded={ready}
-      isSignedIn={ready && isLoaded ? Boolean(isSignedIn) : false}
-      user={ready && isLoaded ? (user ?? null) : null}
+      isSignedIn={isLoaded ? Boolean(isSignedIn) : false}
+      user={isLoaded ? (user ?? null) : null}
     />
   );
 }
 
 function AppShell({
-  isLoaded,
   isSignedIn,
   user,
 }: {
-  isLoaded: boolean;
   isSignedIn: boolean;
   user: ZoneUser | null;
 }) {
   const path = currentPath();
-
-  if (!isLoaded) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-white text-sm text-gray-500">
-        Loading…
-      </div>
-    );
-  }
 
   const zoneId = resolveSelectedZoneId(user);
   const onWelcome = path === "/welcome" || path === "/select-zone";
