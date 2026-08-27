@@ -65,9 +65,17 @@ function resolvePort(): number {
   return 8080;
 }
 
+/** Railway probes the service network — always bind all interfaces in prod. */
+function resolveHost(): string {
+  if (process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_PRIVATE_DOMAIN) {
+    return "0.0.0.0";
+  }
+  return process.env.HOST?.trim() || "0.0.0.0";
+}
+
 export const config = {
   port: resolvePort(),
-  host: process.env.HOST?.trim() || "0.0.0.0",
+  host: resolveHost(),
   clientOrigin: resolveClientOrigin(),
   publicUrl: resolvePublicUrl(),
   // BlocksInside (api.wazeapi.com) Waze poll. 10s cadence; ignore a leftover

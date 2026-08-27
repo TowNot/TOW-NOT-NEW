@@ -26,6 +26,10 @@ export function createApp(store: IncidentStore, dispatcher: PushDispatcher): exp
 
   app.disable("x-powered-by");
 
+  // Health must stay ahead of Clerk — Railway probes /api/health on cold start
+  // and must not wait on auth middleware / JWKS.
+  app.use("/api", healthRouter);
+
   // Clerk must run before other middleware so `getAuth()` / requireClerkAuth work.
   app.use(
     clerkMiddleware({
@@ -100,7 +104,7 @@ export function createApp(store: IncidentStore, dispatcher: PushDispatcher): exp
   );
 
   // Health + incident snapshot/SSE stay public (EventSource cannot send Bearer tokens).
-  app.use("/api", healthRouter);
+  // /api/health is also mounted before Clerk above for Railway cold-start probes.
   app.use("/api/incidents", createIncidentRouter(store));
   app.use("/api/sources", createSourcesRouter(store));
 

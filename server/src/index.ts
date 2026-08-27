@@ -234,7 +234,32 @@ app.get("/progressier.js", (_req, res) => {
 applyClientAssets(app);
 applyTerminalHandlers(app);
 
-const server = createServer(app);
+function isHealthCheckRequest(url: string | undefined): boolean {
+  if (!url) return false;
+  const pathOnly = url.split("?")[0] ?? url;
+  return pathOnly === "/api/health" || pathOnly === "/health";
+}
+
+// Answer healthchecks at the Node layer so Clerk/Express middleware cannot
+// stall Railway's cold-start probe while the rest of the app boots.
+const server = createServer((req, res) => {
+  if (isHealthCheckRequest(req.url)) {
+    const body = JSON.stringify({
+      status: "ok",
+      service: "alertnav-server",
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+    });
+    res.writeHead(200, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Content-Length": Buffer.byteLength(body),
+      "Cache-Control": "no-store",
+    });
+    res.end(body);
+    return;
+  }
+  app(req, res);
+});
 
 server.on("error", (error: unknown) => {
   logger.error("HTTP server failed to bind", {
@@ -244,6 +269,8 @@ server.on("error", (error: unknown) => {
   });
   process.exit(1);
 });
+
+logger.info("Binding HTTP server", { port: config.port, host: config.host });
 
 // Bind first so Railway healthchecks can pass. Migrations, pollers, and the
 // fire listener start only after listen — they must not block port bind.
