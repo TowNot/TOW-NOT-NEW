@@ -1,4 +1,5 @@
 import { useUser } from "@clerk/clerk-react";
+import { useEffect, useState } from "react";
 import { AcceptableUsePage } from "./pages/AcceptableUsePage";
 import { DisclaimerPage } from "./pages/DisclaimerPage";
 import { IncidentDesk } from "./pages/IncidentDesk";
@@ -9,6 +10,9 @@ import { SelectZonePage } from "./pages/SelectZonePage";
 import { TermsPage } from "./pages/TermsPage";
 import { isClerkConfigured } from "./lib/clerkKey";
 import { resolveSelectedZoneId, type ZoneUser } from "./hooks/useSelectedZone";
+
+/** If Clerk handshake hangs (stale SW / bad cookies), don't trap users on Loading… */
+const CLERK_LOAD_TIMEOUT_MS = 8_000;
 
 function currentPath(): string {
   return window.location.pathname.replace(/\/+$/, "") || "/";
@@ -40,7 +44,22 @@ export default function App() {
 
 function ClerkAwareApp() {
   const { isLoaded, isSignedIn, user } = useUser();
-  return <AppShell isLoaded={isLoaded} isSignedIn={Boolean(isSignedIn)} user={user ?? null} />;
+  const [timedOut, setTimedOut] = useState(false);
+
+  useEffect(() => {
+    if (isLoaded) return;
+    const timer = window.setTimeout(() => setTimedOut(true), CLERK_LOAD_TIMEOUT_MS);
+    return () => window.clearTimeout(timer);
+  }, [isLoaded]);
+
+  const ready = isLoaded || timedOut;
+  return (
+    <AppShell
+      isLoaded={ready}
+      isSignedIn={ready && isLoaded ? Boolean(isSignedIn) : false}
+      user={ready && isLoaded ? (user ?? null) : null}
+    />
+  );
 }
 
 function AppShell({

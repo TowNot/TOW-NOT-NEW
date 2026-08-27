@@ -7,11 +7,9 @@ dockerfilePath = "Dockerfile"
 watchPatterns = ["client/**", "server/**", "package.json", "Dockerfile", "railway.toml"]
 
 [deploy]
-# Run from the server package so relative Prisma/dotenv paths match local `npm start -w`.
-startCommand = "node dist/index.js"
+# Root npm start → server workspace (migrate runs after listen inside Node).
+startCommand = "npm start"
 healthcheckPath = "/api/health"
-# Cold start used to run `prisma migrate deploy` before listen, so /api/health
-# stayed dark past 30s and Railway marked redeploys FAILED. Listen first now;
-# keep a generous timeout as a safety net for slow boots.
+# Listen-first boot; generous timeout so cold starts still pass probes.
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"

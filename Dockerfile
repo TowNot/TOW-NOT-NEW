@@ -19,5 +19,6 @@ RUN npm run build
 ENV NODE_ENV=production
 EXPOSE 8080
 
-WORKDIR /app/server
-CMD ["node", "dist/index.js"]
+# Same entry as before healthcheck work: root `npm start` → server workspace.
+WORKDIR /app
+CMD ["npm", "start"]
