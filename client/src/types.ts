@@ -25,6 +25,8 @@ export interface Incident {
   locationLabel: string;
   severity: IncidentSeverity;
   timestamp: string;
+  /** Latest merge or refresh — desk feed sorts by this when set. */
+  lastReportedAt?: string;
   expiresAt: string;
   subtype?: string | null;
   provider?: string;

@@ -10,6 +10,12 @@ interface IncidentState {
 
 const AGE_TICK_MS = 60_000;
 
+function incidentSortMs(incident: Incident): number {
+  const reported = incident.lastReportedAt ?? incident.timestamp;
+  const ms = Date.parse(reported);
+  return Number.isFinite(ms) ? ms : 0;
+}
+
 export function useIncidents(): IncidentState {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [connected, setConnected] = useState(false);
@@ -53,9 +59,7 @@ export function useIncidents(): IncidentState {
       setIncidents((current) => {
         const next = current.filter((item) => item.id !== incident.id);
         next.unshift(incident);
-        return next.sort(
-          (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-        );
+        return next.sort((a, b) => incidentSortMs(b) - incidentSortMs(a));
       });
     });
 

@@ -3,7 +3,7 @@ import type { IncidentStore } from "../../store/incidentStore";
 import { logger } from "../../logger";
 import {
   CONFIRMED_ACCIDENT_MERGE_RADIUS_KM,
-  GENERIC_ACCIDENT_MERGE_RADIUS_KM,
+  GENERIC_ACCIDENT_PUSH_BLOCK_RADIUS_KM,
   isConfirmedAccident,
   mergeCategory,
   sameMergeCategory,
@@ -14,6 +14,7 @@ import { distanceKm } from "../geo";
 export type GoogleMapsNotificationDecision =
   | "PUSHED NEW"
   | "MERGED WITHOUT PUSH (Existing cluster)"
+  | "MERGE OFFSET PUSH"
   | "UPGRADE PUSH TRIGGERED"
   | "STORED WITHOUT PUSH (Gate blocked)"
   | "SKIPPED PUSH (Existing ID refresh)"
@@ -48,7 +49,7 @@ function pushBlockRadiusKm(incident: Incident, other: Incident): number {
   if (isConfirmedAccident(incident) && isConfirmedAccident(other)) {
     return CONFIRMED_ACCIDENT_MERGE_RADIUS_KM;
   }
-  return GENERIC_ACCIDENT_MERGE_RADIUS_KM;
+  return GENERIC_ACCIDENT_PUSH_BLOCK_RADIUS_KM;
 }
 
 function nearbyBlockingAccident(
@@ -62,7 +63,7 @@ function nearbyBlockingAccident(
     if (!sameMergeCategory(incident, other)) return false;
 
     // Confirmed crashes only block on other confirmed crashes within 200 m.
-    // Generic incident / closure pins use the tighter ~75 m radius.
+    // Generic incident pins suppress push within ~25 m (merge can be up to ~30 m).
     if (isConfirmedAccident(incident) && !isConfirmedAccident(other)) {
       return false;
     }

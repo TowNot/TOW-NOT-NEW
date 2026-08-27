@@ -6,6 +6,7 @@ import type { Incident } from "../../types/incident";
 import {
   findNearbyMergeableIncident,
   isMergeableTrafficIncident,
+  shouldPushOnGenericMerge,
   withSourceDetections,
 } from "../incidentMerge";
 import {
@@ -130,6 +131,13 @@ export class GoogleMapsTrafficPoller {
           pushed += 1;
           this.store.emitClusterUpgrade({
             previous: nearby,
+            incoming: incident,
+            merged: upserted,
+          });
+        } else if (shouldPushOnGenericMerge(nearby, incident)) {
+          pushed += 1;
+          this.store.emitClusterMergePush({
+            existing: nearby,
             incoming: incident,
             merged: upserted,
           });

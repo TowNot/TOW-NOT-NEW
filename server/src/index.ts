@@ -140,6 +140,35 @@ store.on("clusterUpgrade", ({ previous, incoming, merged }) => {
     });
 });
 
+store.on("clusterMergePush", ({ existing, incoming, merged }) => {
+  if (!shouldNotifyIncident(merged, store)) {
+    logGoogleMapsNotificationGate(
+      merged.id,
+      "STORED WITHOUT PUSH (Gate blocked)",
+      googleMapsNotificationBlockReason(merged, store) ??
+        `merge-offset from ${incoming.id}`,
+    );
+    return;
+  }
+  void dispatcher
+    .notifyIncident(merged)
+    .then((receipt) => {
+      if (!receipt) return;
+      store.markNotified(merged.id);
+      logGoogleMapsNotificationGate(
+        merged.id,
+        "MERGE OFFSET PUSH",
+        `incoming=${incoming.id} | offset from cluster=${existing.id} | rawType=${incoming.rawType ?? "unknown"}`,
+      );
+    })
+    .catch((error: unknown) => {
+      logger.error("Google Maps merge-offset push failed", {
+        incidentId: merged.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+});
+
 const app = createApp(store, dispatcher);
 
 app.get("/progressier.js", (_req, res) => {

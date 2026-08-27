@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 import { config } from "../config";
 import { mergeGoogleMapsRawType, mergeGoogleMapsZoom } from "../engine/googleMaps/googleMapsDisplay";
 import {
+  incidentFeedSortMs,
   mergeSourceDetections,
   sourceDetectionsFromIncident,
 } from "../engine/incidentMerge";
@@ -10,6 +11,12 @@ import type { Incident, IncidentSeverity } from "../types/incident";
 
 export interface ClusterUpgradeEvent {
   previous: Incident;
+  incoming: Incident;
+  merged: Incident;
+}
+
+export interface ClusterMergePushEvent {
+  existing: Incident;
   incoming: Incident;
   merged: Incident;
 }
@@ -76,6 +83,7 @@ export class IncidentStore extends EventEmitter {
       sourceDetections,
       source: primaryDetection?.source ?? incident.source,
       timestamp: primaryDetection?.detectedAt ?? existing?.timestamp ?? incident.timestamp,
+      lastReportedAt: incident.lastReportedAt ?? existing?.lastReportedAt,
       provider: primaryDetection?.provider ?? existing?.provider ?? incident.provider,
       audioUrl: incident.audioUrl ?? existing?.audioUrl,
       reporterName: existing?.reporterName ?? incident.reporterName,
@@ -107,6 +115,10 @@ export class IncidentStore extends EventEmitter {
     this.emit("clusterUpgrade", event);
   }
 
+  emitClusterMergePush(event: ClusterMergePushEvent): void {
+    this.emit("clusterMergePush", event);
+  }
+
   markNotified(id: string): void {
     const incident = this.incidents.get(id);
     if (!incident || incident.notified) return;
@@ -118,7 +130,7 @@ export class IncidentStore extends EventEmitter {
   getActive(): Incident[] {
     this.pruneExpired();
     return [...this.incidents.values()].sort(
-      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+      (a, b) => incidentFeedSortMs(b) - incidentFeedSortMs(a),
     );
   }
 

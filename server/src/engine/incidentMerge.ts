@@ -13,8 +13,11 @@ export const CROSS_SOURCE_MERGE_RADIUS_KM = CONFIRMED_ACCIDENT_MERGE_RADIUS_KM;
 /** Road closure / construction cluster radius (~40 m). */
 export const ROAD_HAZARD_MERGE_RADIUS_KM = 0.04;
 
-/** Generic Google Maps incident pins (~75 m — about one short block). */
-export const GENERIC_ACCIDENT_MERGE_RADIUS_KM = 0.075;
+/** Generic Google Maps incident cluster merge radius (~30 m). */
+export const GENERIC_ACCIDENT_MERGE_RADIUS_KM = 0.03;
+
+/** Generic pins closer than this suppress duplicate pushes (~25 m). */
+export const GENERIC_ACCIDENT_PUSH_BLOCK_RADIUS_KM = 0.025;
 
 /**
  * Strict merge categories — proximity alone is never enough.
@@ -128,16 +131,53 @@ export function mergeSourceDetections(
   const bySource = new Map<IncidentSource, SourceDetection>();
   for (const detection of [...(existing ?? []), ...(incoming ?? [])]) {
     const prev = bySource.get(detection.source);
-    if (
-      !prev ||
-      new Date(detection.detectedAt).getTime() < new Date(prev.detectedAt).getTime()
-    ) {
-      bySource.set(detection.source, detection);
+    if (!prev) {
+      bySource.set(detection.source, { ...detection });
+      continue;
     }
+    const keepEarliest =
+      new Date(detection.detectedAt).getTime() < new Date(prev.detectedAt).getTime();
+    bySource.set(detection.source, {
+      source: detection.source,
+      detectedAt: keepEarliest ? detection.detectedAt : prev.detectedAt,
+      provider: detection.provider ?? prev.provider,
+      googleMapsZoom: mergeGoogleMapsZoom(prev.googleMapsZoom, detection.googleMapsZoom),
+      rawType: mergeGoogleMapsRawType(prev.rawType, detection.rawType),
+    });
   }
   return [...bySource.values()].sort(
     (a, b) => new Date(a.detectedAt).getTime() - new Date(b.detectedAt).getTime(),
   );
+}
+
+export function incidentDistanceKm(a: Incident, b: Incident): number {
+  return distanceKm(
+    a.coordinates.latitude,
+    a.coordinates.longitude,
+    b.coordinates.latitude,
+    b.coordinates.longitude,
+  );
+}
+
+/** Both rows are generic (non-confirmed) accident-category pins. */
+export function isGenericAccidentPair(a: Incident, b: Incident): boolean {
+  if (mergeCategory(a) !== "accident" || mergeCategory(b) !== "accident") return false;
+  if (isConfirmedAccident(a) && isConfirmedAccident(b)) return false;
+  return true;
+}
+
+/** Push when a generic merge lands far enough from the cluster anchor. */
+export function shouldPushOnGenericMerge(existing: Incident, incoming: Incident): boolean {
+  if (!isGenericAccidentPair(existing, incoming)) return false;
+  if (incoming.source !== "google_maps") return false;
+  return incidentDistanceKm(existing, incoming) > GENERIC_ACCIDENT_PUSH_BLOCK_RADIUS_KM;
+}
+
+/** Feed sort key — bumps merged cards without changing first-seen `timestamp`. */
+export function incidentFeedSortMs(incident: Incident): number {
+  const reported = incident.lastReportedAt ?? incident.timestamp;
+  const ms = Date.parse(reported);
+  return Number.isFinite(ms) ? ms : 0;
 }
 
 export function withSourceDetections(incident: Incident): Incident {
@@ -180,18 +220,16 @@ export function mergeIntoExistingIncident(
 ): Incident {
   const existingDetections = sourceDetectionsFromIncident(existing);
   const incomingDetections = sourceDetectionsFromIncident(incoming);
-  const novelDetections = incomingDetections.filter(
-    (detection) =>
-      !existingDetections.some((existingDetection) => existingDetection.source === detection.source),
-  );
-  const sourceDetections = mergeSourceDetections(existingDetections, novelDetections);
+  const sourceDetections = mergeSourceDetections(existingDetections, incomingDetections);
   const primary = sourceDetections[0]!;
+  const now = new Date().toISOString();
 
   return {
     ...existing,
     id: existing.id,
     source: primary.source,
     timestamp: primary.detectedAt,
+    lastReportedAt: now,
     sourceDetections,
     notified: existing.notified ?? incoming.notified,
     title: existing.title || incoming.title,
