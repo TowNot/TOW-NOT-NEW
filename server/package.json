@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "prisma generate && npm run build --prefix ../client && tsc -p tsconfig.json && node ../scripts/copy-client-dist.cjs",
-    "start": "prisma migrate deploy && node dist/index.js",
+    "start": "node dist/index.js",
     "typecheck": "prisma generate && tsc -p tsconfig.json --noEmit",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",

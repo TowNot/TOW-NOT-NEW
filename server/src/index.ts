@@ -1,7 +1,9 @@
 // Trigger Railway Deploy
+import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
+import { promisify } from "node:util";
 import "dotenv/config";
 import { applyClientAssets, applyTerminalHandlers, createApp } from "./app";
 import { config } from "./config";
@@ -28,6 +30,38 @@ import {
   startNotificationWorker,
   stopNotificationWorker,
 } from "./workers/notificationWorker";
+
+const execFileAsync = promisify(execFile);
+
+/**
+ * Apply pending Prisma migrations after the HTTP server is already listening
+ * so Railway healthchecks on /api/health can pass during cold start.
+ */
+async function deployPrismaMigrations(): Promise<void> {
+  const schemaCandidates = [
+    path.join(process.cwd(), "prisma", "schema.prisma"),
+    path.join(process.cwd(), "server", "prisma", "schema.prisma"),
+    path.join(__dirname, "../prisma/schema.prisma"),
+  ];
+  const schema = schemaCandidates.find((candidate) => existsSync(candidate));
+  if (!schema) {
+    logger.warn("Prisma schema not found — skipping migrate deploy", {
+      cwd: process.cwd(),
+    });
+    return;
+  }
+
+  logger.info("Running prisma migrate deploy", { schema });
+  await execFileAsync(
+    "npx",
+    ["prisma", "migrate", "deploy", "--schema", schema],
+    {
+      env: process.env,
+      cwd: process.cwd(),
+      maxBuffer: 2 * 1024 * 1024,
+    },
+  );
+}
 
 const PROGRESSIER_SW_SOURCE = [
   'importScripts("https://progressier.app/Bv9Rb1Vm5PkATyh6w0wG/sw.js");',
@@ -211,11 +245,18 @@ server.on("error", (error: unknown) => {
   process.exit(1);
 });
 
-// Bind first so Railway healthchecks can pass. Pollers and the fire listener
-// start only after listen — they must not block module eval or port bind.
+// Bind first so Railway healthchecks can pass. Migrations, pollers, and the
+// fire listener start only after listen — they must not block port bind.
 server.listen(config.port, config.host, () => {
   logger.info("AlertNav server listening", { port: config.port, host: config.host });
   void (async () => {
+    try {
+      await deployPrismaMigrations();
+    } catch (error) {
+      logger.error("Prisma migrate deploy failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
     try {
       await connectPrisma();
       await Promise.all([warmSubscriptionCache(), warmSmsSubscriberCache()]);

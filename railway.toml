@@ -9,5 +9,8 @@ watchPatterns = ["client/**", "server/**", "package.json", "Dockerfile", "railwa
 [deploy]
 startCommand = "npm start"
 healthcheckPath = "/api/health"
-healthcheckTimeout = 30
+# Cold start used to run `prisma migrate deploy` before listen, so /api/health
+# stayed dark past 30s and Railway marked redeploys FAILED. Listen first now;
+# keep a generous timeout as a safety net for slow boots.
+healthcheckTimeout = 120
 restartPolicyType = "ON_FAILURE"
