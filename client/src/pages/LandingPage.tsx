@@ -1,5 +1,6 @@
 import { resolveStripeCheckoutUrl } from "../lib/stripeCheckout";
 import { AuthControls } from "../components/AuthControls";
+import { SiteFooter } from "../components/SiteFooter";
 
 const STRIPE_CHECKOUT_URL = resolveStripeCheckoutUrl();
 
@@ -76,12 +77,7 @@ export function LandingPage() {
         </section>
       </main>
 
-      <footer className="border-t border-line">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-5">
-          <p className="text-sm font-semibold text-cobalt">AlertNav</p>
-          <p className="text-xs text-gray-500">Real-time incident monitoring</p>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

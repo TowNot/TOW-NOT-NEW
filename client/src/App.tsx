@@ -1,12 +1,31 @@
 import { useUser } from "@clerk/clerk-react";
+import { DisclaimerPage } from "./pages/DisclaimerPage";
 import { IncidentDesk } from "./pages/IncidentDesk";
 import { LandingPage } from "./pages/LandingPage";
+import { PrivacyPage } from "./pages/PrivacyPage";
+import { RefundPolicyPage } from "./pages/RefundPolicyPage";
 import { SelectZonePage } from "./pages/SelectZonePage";
+import { TermsPage } from "./pages/TermsPage";
 import { isClerkConfigured } from "./lib/clerkKey";
 import { resolveSelectedZoneId, type ZoneUser } from "./hooks/useSelectedZone";
 
 function currentPath(): string {
   return window.location.pathname.replace(/\/+$/, "") || "/";
+}
+
+const LEGAL_PATHS = new Set([
+  "/privacy",
+  "/terms",
+  "/refund-policy",
+  "/disclaimer",
+]);
+
+function LegalRoute({ path }: { path: string }) {
+  if (path === "/privacy") return <PrivacyPage />;
+  if (path === "/terms") return <TermsPage />;
+  if (path === "/refund-policy") return <RefundPolicyPage />;
+  if (path === "/disclaimer") return <DisclaimerPage />;
+  return null;
 }
 
 export default function App() {
@@ -42,6 +61,11 @@ function AppShell({
 
   const zoneId = resolveSelectedZoneId(user);
   const onWelcome = path === "/welcome" || path === "/select-zone";
+  const onLegal = LEGAL_PATHS.has(path);
+
+  if (onLegal) {
+    return <LegalRoute path={path} />;
+  }
 
   if (isSignedIn && !zoneId && path !== "/" && !onWelcome) {
     window.location.replace("/welcome");
