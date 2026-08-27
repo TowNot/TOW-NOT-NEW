@@ -129,12 +129,16 @@ export function startRadioOrchestrator(
     active.push(`${feed.id}:stream`);
   }
 
+  const skippedInactiveCount = skippedInactive.length;
   logger.info("[fire-dispatch] radio orchestrator started", {
     sources: active,
-    skippedInactive,
+    skippedInactive: `skipped ${skippedInactiveCount} inactive region${skippedInactiveCount === 1 ? "" : "s"}`,
     monitoredOnly: Boolean(allowedZoneIds),
     monitoredCities: allowedZoneIds ? [...allowedZoneIds].sort() : undefined,
   });
+  if (skippedInactiveCount > 0) {
+    logger.debug("[fire-dispatch] inactive regions detail", { skippedInactive });
+  }
 }
 
 export function stopRadioOrchestrator(): void {
