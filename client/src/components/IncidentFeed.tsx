@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { Incident, IncidentSource } from "../types";
 import { fireDispatchDisplayLabel } from "../lib/fireDispatchLabel";
+import { passesMapAlertFilters } from "../lib/mapAlertFilters";
 import { IncidentCard } from "./IncidentCard";
 
 const SOURCE_ORDER: IncidentSource[] = ["waze", "google_maps", "fire_dispatch", "ems"];
@@ -31,6 +32,9 @@ export function IncidentFeed({
   const [activeSources, setActiveSources] = useState<Set<IncidentSource>>(
     () => new Set(SOURCE_ORDER),
   );
+  /** Default both on — show accidents/construction and general incidents. */
+  const [showAccidents, setShowAccidents] = useState(true);
+  const [showIncidents, setShowIncidents] = useState(true);
 
   const counts = SOURCE_ORDER.map((source) => ({
     source,
@@ -42,9 +46,10 @@ export function IncidentFeed({
       incidents.filter((incident) => {
         if (incident.source === "ems" && !hasEmsFeed) return false;
         if (incident.source === "fire_dispatch" && !hasFireFeed) return false;
-        return activeSources.has(incident.source);
+        if (!activeSources.has(incident.source)) return false;
+        return passesMapAlertFilters(incident, showAccidents, showIncidents);
       }),
-    [incidents, activeSources, hasEmsFeed, hasFireFeed],
+    [incidents, activeSources, hasEmsFeed, hasFireFeed, showAccidents, showIncidents],
   );
 
   function toggleSource(source: IncidentSource) {
@@ -120,6 +125,27 @@ export function IncidentFeed({
         </span>
       </div>
 
+      <div
+        className="flex flex-wrap gap-2"
+        role="group"
+        aria-label="Map alert type filters"
+      >
+        <MapTypeToggle
+          label="Accidents"
+          description="Crashes and construction / road closures"
+          enabled={showAccidents}
+          onToggle={() => setShowAccidents((v) => !v)}
+          onClass="border-rose-300 bg-rose-50 text-rose-800"
+        />
+        <MapTypeToggle
+          label="Incidents"
+          description="General Google Maps incident pins"
+          enabled={showIncidents}
+          onToggle={() => setShowIncidents((v) => !v)}
+          onClass="border-amber-300 bg-amber-50 text-amber-900"
+        />
+      </div>
+
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {counts.map((item) => {
           const emsLocked = item.source === "ems" && !hasEmsFeed;
@@ -169,7 +195,9 @@ export function IncidentFeed({
         <div className="rounded-lg border border-dashed border-line bg-panel px-6 py-16 text-center text-sm text-gray-500">
           {incidents.length === 0
             ? "Waiting on aggregator pollers…"
-            : "No incidents for the selected sources."}
+            : !showAccidents && !showIncidents
+              ? "Turn on Accidents or Incidents to see alerts."
+              : "No incidents for the selected filters."}
         </div>
       ) : (
         <ol className="grid gap-3">
@@ -181,6 +209,40 @@ export function IncidentFeed({
         </ol>
       )}
     </section>
+  );
+}
+
+function MapTypeToggle({
+  label,
+  description,
+  enabled,
+  onToggle,
+  onClass,
+}: {
+  label: string;
+  description: string;
+  enabled: boolean;
+  onToggle: () => void;
+  onClass: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={enabled}
+      title={description}
+      onClick={onToggle}
+      className={
+        enabled
+          ? `rounded-md border px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] ${onClass}`
+          : "rounded-md border border-line bg-panel px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-gray-500 hover:border-gray-400"
+      }
+    >
+      {label}
+      <span className="mt-1 block normal-case tracking-normal text-[10px] font-medium opacity-80">
+        {enabled ? "On" : "Off"}
+      </span>
+    </button>
   );
 }
 
