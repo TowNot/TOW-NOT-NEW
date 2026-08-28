@@ -207,10 +207,9 @@ export function shouldPushOnGenericMerge(existing: Incident, incoming: Incident)
   return incidentDistanceKm(existing, incoming) > GENERIC_ACCIDENT_PUSH_BLOCK_RADIUS_KM;
 }
 
-/** Feed sort key — bumps merged cards without changing first-seen `timestamp`. */
+/** Feed sort key — first-seen `timestamp` only (never lastReportedAt / merge refresh time). */
 export function incidentFeedSortMs(incident: Incident): number {
-  const reported = incident.lastReportedAt ?? incident.timestamp;
-  const ms = Date.parse(reported);
+  const ms = Date.parse(incident.timestamp);
   return Number.isFinite(ms) ? ms : 0;
 }
 

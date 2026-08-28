@@ -11,9 +11,12 @@ interface IncidentState {
 const AGE_TICK_MS = 60_000;
 
 function incidentSortMs(incident: Incident): number {
-  const reported = incident.lastReportedAt ?? incident.timestamp;
-  const ms = Date.parse(reported);
+  const ms = Date.parse(incident.timestamp);
   return Number.isFinite(ms) ? ms : 0;
+}
+
+function sortIncidentsDesc(incidents: Incident[]): Incident[] {
+  return [...incidents].sort((a, b) => incidentSortMs(b) - incidentSortMs(a));
 }
 
 export function useIncidents(): IncidentState {
@@ -37,7 +40,7 @@ export function useIncidents(): IncidentState {
         }
         if (!response.ok) throw new Error("Failed to load incidents");
         const body = (await response.json()) as { incidents: Incident[] };
-        if (!cancelled) setIncidents(body.incidents);
+        if (!cancelled) setIncidents(sortIncidentsDesc(body.incidents));
       } catch {
         if (!cancelled) setConnected(false);
       }
@@ -50,17 +53,15 @@ export function useIncidents(): IncidentState {
 
     source.addEventListener("snapshot", (event) => {
       const payload = JSON.parse((event as MessageEvent).data) as Incident[];
-      setIncidents(payload);
+      setIncidents(sortIncidentsDesc(payload));
       setConnected(true);
     });
 
     source.addEventListener("upsert", (event) => {
       const incident = JSON.parse((event as MessageEvent).data) as Incident;
-      setIncidents((current) => {
-        const next = current.filter((item) => item.id !== incident.id);
-        next.unshift(incident);
-        return next.sort((a, b) => incidentSortMs(b) - incidentSortMs(a));
-      });
+      setIncidents((current) =>
+        sortIncidentsDesc(current.filter((item) => item.id !== incident.id).concat(incident)),
+      );
     });
 
     source.addEventListener("expire", (event) => {
