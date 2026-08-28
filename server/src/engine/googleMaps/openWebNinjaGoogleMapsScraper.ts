@@ -260,7 +260,20 @@ function isGenericOpenWebNinjaType(rawType: string): boolean {
 
 /** Crowd-sourced crash language — do not reclassify these as road_hazard. */
 const CRASH_LANGUAGE_RE =
-  /\b(accident|accidents|crash|crashed|collision|collisions|mvc|pileup|pile-up|stalled|disabled|vehicle)\b/i;
+  /\b(accident|accidents|crash|crashed|collision|collisions|mvc|pileup|pile-up|struck|rollover|hit|stalled|disabled|vehicle)\b/i;
+
+/** Promote generic incident/other rows to accident when crash language dominates. */
+const CRASH_PROMOTION_RE =
+  /\b(accident|accidents|crash|crashed|collision|collisions|mvc|pileup|pile-up|struck|rollover|hit)\b/i;
+
+export function promoteRawTypeForCrashLanguage(
+  rawType: string,
+  alertText: string,
+): string {
+  if (!isGenericOpenWebNinjaType(rawType)) return rawType;
+  if (CRASH_PROMOTION_RE.test(alertText)) return "accident";
+  return rawType;
+}
 
 /**
  * Only reclassify generic incident/other rows when closure language dominates
@@ -465,7 +478,22 @@ function toIncident(
     return null;
   }
 
-  const mappedBase = classify(rawType);
+  const preliminaryDescription =
+    asString(raw.description) ?? asString(raw.snippet) ?? asString(raw.details) ?? "";
+  const preliminaryTitle = asString(raw.title) ?? "";
+  const alertTextForPromotion = collectRawAlertText(
+    raw,
+    preliminaryTitle,
+    preliminaryDescription,
+  );
+  const effectiveRawType = promoteRawTypeForCrashLanguage(rawType, alertTextForPromotion);
+  if (effectiveRawType !== rawType) {
+    logger.info(
+      `[GoogleMaps] Promoted generic ${rawType} → accident via crash language | title="${preliminaryTitle}"`,
+    );
+  }
+
+  const mappedBase = classify(effectiveRawType);
   if (!mappedBase) {
     logRawGoogleMapsItem({
       rawId,
@@ -484,22 +512,20 @@ function toIncident(
     logGoogleMapsNotificationGate(
       rawId || `${lat.toFixed(5)},${lng.toFixed(5)}`,
       "DROPPED (Type filter)",
-      `rawType=${rawType || "unknown"}`,
+      `rawType=${effectiveRawType || rawType || "unknown"}`,
     );
     return null;
   }
 
-  const preliminaryDescription =
-    asString(raw.description) ?? asString(raw.snippet) ?? asString(raw.details) ?? "";
   const alertText = collectRawAlertText(raw, mappedBase.title, preliminaryDescription);
   const closureKeyword = findExcludedKeyword(alertText);
   let mapped = mappedBase;
 
   // Generic incident/other + closure-only language → road_hazard (map only), not crash.
-  if (shouldReclassifyGenericAsRoadHazard(rawType, alertText) && closureKeyword) {
+  if (shouldReclassifyGenericAsRoadHazard(effectiveRawType, alertText) && closureKeyword) {
     mapped = mapGenericClosureToRoadHazard(closureKeyword);
     logger.info(
-      `[GoogleMaps] Reclassified generic ${rawType} as ${mapped.type} | keyword="${closureKeyword}"`,
+      `[GoogleMaps] Reclassified generic ${effectiveRawType} as ${mapped.type} | keyword="${closureKeyword}"`,
     );
   }
 
@@ -508,7 +534,7 @@ function toIncident(
     asString(raw.description) || labels.description || asString(raw.snippet) || "";
 
   const providerId = asString(raw.id) ?? asString(raw.alert_id);
-  const normalizedRawType = rawType.toLowerCase().trim() || undefined;
+  const normalizedRawType = effectiveRawType.toLowerCase().trim() || undefined;
   const incidentId = stableIncidentId({
     providerId,
     type: mapped.type,
@@ -528,15 +554,15 @@ function toIncident(
   });
 
   if (closureKeyword && mappedBase === mapped) {
-    if (shouldBypassConstructionKeywordFilter(rawType, mapped)) {
+    if (shouldBypassConstructionKeywordFilter(effectiveRawType, mapped)) {
       logger.info(
-        `[Filter] Accident kept despite construction keywords in description | id=${incidentId} | keyword="${closureKeyword}" | rawType=${normalizedRawType ?? rawType}`,
+        `[Filter] Accident kept despite construction keywords in description | id=${incidentId} | keyword="${closureKeyword}" | rawType=${normalizedRawType ?? effectiveRawType}`,
       );
     } else {
       logGoogleMapsNotificationGate(
         incidentId,
         "DROPPED (Keyword filter)",
-        `keyword="${closureKeyword}" | rawType=${normalizedRawType ?? rawType}`,
+        `keyword="${closureKeyword}" | rawType=${normalizedRawType ?? effectiveRawType}`,
       );
       return null;
     }

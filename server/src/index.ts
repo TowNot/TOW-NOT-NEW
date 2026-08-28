@@ -156,7 +156,7 @@ store.on("clusterUpgrade", ({ previous, incoming, merged }) => {
     return;
   }
   void dispatcher
-    .notifyIncident(merged)
+    .notifyIncident(merged, { bypassPushLock: true })
     .then((receipt) => {
       if (!receipt) return;
       store.markNotified(merged.id);

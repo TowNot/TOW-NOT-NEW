@@ -1,5 +1,9 @@
 import { isPoliceType } from "../engine/wazeAggregator";
-import { claimIncidentPush, logSkippedPush } from "../engine/pushDedup";
+import {
+  claimIncidentPush,
+  logSkippedPush,
+  type PushClaimOptions,
+} from "../engine/pushDedup";
 import { logger } from "../logger";
 import { incidentToPushPayload } from "../push";
 import { enqueueDispatchNotification } from "../queue/notificationQueue";
@@ -74,8 +78,11 @@ export class PushDispatcher extends EventEmitter {
     return receipt;
   }
 
-  async notifyIncident(incident: Incident): Promise<PushReceipt | null> {
-    const claim = claimIncidentPush(incident);
+  async notifyIncident(
+    incident: Incident,
+    options?: PushClaimOptions,
+  ): Promise<PushReceipt | null> {
+    const claim = claimIncidentPush(incident, options);
     if (!claim.ok) {
       logSkippedPush(incident.id, claim.reason);
       return null;

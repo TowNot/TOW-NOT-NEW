@@ -46,6 +46,13 @@ export function applyGoogleMapsClusterUpgradeFields(
   const rawType = mergeGoogleMapsRawTypePreferUpgrade(existing.rawType, incoming.rawType);
   let { subtype, title, severity } = merged;
 
+  if (googleMapsRawTypeRank(rawType) >= 2 && existing.subtype === "GOOGLE_MAPS_INCIDENT") {
+    subtype = null;
+    if (!title || title === "Traffic Incident / Collision") {
+      title = "Traffic accident";
+    }
+  }
+
   if (googleMapsRawTypeRank(incoming.rawType) > googleMapsRawTypeRank(existing.rawType)) {
     if (incoming.title) title = incoming.title;
     if (incoming.subtype === null || incoming.subtype === undefined) {

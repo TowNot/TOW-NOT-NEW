@@ -1,4 +1,5 @@
 import type { Incident } from "../types/incident";
+import { mergeLane } from "./incidentMerge";
 import { logger } from "../logger";
 
 /** Do not push incidents older than this (stale API rows / late ingest). */
@@ -19,9 +20,11 @@ function prunePushLocks(now = Date.now()): void {
   }
 }
 
-/** ~100 m grid key for Google Maps concurrent tile races. */
-export function googleMapsPushLockKey(lat: number, lng: number): string {
-  return `gmaps-push:${lat.toFixed(3)}:${lng.toFixed(3)}`;
+/** ~100 m grid key scoped by merge lane — generic incident locks must not block accidents. */
+export function googleMapsPushLockKey(incident: Incident): string {
+  const { latitude: lat, longitude: lng } = incident.coordinates;
+  const lane = mergeLane(incident);
+  return `gmaps-push:${lat.toFixed(3)}:${lng.toFixed(3)}:${lane}`;
 }
 
 export function wazePushLockKey(incidentId: string): string {
@@ -60,11 +63,26 @@ export type PushClaimResult =
   | { ok: true; lockKey: string | null }
   | { ok: false; reason: string; lockKey?: string };
 
+export type PushClaimOptions = {
+  /** Bypass duplicate lock (e.g. incident → accident cluster upgrade). */
+  bypassPushLock?: boolean;
+};
+
+/** Claim or refresh a push lock without checking for an existing holder. */
+export function forceClaimPushLock(key: string): void {
+  prunePushLocks();
+  pendingPushLocks.add(key);
+  recentPushAt.set(key, Date.now());
+}
+
 /**
  * Age + source-specific concurrent dedup before Progressier send.
  * Call synchronously before sendProgressierPush.
  */
-export function claimIncidentPush(incident: Incident): PushClaimResult {
+export function claimIncidentPush(
+  incident: Incident,
+  options?: PushClaimOptions,
+): PushClaimResult {
   if (isIncidentTooOldForPush(incident)) {
     return {
       ok: false,
@@ -73,10 +91,11 @@ export function claimIncidentPush(incident: Incident): PushClaimResult {
   }
 
   if (incident.source === "google_maps") {
-    const lockKey = googleMapsPushLockKey(
-      incident.coordinates.latitude,
-      incident.coordinates.longitude,
-    );
+    const lockKey = googleMapsPushLockKey(incident);
+    if (options?.bypassPushLock) {
+      forceClaimPushLock(lockKey);
+      return { ok: true, lockKey };
+    }
     if (!claimPushLock(lockKey)) {
       return {
         ok: false,
