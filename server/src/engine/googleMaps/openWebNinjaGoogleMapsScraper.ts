@@ -10,7 +10,12 @@ import { logger } from "../../logger";
 import type { Incident, IncidentSeverity } from "../../types/incident";
 import { keepAliveFetch } from "../httpFetch";
 import { extractReporterName } from "../reporterName";
-import { mergeGoogleMapsRawType, mergeGoogleMapsZoom } from "./googleMapsDisplay";
+import { mergeLane } from "../incidentMerge";
+import {
+  mergeGoogleMapsRawType,
+  mergeGoogleMapsRawTypePreferUpgrade,
+  mergeGoogleMapsZoom,
+} from "./googleMapsDisplay";
 import { logGoogleMapsNotificationGate } from "./googleMapsNotificationGate";
 
 const ENDPOINT = "https://api.openwebninja.com/google-maps-traffic-alerts/traffic-alerts";
@@ -581,6 +586,7 @@ export function dedupeGoogleMapsIncidents(incidents: Incident[]): Incident[] {
     const duplicate = unique.find(
       (kept) =>
         kept.type === incident.type &&
+        mergeLane(kept) === mergeLane(incident) &&
         distanceKm(
           kept.coordinates.latitude,
           kept.coordinates.longitude,
@@ -593,7 +599,10 @@ export function dedupeGoogleMapsIncidents(incidents: Incident[]): Incident[] {
         duplicate.googleMapsZoom,
         incident.googleMapsZoom,
       );
-      duplicate.rawType = mergeGoogleMapsRawType(duplicate.rawType, incident.rawType);
+      duplicate.rawType = mergeGoogleMapsRawTypePreferUpgrade(
+        duplicate.rawType,
+        incident.rawType,
+      );
       continue;
     }
     unique.push(incident);

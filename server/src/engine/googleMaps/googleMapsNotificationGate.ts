@@ -4,9 +4,9 @@ import { logger } from "../../logger";
 import {
   CONFIRMED_ACCIDENT_MERGE_RADIUS_KM,
   GENERIC_ACCIDENT_PUSH_BLOCK_RADIUS_KM,
-  isConfirmedAccident,
   mergeCategory,
-  sameMergeCategory,
+  mergeLane,
+  sameMergeLane,
 } from "../incidentMerge";
 import { isIncidentTooOldForPush } from "../pushDedup";
 import { distanceKm } from "../geo";
@@ -46,7 +46,10 @@ function isAccidentType(type: string): boolean {
 }
 
 function pushBlockRadiusKm(incident: Incident, other: Incident): number {
-  if (isConfirmedAccident(incident) && isConfirmedAccident(other)) {
+  if (
+    mergeLane(incident) === "confirmed_accident" &&
+    mergeLane(other) === "confirmed_accident"
+  ) {
     return CONFIRMED_ACCIDENT_MERGE_RADIUS_KM;
   }
   return GENERIC_ACCIDENT_PUSH_BLOCK_RADIUS_KM;
@@ -60,11 +63,11 @@ function nearbyBlockingAccident(
 
   return store.getActive().find((other) => {
     if (other.id === incident.id) return false;
-    if (!sameMergeCategory(incident, other)) return false;
+    if (!sameMergeLane(incident, other)) return false;
 
     // Confirmed crashes only block on other confirmed crashes within 200 m.
-    // Generic incident pins suppress push within ~25 m (merge can be up to ~30 m).
-    if (isConfirmedAccident(incident) && !isConfirmedAccident(other)) {
+    // Generic incident pins suppress push within ~15 m (same lane only).
+    if (mergeLane(incident) === "confirmed_accident" && mergeLane(other) !== "confirmed_accident") {
       return false;
     }
 
