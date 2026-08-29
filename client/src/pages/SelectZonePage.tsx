@@ -19,22 +19,22 @@ export function SelectZonePage({ user }: { user?: ZoneUser | null }) {
   };
 
   return (
-    <div className="min-h-screen bg-white text-gray-800">
-      <header className="bg-white">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-6">
-          <a href="/" className="text-3xl font-bold tracking-tight text-cobalt no-underline">
+    <div className="design-option1 page-shell min-h-screen">
+      <header className="app-header">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-4">
+          <a href="/" className="header-logo text-2xl font-bold tracking-tight no-underline">
             AlertNav
           </a>
-          <AuthControls />
+          <AuthControls variant="dark" />
         </div>
       </header>
 
       <main className="mx-auto max-w-5xl px-5 py-12 md:py-16">
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-green">Get started</p>
-        <h1 className="mt-3 max-w-2xl text-4xl font-bold tracking-tight text-cobalt md:text-5xl">
+        <p className="section-label">Get started</p>
+        <h1 className="mt-3 max-w-2xl text-4xl font-bold tracking-tight text-foreground md:text-5xl">
           Choose your coverage zone
         </h1>
-        <p className="mt-4 max-w-xl text-lg text-gray-600">
+        <p className="mt-4 max-w-xl text-lg text-muted">
           Alerts and the live map will focus on the city you pick. You can switch anytime from the
           dashboard.
         </p>
@@ -46,11 +46,11 @@ export function SelectZonePage({ user }: { user?: ZoneUser | null }) {
                 type="button"
                 disabled={busy !== null}
                 onClick={() => void onSelect(zone.id)}
-                className="surface-card flex h-full w-full flex-col p-5 text-left transition hover:border-green/30 disabled:opacity-60"
+                className="surface-card flex h-full w-full flex-col p-5 text-left transition disabled:opacity-60"
               >
-                <span className="text-xl font-bold text-cobalt">{zone.name}</span>
-                <span className="mt-1 text-sm text-gray-500">{zone.region}</span>
-                <span className="mt-6 text-sm font-semibold text-green">
+                <span className="text-xl font-bold text-brand">{zone.name}</span>
+                <span className="mt-1 text-sm text-muted">{zone.region}</span>
+                <span className="mt-6 text-sm font-semibold text-accent-deep">
                   {busy === zone.id ? "Saving…" : "Select zone"}
                 </span>
               </button>

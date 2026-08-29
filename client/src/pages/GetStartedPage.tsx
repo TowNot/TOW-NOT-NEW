@@ -37,7 +37,7 @@ export function GetStartedPage({ user }: { user?: ZoneUser | null }) {
 
 function GetStartedPageNoAuth() {
   return (
-    <div className="landing-shell min-h-screen text-white" style={{ backgroundColor: "#0f172a" }}>
+    <div className="design-option1 landing-shell min-h-screen text-white" style={{ backgroundColor: "#0f172a" }}>
       <header className="landing-header">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-5">
           <a href="/" className="header-logo text-2xl font-bold tracking-tight no-underline">
@@ -97,7 +97,7 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
 
   if (!isSignedIn) {
     return (
-      <div className="landing-shell min-h-screen text-white" style={{ backgroundColor: "#0f172a" }}>
+      <div className="design-option1 landing-shell min-h-screen text-white" style={{ backgroundColor: "#0f172a" }}>
         <header className="landing-header">
           <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-5">
             <a href="/" className="header-logo text-2xl font-bold tracking-tight no-underline">
@@ -124,7 +124,7 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
   }
 
   return (
-    <div className="page-shell min-h-screen">
+    <div className="design-option1 page-shell min-h-screen">
       <header className="app-header">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-4">
           <a href="/" className="header-logo text-xl font-bold tracking-tight no-underline">

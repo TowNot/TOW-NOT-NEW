@@ -1,7 +1,6 @@
 import { useUser } from "@clerk/clerk-react";
 import { AcceptableUsePage } from "./pages/AcceptableUsePage";
 import { DisclaimerPage } from "./pages/DisclaimerPage";
-import { DesignHubPage } from "./pages/DesignHubPage";
 import { GetStartedPage } from "./pages/GetStartedPage";
 import { IncidentDesk } from "./pages/IncidentDesk";
 import { LandingPage } from "./pages/LandingPage";
@@ -9,23 +8,6 @@ import { PrivacyPage } from "./pages/PrivacyPage";
 import { RefundPolicyPage } from "./pages/RefundPolicyPage";
 import { SelectZonePage } from "./pages/SelectZonePage";
 import { TermsPage } from "./pages/TermsPage";
-import { Option2IncidentDesk } from "./pages/option2/Option2IncidentDesk";
-import { Option2LandingPage } from "./pages/option2/Option2LandingPage";
-import { Option3IncidentDesk } from "./pages/option3/Option3IncidentDesk";
-import { Option3LandingPage } from "./pages/option3/Option3LandingPage";
-import { Option4IncidentDesk } from "./pages/option4/Option4IncidentDesk";
-import { Option4LandingPage } from "./pages/option4/Option4LandingPage";
-import { Option5IncidentDesk } from "./pages/option5/Option5IncidentDesk";
-import { Option5LandingPage } from "./pages/option5/Option5LandingPage";
-import { Option6IncidentDesk } from "./pages/option6/Option6IncidentDesk";
-import { Option6LandingPage } from "./pages/option6/Option6LandingPage";
-import {
-  DESIGN_HUB_PATH,
-  parseDesignPath,
-  type DesignVariant,
-  variantPublicDesk,
-  variantPublicHome,
-} from "./design/designRoutes";
 import { canAccessDesk } from "./lib/adminAccess";
 import { isClerkConfigured } from "./lib/clerkKey";
 import { resolveSelectedZoneId, type ZoneUser } from "./hooks/useSelectedZone";
@@ -41,6 +23,26 @@ const LEGAL_PATHS = new Set([
   "/disclaimer",
   "/acceptable-use",
 ]);
+
+/** Retired design-preview URLs — send visitors to the live app. */
+function isRetiredPreviewPath(path: string): boolean {
+  return (
+    path === "/design-preview" ||
+    path === "/designs" ||
+    path === "/option-1" ||
+    path.startsWith("/option-1/") ||
+    path === "/option-2" ||
+    path.startsWith("/option-2/") ||
+    path === "/option-3" ||
+    path.startsWith("/option-3/") ||
+    path === "/option-4" ||
+    path.startsWith("/option-4/") ||
+    path === "/option-5" ||
+    path.startsWith("/option-5/") ||
+    path === "/option-6" ||
+    path.startsWith("/option-6/")
+  );
+}
 
 function LegalRoute({ path }: { path: string }) {
   if (path === "/privacy") return <PrivacyPage />;
@@ -73,24 +75,6 @@ function ClerkAwareApp() {
   );
 }
 
-function renderHome(variant: DesignVariant, isSignedIn: boolean) {
-  if (variant === "option2") return <Option2LandingPage isSignedIn={isSignedIn} />;
-  if (variant === "option3") return <Option3LandingPage isSignedIn={isSignedIn} />;
-  if (variant === "option4") return <Option4LandingPage isSignedIn={isSignedIn} />;
-  if (variant === "option5") return <Option5LandingPage isSignedIn={isSignedIn} />;
-  if (variant === "option6") return <Option6LandingPage isSignedIn={isSignedIn} />;
-  return <LandingPage isSignedIn={isSignedIn} />;
-}
-
-function renderDesk(variant: DesignVariant, user: ZoneUser | null) {
-  if (variant === "option2") return <Option2IncidentDesk user={user} />;
-  if (variant === "option3") return <Option3IncidentDesk user={user} />;
-  if (variant === "option4") return <Option4IncidentDesk user={user} />;
-  if (variant === "option5") return <Option5IncidentDesk user={user} />;
-  if (variant === "option6") return <Option6IncidentDesk user={user} />;
-  return <IncidentDesk user={user} />;
-}
-
 function AppShell({
   isSignedIn,
   user,
@@ -100,7 +84,7 @@ function AppShell({
   user: ZoneUser | null;
   userEmail: string | null;
 }) {
-  const { variant, appPath } = parseDesignPath(currentPath());
+  const appPath = currentPath();
   const isAdmin = canAccessDesk(userEmail);
 
   const zoneId = resolveSelectedZoneId(user);
@@ -110,19 +94,23 @@ function AppShell({
   const onHome = appPath === "/";
   const onDesk = appPath === "/dashboard" || appPath === "/desk";
 
+  if (isRetiredPreviewPath(appPath)) {
+    window.location.replace("/");
+    return null;
+  }
+
   if (onLegal) {
     return <LegalRoute path={appPath} />;
   }
 
-  if (appPath === DESIGN_HUB_PATH || appPath === "/designs") return <DesignHubPage />;
   if (onGetStarted) return <GetStartedPage user={user} />;
 
   if (onHome) {
-    return renderHome(variant, isSignedIn);
+    return <LandingPage isSignedIn={isSignedIn} />;
   }
 
   if (onDesk && !isAdmin) {
-    window.location.replace(isSignedIn ? "/get-started" : variantPublicHome(variant));
+    window.location.replace(isSignedIn ? "/get-started" : "/");
     return null;
   }
 
@@ -132,16 +120,16 @@ function AppShell({
   }
 
   if (isSignedIn && zoneId && onWelcome && isAdmin) {
-    window.location.replace(variantPublicDesk(variant));
+    window.location.replace("/dashboard");
     return null;
   }
 
   if (onWelcome) return <SelectZonePage user={user} />;
 
   if (onDesk) {
-    return renderDesk(variant, user);
+    return <IncidentDesk user={user} />;
   }
 
-  window.location.replace(variantPublicHome(variant));
+  window.location.replace("/");
   return null;
 }
