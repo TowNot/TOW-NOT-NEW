@@ -30,7 +30,7 @@ export function SelectZonePage({ user }: { user?: ZoneUser | null }) {
       </header>
 
       <main className="mx-auto max-w-5xl px-5 py-12 md:py-16">
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-green">Get started</p>
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-sky">Get started</p>
         <h1 className="mt-3 max-w-2xl text-4xl font-bold tracking-tight text-cobalt md:text-5xl">
           Choose your coverage zone
         </h1>
@@ -46,11 +46,11 @@ export function SelectZonePage({ user }: { user?: ZoneUser | null }) {
                 type="button"
                 disabled={busy !== null}
                 onClick={() => void onSelect(zone.id)}
-                className="surface-card flex h-full w-full flex-col p-5 text-left transition hover:border-green/30 disabled:opacity-60"
+                className="flex h-full w-full flex-col rounded-xl border border-line bg-white p-5 text-left transition hover:border-sky hover:shadow-sm disabled:opacity-60"
               >
                 <span className="text-xl font-bold text-cobalt">{zone.name}</span>
                 <span className="mt-1 text-sm text-gray-500">{zone.region}</span>
-                <span className="mt-6 text-sm font-semibold text-green">
+                <span className="mt-6 text-sm font-semibold text-sky">
                   {busy === zone.id ? "Saving…" : "Select zone"}
                 </span>
               </button>

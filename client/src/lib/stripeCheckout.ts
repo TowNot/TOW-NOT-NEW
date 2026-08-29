@@ -11,17 +11,3 @@ export function resolveStripeCheckoutUrl(): string {
   if (fromEnv) return fromEnv;
   return DEFAULT_STRIPE_CHECKOUT_URL;
 }
-
-/** Stripe Payment Link with prefilled email + Clerk user id for webhook matching. */
-export function buildStripeCheckoutUrl(options: {
-  email?: string | null;
-  clientReferenceId?: string | null;
-}): string {
-  const base = resolveStripeCheckoutUrl();
-  const url = new URL(base);
-  const email = options.email?.trim();
-  const clientReferenceId = options.clientReferenceId?.trim();
-  if (email) url.searchParams.set("prefilled_email", email);
-  if (clientReferenceId) url.searchParams.set("client_reference_id", clientReferenceId);
-  return url.toString();
-}

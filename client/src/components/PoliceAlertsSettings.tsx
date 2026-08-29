@@ -8,7 +8,7 @@ interface PoliceAlertsSettingsProps {
 /** Desk preference: opt into Waze police pins + Progressier police pushes. */
 export function PoliceAlertsSettings({ enabled, onToggle }: PoliceAlertsSettingsProps) {
   return (
-    <section className="surface-card px-4 py-3">
+    <section className="rounded-lg border border-line bg-panel px-4 py-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-gray-900">Police Alerts</h2>
@@ -23,8 +23,8 @@ export function PoliceAlertsSettings({ enabled, onToggle }: PoliceAlertsSettings
           onClick={onToggle}
           className={
             enabled
-              ? "pill-active-green px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em]"
-              : "rounded-full border border-line bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-gray-500 hover:border-gray-400"
+              ? "rounded-md border border-sky-300 bg-sky-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-waze"
+              : "rounded-md border border-line bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-gray-500 hover:border-gray-400"
           }
         >
           {enabled ? "On" : "Off"}

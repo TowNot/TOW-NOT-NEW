@@ -7,7 +7,6 @@ declare module "*.html?raw" {
 
 interface ImportMetaEnv {
   readonly VITE_STRIPE_CHECKOUT_URL?: string;
-  readonly VITE_ADMIN_EMAILS?: string;
   readonly VITE_CLERK_PUBLISHABLE_KEY?: string;
   readonly VITE_GOOGLE_MAPS_API_KEY?: string;
   readonly VITE_NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?: string;
