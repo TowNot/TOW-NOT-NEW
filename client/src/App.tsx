@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useUser } from "@clerk/clerk-react";
 import { AcceptableUsePage } from "./pages/AcceptableUsePage";
 import { DisclaimerPage } from "./pages/DisclaimerPage";
@@ -69,6 +70,13 @@ function ClerkAwareApp() {
   );
 }
 
+function usePageTheme(path: string) {
+  useEffect(() => {
+    const isAurora = path === "/" || path === "/get-started";
+    document.documentElement.classList.toggle("theme-aurora", isAurora);
+  }, [path]);
+}
+
 function AppShell({
   isSignedIn,
   user,
@@ -77,6 +85,7 @@ function AppShell({
   user: ZoneUser | null;
 }) {
   const path = currentPath();
+  usePageTheme(path);
 
   const zoneId = resolveSelectedZoneId(user);
   const onWelcome = path === "/welcome" || path === "/select-zone";

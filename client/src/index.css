@@ -45,6 +45,17 @@
 
 html {
   color-scheme: light;
+  background-color: #ffffff;
+}
+
+/* Dark Aurora pages — match overscroll / rubber-band canvas to navy shell */
+html.theme-aurora {
+  color-scheme: dark;
+  background-color: #0f172a;
+}
+
+html.theme-aurora body {
+  background-color: #0f172a;
 }
 
 html,
