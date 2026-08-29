@@ -3,24 +3,40 @@ import { getZone, selectableCoverageZones, type ZoneId } from "../lib/zones";
 export function ZoneSwitcher({
   value,
   onChange,
+  dark = false,
 }: {
   value: ZoneId;
   onChange: (id: ZoneId) => void;
+  dark?: boolean;
 }) {
   const active = getZone(value);
   const firePending = active ? !active.hasFireFeed : false;
   const zones = selectableCoverageZones();
 
+  const chipClass = dark
+    ? "header-chip header-chip-dark gap-2 rounded-full px-3"
+    : "header-chip gap-2 rounded-full border border-line bg-surface px-3";
+
+  const labelClass = dark
+    ? "text-[11px] font-semibold uppercase tracking-widest text-indigo-200/70"
+    : "text-[11px] font-semibold uppercase tracking-widest text-muted";
+
+  const selectClass = dark
+    ? "max-w-[10rem] bg-transparent text-center text-sm font-semibold text-white outline-none"
+    : "max-w-[10rem] bg-transparent text-center text-sm font-semibold text-brand outline-none";
+
+  const pendingClass = dark
+    ? "header-chip header-chip-dark rounded-full px-3 font-mono text-[10px] font-medium"
+    : "header-chip rounded-full border border-dashed border-line bg-surface-muted px-3 font-mono text-[10px] font-medium text-muted";
+
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <label className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-2 py-1.5">
-        <span className="hidden text-[11px] font-semibold uppercase tracking-widest text-gray-500 sm:inline">
-          Zone
-        </span>
+      <label className={chipClass}>
+        <span className={labelClass}>Zone</span>
         <select
           value={value}
           onChange={(event) => onChange(event.target.value as ZoneId)}
-          className="max-w-[14rem] bg-transparent text-sm font-semibold text-cobalt outline-none sm:max-w-none"
+          className={selectClass}
           aria-label="Active coverage zone"
         >
           {zones.map((zone) => (
@@ -32,7 +48,7 @@ export function ZoneSwitcher({
       </label>
       {firePending && active ? (
         <span
-          className="inline-flex cursor-default items-center rounded-md border border-dashed border-line bg-ink px-2.5 py-1.5 font-mono text-[10px] font-medium text-gray-500"
+          className={pendingClass}
           title={`${active.name} fire audio is not configured yet`}
           role="status"
           aria-live="polite"

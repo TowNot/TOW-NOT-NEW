@@ -25,8 +25,19 @@ export function useDeskFilterPreferences() {
     syncProgressierTagsFromStorage();
   }, []);
 
-  const toggleAccidents = useCallback(() => {
-    persist({ ...preferences, showAccidents: !preferences.showAccidents });
+  const toggleWazeAccidents = useCallback(() => {
+    persist({ ...preferences, showWazeAccidents: !preferences.showWazeAccidents });
+  }, [persist, preferences]);
+
+  const toggleGoogleMapsAccidents = useCallback(() => {
+    persist({
+      ...preferences,
+      showGoogleMapsAccidents: !preferences.showGoogleMapsAccidents,
+    });
+  }, [persist, preferences]);
+
+  const toggleWazeWeather = useCallback(() => {
+    persist({ ...preferences, wazeWeather: !preferences.wazeWeather });
   }, [persist, preferences]);
 
   const toggleIncidents = useCallback(() => {
@@ -51,7 +62,9 @@ export function useDeskFilterPreferences() {
 
   return {
     preferences,
-    toggleAccidents,
+    toggleWazeAccidents,
+    toggleGoogleMapsAccidents,
+    toggleWazeWeather,
     toggleIncidents,
     toggleSource,
     setSourceEnabled,

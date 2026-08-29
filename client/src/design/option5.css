@@ -1,0 +1,732 @@
+/* ═══════════════════════════════════════════════════════════════
+   Option 5 — Lumen (iridescent glass · mesh · floating dock)
+   Scoped under .design-option5
+   ═══════════════════════════════════════════════════════════════ */
+
+.design-option5 {
+  --o5-bg: #07060d;
+  --o5-glass: rgb(255 255 255 / 6%);
+  --o5-glass-border: rgb(255 255 255 / 12%);
+  --o5-text: #f4f4f5;
+  --o5-muted: rgb(255 255 255 / 50%);
+  --o5-magenta: #e879f9;
+  --o5-violet: #a78bfa;
+  --o5-cyan: #22d3ee;
+}
+
+/* ── Background layers ───────────────────────────────────────── */
+
+.design-option5.o5-shell,
+.design-option5.o5-desk {
+  position: relative;
+  overflow-x: hidden;
+  background: var(--o5-bg);
+  color: var(--o5-text);
+}
+
+.o5-mesh {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 70% 50% at 20% 10%, rgb(232 121 249 / 18%) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 45% at 85% 25%, rgb(167 139 250 / 16%) 0%, transparent 50%),
+    radial-gradient(ellipse 50% 40% at 50% 90%, rgb(34 211 238 / 12%) 0%, transparent 45%);
+}
+
+.o5-mesh-desk {
+  opacity: 0.7;
+}
+
+.o5-grid {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgb(255 255 255 / 3%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 3%) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, black 20%, transparent 75%);
+}
+
+/* ── Glass nav (landing) ─────────────────────────────────────── */
+
+.o5-glass-nav {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  z-index: 40;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem 0.75rem;
+  max-width: calc(100% - 2rem);
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--o5-glass-border);
+  border-radius: 9999px;
+  background: rgb(7 6 13 / 65%);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 8px 32px rgb(0 0 0 / 35%);
+  transform: translateX(-50%);
+}
+
+.o5-nav-brand {
+  padding-inline: 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  background: linear-gradient(90deg, var(--o5-magenta), var(--o5-cyan));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.o5-nav-divider {
+  width: 1px;
+  height: 1.25rem;
+  background: var(--o5-glass-border);
+}
+
+.o5-nav-link {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--o5-muted);
+}
+
+.o5-nav-link:hover {
+  color: var(--o5-text);
+}
+
+.o5-nav-cta {
+  min-height: 2.25rem;
+  padding: 0 1rem;
+  border: none;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, var(--o5-violet) 0%, var(--o5-magenta) 100%);
+  color: #ffffff;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* ── Landing hero ────────────────────────────────────────────── */
+
+.o5-main {
+  position: relative;
+  z-index: 1;
+  max-width: 72rem;
+  margin-inline: auto;
+  padding: 6.5rem 1.25rem 4rem;
+}
+
+.o5-hero-grid {
+  display: grid;
+  gap: 2rem;
+  align-items: center;
+}
+
+@media (min-width: 960px) {
+  .o5-hero-grid {
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: 2.5rem;
+    min-height: min(70vh, 36rem);
+  }
+}
+
+.o5-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--o5-cyan);
+}
+
+.o5-title {
+  margin-top: 1rem;
+  font-size: clamp(2.25rem, 6vw, 4rem);
+  font-weight: 800;
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+}
+
+.o5-title-gradient {
+  background: linear-gradient(
+    120deg,
+    #ffffff 0%,
+    var(--o5-cyan) 35%,
+    var(--o5-magenta) 70%,
+    #ffffff 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: o5-shimmer 8s linear infinite;
+}
+
+@keyframes o5-shimmer {
+  0% {
+    background-position: 0% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+.o5-lead {
+  margin-top: 1.5rem;
+  max-width: 34rem;
+  font-size: 1.0625rem;
+  line-height: 1.7;
+  color: var(--o5-muted);
+}
+
+.o5-hero-actions {
+  margin-top: 2.25rem;
+}
+
+.o5-glow-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 13rem;
+  min-height: 3.375rem;
+  padding: 0 2rem;
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 1rem;
+  background: linear-gradient(135deg, rgb(167 139 250 / 25%) 0%, rgb(232 121 249 / 15%) 100%);
+  backdrop-filter: blur(12px);
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow:
+    0 0 0 1px rgb(167 139 250 / 20%) inset,
+    0 0 40px rgb(232 121 249 / 20%);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.o5-glow-btn:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 1px rgb(167 139 250 / 35%) inset,
+    0 0 56px rgb(34 211 238 / 25%);
+}
+
+/* ── Glass card / timeline ───────────────────────────────────── */
+
+.o5-glass-card {
+  padding: 1.75rem;
+  border-radius: 1.5rem;
+  border: 1px solid var(--o5-glass-border);
+  background: var(--o5-glass);
+  backdrop-filter: blur(24px);
+  box-shadow: 0 24px 64px rgb(0 0 0 / 35%);
+}
+
+.o5-card-kicker {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--o5-magenta);
+}
+
+.o5-timeline {
+  margin: 1.25rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.o5-timeline-item {
+  display: flex;
+  gap: 1rem;
+}
+
+.o5-timeline-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.o5-timeline-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  border: 1px solid rgb(34 211 238 / 35%);
+  background: rgb(34 211 238 / 10%);
+  color: var(--o5-cyan);
+  font-size: 0.8125rem;
+  font-weight: 800;
+}
+
+.o5-timeline-line {
+  flex: 1;
+  width: 2px;
+  min-height: 1.5rem;
+  margin-block: 0.375rem;
+  background: linear-gradient(180deg, var(--o5-cyan), var(--o5-magenta));
+  opacity: 0.45;
+}
+
+.o5-timeline-title {
+  padding-top: 0.25rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.o5-timeline-detail {
+  margin-top: 0.25rem;
+  padding-bottom: 1.25rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--o5-muted);
+}
+
+.o5-timeline-item:last-child .o5-timeline-detail {
+  padding-bottom: 0;
+}
+
+/* ── Features ────────────────────────────────────────────────── */
+
+.o5-features {
+  margin-top: 4rem;
+}
+
+.o5-features-label {
+  text-align: center;
+}
+
+.o5-feature-row {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .o5-feature-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.o5-feature-glass {
+  padding: 1.375rem;
+  border-radius: 1.25rem;
+  border: 1px solid var(--o5-glass-border);
+  background: var(--o5-glass);
+  backdrop-filter: blur(16px);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.o5-feature-glass:hover {
+  border-color: rgb(232 121 249 / 30%);
+  box-shadow: 0 0 32px rgb(167 139 250 / 12%);
+}
+
+.o5-feature-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--o5-cyan);
+}
+
+.o5-feature-text {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--o5-muted);
+}
+
+.design-option5 .landing-footer {
+  position: relative;
+  z-index: 1;
+  border-top-color: var(--o5-glass-border);
+  background: transparent;
+}
+
+/* ── Desk ────────────────────────────────────────────────────── */
+
+.o5-desk-float {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem 0.625rem;
+  max-width: calc(100% - 1.5rem);
+  padding: 0.5rem 0.875rem;
+  border: 1px solid var(--o5-glass-border);
+  border-radius: 9999px;
+  background: rgb(7 6 13 / 75%);
+  backdrop-filter: blur(20px);
+  transform: translateX(-50%);
+}
+
+.o5-desk-logo {
+  font-size: 0.875rem;
+  font-weight: 800;
+  color: var(--o5-text);
+}
+
+.o5-pulse-badge {
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 8%);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--o5-muted);
+}
+
+.o5-pulse-live {
+  background: rgb(34 211 238 / 15%);
+  color: var(--o5-cyan);
+  box-shadow: 0 0 12px rgb(34 211 238 / 35%);
+}
+
+.o5-desk-stage {
+  position: relative;
+  z-index: 1;
+  max-width: 56rem;
+  margin-inline: auto;
+  padding: 5.5rem 1rem 7rem;
+}
+
+.o5-view-header {
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.o5-view-title {
+  font-size: 1.125rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, var(--o5-cyan), var(--o5-magenta));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.o5-view-sub {
+  margin-top: 0.375rem;
+  font-size: 0.75rem;
+  color: var(--o5-muted);
+}
+
+.o5-glass-panel {
+  border-radius: 1.5rem;
+  border: 1px solid var(--o5-glass-border);
+  background: var(--o5-glass);
+  backdrop-filter: blur(24px);
+  box-shadow: 0 20px 60px rgb(0 0 0 / 40%);
+  overflow: hidden;
+}
+
+.o5-panel-pad {
+  padding: 1.25rem 1.5rem 1.5rem;
+}
+
+/* ── Floating dock ───────────────────────────────────────────── */
+
+.o5-dock {
+  position: fixed;
+  bottom: 1.25rem;
+  left: 50%;
+  z-index: 40;
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.375rem;
+  border: 1px solid var(--o5-glass-border);
+  border-radius: 1.25rem;
+  background: rgb(7 6 13 / 82%);
+  backdrop-filter: blur(24px);
+  box-shadow: 0 12px 48px rgb(0 0 0 / 45%);
+  transform: translateX(-50%);
+}
+
+.o5-dock-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 4.5rem;
+  padding: 0.625rem 0.75rem;
+  border: none;
+  border-radius: 0.875rem;
+  background: transparent;
+  color: var(--o5-muted);
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+
+.o5-dock-btn:hover {
+  color: var(--o5-text);
+  background: rgb(255 255 255 / 5%);
+}
+
+.o5-dock-btn-active {
+  background: linear-gradient(135deg, rgb(167 139 250 / 25%), rgb(34 211 238 / 15%));
+  color: var(--o5-text);
+  box-shadow: 0 0 20px rgb(167 139 250 / 15%);
+}
+
+.o5-dock-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 0.375rem;
+  border: 2px solid currentColor;
+  opacity: 0.85;
+}
+
+.o5-dock-btn:nth-child(1) .o5-dock-icon {
+  border-radius: 0.25rem;
+}
+
+.o5-dock-btn:nth-child(2) .o5-dock-icon {
+  border-radius: 9999px;
+}
+
+.o5-dock-btn:nth-child(3) .o5-dock-icon {
+  border-radius: 0.25rem 0.25rem 0.625rem 0.625rem;
+}
+
+.o5-dock-label {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.o5-desk-link {
+  position: fixed;
+  bottom: 0.5rem;
+  left: 50%;
+  z-index: 35;
+  transform: translateX(-50%);
+  font-size: 0.6875rem;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (min-width: 768px) {
+  .o5-desk-link {
+    opacity: 1;
+    pointer-events: auto;
+    bottom: 1.5rem;
+    left: auto;
+    right: 1.25rem;
+    transform: none;
+  }
+}
+
+/* ── Shared component overrides ──────────────────────────────── */
+
+.design-option5 .page-shell {
+  background: transparent;
+}
+
+.design-option5 .surface-card {
+  border-color: var(--o5-glass-border);
+  background: rgb(255 255 255 / 4%);
+  box-shadow: none;
+}
+
+.design-option5 .surface-card:hover {
+  border-color: rgb(255 255 255 / 18%);
+  box-shadow: 0 0 24px rgb(167 139 250 / 8%);
+}
+
+.design-option5 .stat-card-accent::before {
+  background: linear-gradient(180deg, var(--o5-magenta), var(--o5-cyan));
+}
+
+.design-option5 .stat-card-accent.stat-accent::before {
+  background: var(--o5-cyan);
+}
+
+.design-option5 .stat-card-accent.stat-fire::before {
+  background: #fb923c;
+}
+
+.design-option5 .stat-card-accent.stat-ems::before {
+  background: #f472b6;
+}
+
+.design-option5 .live-count {
+  background: rgb(34 211 238 / 12%);
+  color: var(--o5-cyan);
+}
+
+.design-option5 .text-foreground {
+  color: var(--o5-text);
+}
+
+.design-option5 .text-muted {
+  color: var(--o5-muted);
+}
+
+.design-option5 .text-brand,
+.design-option5 .text-brand-deep {
+  color: var(--o5-violet);
+}
+
+.design-option5 .text-accent-deep {
+  color: var(--o5-cyan);
+}
+
+.design-option5 .pill-active-brand {
+  border-color: rgb(167 139 250 / 35%);
+  background: rgb(167 139 250 / 12%);
+  color: #ddd6fe;
+}
+
+.design-option5 .pill-active-accent {
+  border-color: rgb(34 211 238 / 35%);
+  background: rgb(34 211 238 / 10%);
+  color: #a5f3fc;
+}
+
+.design-option5 .waze-filter-group,
+.design-option5 .google-maps-filter-group {
+  border-color: var(--o5-glass-border);
+  background: rgb(255 255 255 / 3%);
+}
+
+.design-option5 .btn-primary {
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, var(--o5-violet), var(--o5-magenta));
+  box-shadow: none;
+}
+
+.design-option5 .input-field {
+  border-color: var(--o5-glass-border);
+  background: rgb(255 255 255 / 5%);
+  color: var(--o5-text);
+}
+
+.design-option5 .input-field:focus {
+  border-color: rgb(34 211 238 / 40%);
+  box-shadow: 0 0 0 2px rgb(34 211 238 / 12%);
+}
+
+.design-option5 .nav-link-pill {
+  border-color: var(--o5-glass-border);
+  background: rgb(255 255 255 / 4%);
+  color: var(--o5-cyan);
+}
+
+.design-option5 .nav-link-pill:hover {
+  background: rgb(34 211 238 / 10%);
+}
+
+.design-option5 .header-chip-dark {
+  border-color: var(--o5-glass-border);
+  background: rgb(255 255 255 / 5%);
+  color: var(--o5-muted);
+}
+
+.design-option5 .empty-state {
+  background: transparent;
+  border-color: var(--o5-glass-border);
+}
+
+.design-option5 section.mx-auto {
+  max-width: none;
+  padding-inline: 1rem;
+}
+
+.design-option5 .section-label {
+  color: var(--o5-muted);
+}
+
+.design-option5 .filter-panel-inner .section-label.text-brand {
+  color: var(--o5-violet);
+}
+
+.design-option5 .filter-panel-inner .section-label.text-accent {
+  color: var(--o5-cyan);
+}
+
+.design-option5 .pill-btn:not(.pill-active-brand):not(.pill-active-accent):not(.pill-active-fire):not(.pill-active-ems) {
+  border-color: var(--o5-glass-border);
+  background: rgb(255 255 255 / 3%);
+  color: var(--o5-muted);
+}
+
+.design-option5 .pill-coming-soon {
+  border-color: var(--o5-glass-border);
+  background: transparent;
+  color: var(--o5-muted);
+}
+
+.design-option5 .btn-auth-light {
+  border-color: var(--o5-glass-border);
+  background: rgb(255 255 255 / 5%);
+  color: var(--o5-text);
+}
+
+.design-option5 .btn-ghost {
+  border-color: var(--o5-glass-border);
+  background: rgb(255 255 255 / 4%);
+  color: var(--o5-text);
+}
+
+.design-option5 .bg-brand-soft {
+  background: rgb(167 139 250 / 12%);
+}
+
+.design-option5 .bg-accent-soft {
+  background: rgb(34 211 238 / 10%);
+}
+
+.design-option5 .bg-surface-muted {
+  background: rgb(255 255 255 / 4%);
+}
+
+.design-option5 .border-line {
+  border-color: var(--o5-glass-border);
+}
+
+.design-option5 .bg-surface {
+  background: rgb(255 255 255 / 4%);
+}
+
+.design-option5 .incident-card {
+  border-radius: 1rem;
+}
+
+.design-option5 .border-brand\/20 {
+  border-color: rgb(167 139 250 / 20%);
+}
+
+.design-option5 .border-accent\/25 {
+  border-color: rgb(34 211 238 / 25%);
+}
+
+.design-option5 .border-brand\/30 {
+  border-color: rgb(167 139 250 / 30%);
+}
+
+.design-option5 .bg-surface-muted {
+  background: rgb(255 255 255 / 4%);
+}
+
+.design-option5 .collapsible-title,
+.design-option5 .onboarding-title {
+  color: var(--o5-text);
+}

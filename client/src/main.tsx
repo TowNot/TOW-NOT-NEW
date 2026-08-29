@@ -4,6 +4,11 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import { resolveClerkPublishableKey } from "./lib/clerkKey";
 import "./index.css";
+import "./design/option2.css";
+import "./design/option3.css";
+import "./design/option4.css";
+import "./design/option5.css";
+import "./design/option6.css";
 
 const root = document.getElementById("root");
 if (!root) {

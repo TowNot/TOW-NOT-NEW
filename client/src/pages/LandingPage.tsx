@@ -1,83 +1,128 @@
-import { resolveStripeCheckoutUrl } from "../lib/stripeCheckout";
 import { AuthControls } from "../components/AuthControls";
+import { GetStartedButton } from "../components/GetStartedButton";
 import { SiteFooter } from "../components/SiteFooter";
+import {
+  APP_DESCRIPTION,
+  BRAND_TAGLINE,
+  HERO_HEADLINE,
+  NAV_FEATURES,
+  SETUP_STEPS,
+} from "../design/copy";
+import { designGetStartedHref } from "../design/designRoutes";
 
-const STRIPE_CHECKOUT_URL = resolveStripeCheckoutUrl();
+/** Option 1 — Aurora (dark hero, collapsible desk panels). Saved baseline. */
+export function LandingPage({ isSignedIn = false }: { isSignedIn?: boolean }) {
+  const setupHref = designGetStartedHref("option1");
 
-const NAV_FEATURES = [
-  {
-    name: "Waze",
-    detail: "One tap opens the pin in Waze for turn-by-turn guidance.",
-  },
-  {
-    name: "Google Maps",
-    detail: "Or jump straight into Google Maps with the same coordinates.",
-  },
-] as const;
-
-export function LandingPage() {
   return (
-    <div className="min-h-screen bg-white text-gray-800">
-      <header className="bg-white">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-6">
-          <a
-            href="/"
-            className="text-3xl font-bold tracking-tight text-cobalt no-underline md:text-4xl"
-          >
+    <div
+      className="design-option1 landing-shell min-h-screen text-white"
+      style={{ backgroundColor: "#0f172a" }}
+    >
+      <header className="landing-header">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-5">
+          <a href="/" className="header-logo text-3xl font-bold tracking-tight no-underline md:text-4xl">
             AlertNav
           </a>
-          <nav className="flex items-center gap-3 sm:gap-4" aria-label="Primary">
-            {/* TEMP: remove after launch — quick access to Waze + Fire desk */}
-            <a
-              href="/dashboard"
-              className="rounded-md border border-cobalt/30 bg-white px-3 py-2 text-xs font-semibold text-cobalt no-underline hover:bg-ink"
-            >
-              Live desk
-            </a>
-            <a
-              href={STRIPE_CHECKOUT_URL}
-              className="hidden rounded-md bg-sky px-4 py-2 text-sm font-semibold text-white no-underline hover:brightness-105 sm:inline"
-            >
-              Get the App
-            </a>
-            <AuthControls />
+          <nav className="flex items-center gap-2 sm:gap-3" aria-label="Primary">
+            {isSignedIn ? (
+              <a href={setupHref} className="btn-secondary btn-cta-pair text-sm no-underline">
+                Continue setup
+              </a>
+            ) : (
+              <GetStartedButton className="btn-secondary btn-cta-pair text-sm" />
+            )}
+            <AuthControls variant="dark" />
           </nav>
         </div>
       </header>
 
       <main>
-        <section className="mx-auto flex min-h-[calc(100vh-5.5rem)] max-w-5xl flex-col justify-center px-5 pb-16 pt-8 md:pt-4">
-          <h1 className="max-w-3xl text-4xl font-bold leading-[1.08] tracking-tight text-cobalt md:text-6xl lg:text-7xl">
-            Monitor Every Incident in Real-Time.
-          </h1>
-          <p className="mt-6 max-w-2xl text-lg font-normal leading-relaxed text-gray-600 md:text-xl">
-            Instantly track accidents, collisions, and road hazards across your preferred zones.
-            Effortless management with a clean, lightning-fast interface.
-          </p>
-          <div className="mt-10">
-            <a
-              href={STRIPE_CHECKOUT_URL}
-              className="inline-flex rounded-md bg-sky px-8 py-3.5 text-base font-semibold text-white no-underline shadow-none hover:brightness-105"
-            >
-              Get the App
-            </a>
-          </div>
+        <section className="landing-hero mx-auto max-w-5xl">
+          <div className="landing-hero-glow landing-hero-glow-a" aria-hidden />
+          <div className="landing-hero-glow landing-hero-glow-b" aria-hidden />
+          <div className="landing-hero-glow landing-hero-glow-c" aria-hidden />
 
-          <ul className="mt-16 max-w-xl space-y-6 border-t border-line pt-10" aria-label="Navigation options">
-            {NAV_FEATURES.map((feature) => (
-              <li key={feature.name} className="flex gap-4">
-                <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-sky" aria-hidden />
-                <div>
-                  <p className="text-base font-semibold text-cobalt">{feature.name}</p>
-                  <p className="mt-1 text-sm leading-relaxed text-gray-600">{feature.detail}</p>
-                </div>
-              </li>
+          <div className="hero-panel relative px-6 py-10 md:px-10 md:py-14">
+            <p className="section-label text-indigo-200/80">{BRAND_TAGLINE}</p>
+            <h1 className="max-w-3xl text-4xl font-bold leading-[1.08] tracking-tight text-white md:text-5xl lg:text-[3.25rem]">
+              {HERO_HEADLINE}
+            </h1>
+            <p className="mt-5 max-w-2xl text-lg leading-relaxed text-indigo-100/80 md:text-xl">
+              {APP_DESCRIPTION}
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              {isSignedIn ? (
+                <a href={setupHref} className="btn-secondary btn-cta-pair no-underline">
+                  Continue setup
+                </a>
+              ) : (
+                <GetStartedButton className="btn-secondary btn-cta-pair" />
+              )}
+            </div>
+
+            <ol className="mt-10 grid gap-3 sm:grid-cols-3" aria-label="How to get AlertNav">
+              {SETUP_STEPS.map((step) => (
+                <li key={step.number} className="landing-step-card">
+                  <span className="landing-step-number">{step.number}</span>
+                  <p className="mt-2 text-sm font-bold text-white">{step.title}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-indigo-100/65">{step.detail}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-5xl px-5 pb-16 pt-4" aria-label="How AlertNav helps">
+          <p className="section-label text-indigo-200/60">Built for your commute</p>
+          <div className="grid gap-4 md:grid-cols-3">
+            {NAV_FEATURES.map((feature, index) => (
+              <article key={feature.name} className="feature-card">
+                <span
+                  className={`feature-icon ${
+                    index === 0 ? "feature-icon-brand" : "feature-icon-accent"
+                  }`}
+                  aria-hidden
+                >
+                  ●
+                </span>
+                <h2 className="mt-3 text-lg font-bold text-white">{feature.name}</h2>
+                <p className="mt-2 text-sm leading-relaxed text-indigo-100/70">{feature.detail}</p>
+              </article>
             ))}
-          </ul>
+          </div>
         </section>
       </main>
 
-      <SiteFooter />
+      <SiteFooter dark />
+
+      <a
+        href="/dashboard"
+        className="landing-alerts-fab no-underline"
+        aria-label="Open road alerts"
+        title="Road alerts"
+      >
+        <span className="landing-alerts-fab-ring" aria-hidden />
+        <svg
+          className="landing-alerts-fab-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden
+        >
+          <path
+            d="M12 3a5.5 5.5 0 0 0-5.5 5.5v2.1l-.9 1.8a1 1 0 0 0 .9 1.45h11a1 1 0 0 0 .9-1.45l-.9-1.8V8.5A5.5 5.5 0 0 0 12 3Z"
+            stroke="currentColor"
+            strokeWidth="1.75"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M10 18.5a2 2 0 0 0 4 0"
+            stroke="currentColor"
+            strokeWidth="1.75"
+            strokeLinecap="round"
+          />
+        </svg>
+      </a>
     </div>
   );
 }

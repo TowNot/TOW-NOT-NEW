@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { clerkClient, getAuth } from "@clerk/express";
 import {
   findSubscriptionByEmail,
   isSubscriptionActive,
@@ -6,8 +7,42 @@ import {
   subscriptionStoreStats,
 } from "../store/subscriptionStore";
 
+async function primaryEmailForUser(userId: string): Promise<string | null> {
+  const user = await clerkClient.users.getUser(userId);
+  return (
+    user.emailAddresses.find((entry) => entry.id === user.primaryEmailAddressId)?.emailAddress ??
+    user.emailAddresses[0]?.emailAddress ??
+    null
+  );
+}
+
 export function createSubscriptionsRouter(): Router {
   const router = Router();
+
+  router.get("/me", async (req, res, next) => {
+    try {
+      const auth = getAuth(req);
+      if (!auth.isAuthenticated || !auth.userId) {
+        res.status(401).json({ error: "Unauthorized — sign in required" });
+        return;
+      }
+
+      const email = await primaryEmailForUser(auth.userId);
+      if (!email) {
+        res.status(400).json({ error: "No email on account" });
+        return;
+      }
+
+      const record = await findSubscriptionByEmail(email);
+      res.json({
+        email: email.trim().toLowerCase(),
+        active: await isSubscriptionActive(email),
+        subscription: record,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
 
   router.get("/status", async (req, res, next) => {
     try {

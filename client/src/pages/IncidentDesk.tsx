@@ -1,7 +1,8 @@
 import { useEffect } from "react";
+import { CollapsibleSection } from "../components/CollapsibleSection";
 import { Header } from "../components/Header";
 import { IncidentFeed } from "../components/IncidentFeed";
-import { PoliceAlertsSettings } from "../components/PoliceAlertsSettings";
+import { IncidentFeedFilters } from "../components/IncidentFeedFilters";
 import { SmsSettings } from "../components/SmsSettings";
 import { useAlertOnNewIncidents } from "../hooks/useAlertOnNewIncidents";
 import { useDeskFilterPreferences } from "../hooks/useDeskFilterPreferences";
@@ -15,7 +16,7 @@ import { isPoliceIncident } from "../lib/policeAlerts";
 import { getZone, incidentInZone } from "../lib/zones";
 
 /**
- * Public live desk (`/desk`, `/dashboard`, …). Zone preference uses Clerk when
+ * Community road alerts desk (`/desk`, `/dashboard`, …). Zone preference uses Clerk when
  * signed in; guests keep `selectedZoneId` in React state + localStorage only.
  * Push tags always match the single active city.
  */
@@ -25,7 +26,9 @@ export function IncidentDesk({ user }: { user?: ZoneUser | null }) {
   const { enabled: policeAlertsEnabled, togglePoliceAlerts } = usePoliceAlertsPreference();
   const {
     preferences: deskFilters,
-    toggleAccidents,
+    toggleWazeAccidents,
+    toggleGoogleMapsAccidents,
+    toggleWazeWeather,
     toggleIncidents,
     toggleSource,
   } = useDeskFilterPreferences();
@@ -54,26 +57,39 @@ export function IncidentDesk({ user }: { user?: ZoneUser | null }) {
   usePushAlertBridge();
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="design-option1 page-shell min-h-screen">
       <Header
         connected={connected}
         health={health}
         zoneId={activeZone.id}
         onZoneChange={(id) => void saveZone(id)}
       />
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-5 pt-6">
-        <PoliceAlertsSettings
-          enabled={policeAlertsEnabled}
-          onToggle={togglePoliceAlerts}
-        />
-        <SmsSettings />
+      <div className="desk-controls mx-auto flex w-full max-w-6xl flex-col gap-3 px-5 pt-6">
+        <CollapsibleSection
+          title="Filters"
+          subtitle="Data sources & alert types"
+        >
+          <IncidentFeedFilters
+            preferences={deskFilters}
+            policeAlertsEnabled={policeAlertsEnabled}
+            onTogglePoliceAlerts={togglePoliceAlerts}
+            onToggleWazeAccidents={toggleWazeAccidents}
+            onToggleGoogleMapsAccidents={toggleGoogleMapsAccidents}
+            onToggleWazeWeather={toggleWazeWeather}
+            onToggleIncidents={toggleIncidents}
+            onToggleSource={toggleSource}
+            zoneName={activeZone.name}
+            hasFireFeed={activeZone.hasFireFeed}
+            hasEmsFeed={activeZone.hasEmsFeed}
+          />
+        </CollapsibleSection>
+        <CollapsibleSection title="SMS alerts" subtitle="Opt in to text messages">
+          <SmsSettings embedded />
+        </CollapsibleSection>
       </div>
       <IncidentFeed
         incidents={zoneIncidents}
         preferences={deskFilters}
-        onToggleAccidents={toggleAccidents}
-        onToggleIncidents={toggleIncidents}
-        onToggleSource={toggleSource}
         zoneName={activeZone.name}
         hasFireFeed={activeZone.hasFireFeed}
         hasEmsFeed={activeZone.hasEmsFeed}

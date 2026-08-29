@@ -1,20 +1,26 @@
+import { mapAlertKind } from "./mapAlertFilters";
 import type { Incident, IncidentSource } from "../types";
 import { passesMapAlertFilters } from "./mapAlertFilters";
 
 export const DESK_FILTER_STORAGE_KEY = "alertnav-desk-filter-preferences";
 
-/** Persisted Live Desk filters — sources + Google Maps alert kinds. */
+/** Persisted Live Desk filters — sources + per-source alert kinds. */
 export interface DeskFilterPreferences {
-  showAccidents: boolean;
+  showWazeAccidents: boolean;
+  showGoogleMapsAccidents: boolean;
   showIncidents: boolean;
+  /** Waze weather layer preference (UI + future map overlay). */
+  wazeWeather: boolean;
   waze: boolean;
   google_maps: boolean;
   fire_dispatch: boolean;
 }
 
 export const DEFAULT_DESK_FILTER_PREFERENCES: DeskFilterPreferences = {
-  showAccidents: true,
+  showWazeAccidents: true,
+  showGoogleMapsAccidents: true,
   showIncidents: true,
+  wazeWeather: true,
   waze: true,
   google_maps: true,
   fire_dispatch: true,
@@ -34,10 +40,16 @@ export function readDeskFilterPreferences(): DeskFilterPreferences {
   try {
     const raw = window.localStorage.getItem(DESK_FILTER_STORAGE_KEY);
     if (!raw) return { ...DEFAULT_DESK_FILTER_PREFERENCES };
-    const parsed = JSON.parse(raw) as Partial<DeskFilterPreferences>;
+    const parsed = JSON.parse(raw) as Partial<DeskFilterPreferences> & { showAccidents?: boolean };
+    const legacyAccidents = parseBool(
+      parsed.showAccidents,
+      DEFAULT_DESK_FILTER_PREFERENCES.showWazeAccidents,
+    );
     return {
-      showAccidents: parseBool(parsed.showAccidents, DEFAULT_DESK_FILTER_PREFERENCES.showAccidents),
+      showWazeAccidents: parseBool(parsed.showWazeAccidents, legacyAccidents),
+      showGoogleMapsAccidents: parseBool(parsed.showGoogleMapsAccidents, legacyAccidents),
       showIncidents: parseBool(parsed.showIncidents, DEFAULT_DESK_FILTER_PREFERENCES.showIncidents),
+      wazeWeather: parseBool(parsed.wazeWeather, DEFAULT_DESK_FILTER_PREFERENCES.wazeWeather),
       waze: parseBool(parsed.waze, DEFAULT_DESK_FILTER_PREFERENCES.waze),
       google_maps: parseBool(parsed.google_maps, DEFAULT_DESK_FILTER_PREFERENCES.google_maps),
       fire_dispatch: parseBool(parsed.fire_dispatch, DEFAULT_DESK_FILTER_PREFERENCES.fire_dispatch),
@@ -68,8 +80,18 @@ export function passesDeskFilters(
   if (incident.source === "google_maps" && !prefs.google_maps) return false;
   if (incident.source === "fire_dispatch" && !prefs.fire_dispatch) return false;
 
-  if (incident.source === "google_maps" || incident.source === "waze") {
-    return passesMapAlertFilters(incident, prefs.showAccidents, prefs.showIncidents);
+  if (incident.source === "waze") {
+    const kind = mapAlertKind(incident);
+    if (kind === "accident") return prefs.showWazeAccidents;
+    return true;
+  }
+
+  if (incident.source === "google_maps") {
+    return passesMapAlertFilters(
+      incident,
+      prefs.showGoogleMapsAccidents,
+      prefs.showIncidents,
+    );
   }
 
   if (
@@ -77,7 +99,7 @@ export function passesDeskFilters(
     incident.type.toUpperCase().includes("CRASH") ||
     incident.type.toUpperCase().includes("COLLISION")
   ) {
-    return prefs.showAccidents;
+    return prefs.showWazeAccidents || prefs.showGoogleMapsAccidents;
   }
 
   return true;

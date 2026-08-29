@@ -362,7 +362,7 @@ export function progressierTagsForPush(
   if (deskFilters.waze) {
     tags.push(zoneWazePushTag(zoneId));
   }
-  if (deskFilters.google_maps && deskFilters.showAccidents) {
+  if (deskFilters.google_maps && deskFilters.showGoogleMapsAccidents) {
     tags.push(zoneGoogleMapsAccidentsPushTag(zoneId));
   }
   if (deskFilters.google_maps && deskFilters.showIncidents) {

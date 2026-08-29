@@ -30,7 +30,7 @@ export function IncidentMapThumbnail({ lat, lng }: IncidentMapThumbnailProps) {
   if (!useOsmFallback && googleSrc) {
     return (
       <div
-        className="relative aspect-video w-[300px] max-w-full shrink-0 overflow-hidden rounded-md border border-line bg-ink"
+        className="relative aspect-video w-[300px] max-w-full shrink-0 overflow-hidden rounded-md border border-line bg-surface-muted"
         style={{ width: MAP_THUMB_WIDTH, height: MAP_THUMB_HEIGHT }}
       >
         <img
@@ -54,7 +54,7 @@ function OsmMapThumbnailFallback({ lat, lng }: IncidentMapThumbnailProps) {
 
   return (
     <div
-      className="relative shrink-0 overflow-hidden rounded-md border border-line bg-ink"
+      className="relative shrink-0 overflow-hidden rounded-md border border-line bg-surface-muted"
       style={{ width: MAP_THUMB_WIDTH, height: MAP_THUMB_HEIGHT }}
     >
       <div
