@@ -13,7 +13,7 @@ const ONBOARDING_STEPS = [
   {
     number: "1",
     title: "Create your account",
-    detail: "Sign up with email so AlertNav can save your city and subscription.",
+    detail: "Sign up with your email to secure your account and manage your subscription.",
   },
   {
     number: "2",
