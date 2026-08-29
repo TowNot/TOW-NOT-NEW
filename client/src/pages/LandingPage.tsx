@@ -8,10 +8,11 @@ import {
   NAV_FEATURES,
   SETUP_STEPS,
 } from "../design/copy";
+import { designGetStartedHref } from "../design/designRoutes";
 
-/** Option 1 — Aurora (dark hero, collapsible desk panels). Live app. */
+/** Option 1 — Aurora (dark hero, collapsible desk panels). Saved baseline. */
 export function LandingPage({ isSignedIn = false }: { isSignedIn?: boolean }) {
-  const setupHref = "/get-started";
+  const setupHref = designGetStartedHref("option1");
 
   return (
     <div
