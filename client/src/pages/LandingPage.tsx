@@ -35,7 +35,7 @@ function LandingHeaderNav({ isSignedIn }: { isSignedIn: boolean }) {
         href={accountPortalUrl("sign-up")}
         className={`btn-primary px-4 py-2 text-xs tracking-wide no-underline ${headerAuthTouch}`}
       >
-        Start Free Trial
+        Start Your Free Trial
       </a>
     </nav>
   );
