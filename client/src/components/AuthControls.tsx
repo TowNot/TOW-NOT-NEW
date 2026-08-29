@@ -1,21 +1,10 @@
 import { UserButton, useAuth } from "@clerk/clerk-react";
+import { accountPortalUrl } from "../lib/clerkPortal";
 import { isClerkConfigured } from "../lib/clerkKey";
-
-const ACCOUNT_HOST = "https://accounts.alertnav.com";
-
-function welcomeRedirectUrl(): string {
-  if (typeof window === "undefined") return "https://alertnav.com/welcome";
-  return `${window.location.origin}/welcome`;
-}
-
-function accountPortalUrl(path: "sign-in" | "sign-up"): string {
-  const redirect = encodeURIComponent(welcomeRedirectUrl());
-  return `${ACCOUNT_HOST}/${path}?redirect_url=${redirect}`;
-}
 
 /**
  * Sign-in / sign-up for guests; profile when signed in.
- * Plain Account Portal links so taps work in installed PWAs (Clerk button wrappers often don't receive touches).
+ * Plain Account Portal links so taps work in installed PWAs.
  */
 export function AuthControls({ variant = "light" }: { variant?: "light" | "dark" }) {
   if (!isClerkConfigured()) return null;
@@ -28,20 +17,24 @@ function AuthControlsInner({ variant }: { variant: "light" | "dark" }) {
   const dark = variant === "dark";
 
   if (!isLoaded || !isSignedIn) {
-    const signInClass = dark
-      ? "btn-auth-compact btn-auth-dark"
-      : "rounded-md border border-line bg-white px-3 py-2 text-xs font-semibold tracking-wide text-cobalt hover:bg-ink";
-    const signUpClass = dark
-      ? "btn-auth-compact btn-auth-dark-primary"
-      : "rounded-md bg-cobalt px-3 py-2 text-xs font-semibold tracking-wide text-white hover:brightness-110";
-    const touchTarget = "relative z-50 inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center no-underline touch-manipulation";
+    const touchTarget = "inline-flex min-h-[2.25rem] cursor-pointer items-center justify-center touch-manipulation";
 
     return (
-      <div className="auth-controls relative z-50 flex shrink-0 flex-wrap items-center gap-2">
-        <a href={accountPortalUrl("sign-in")} className={`${signInClass} ${touchTarget}`}>
+      <div className="auth-controls flex min-w-0 flex-wrap items-center gap-1.5 sm:gap-2">
+        <a
+          href={accountPortalUrl("sign-in")}
+          className={
+            dark
+              ? `btn-auth-light ${touchTarget}`
+              : `${touchTarget} rounded-full border border-line bg-surface px-4 py-2 text-xs font-semibold tracking-wide text-brand hover:bg-brand-soft no-underline`
+          }
+        >
           Sign in
         </a>
-        <a href={accountPortalUrl("sign-up")} className={`${signUpClass} ${touchTarget}`}>
+        <a
+          href={accountPortalUrl("sign-up")}
+          className={`btn-primary px-4 py-2 text-xs tracking-wide no-underline ${touchTarget}`}
+        >
           Sign up
         </a>
       </div>
@@ -49,7 +42,7 @@ function AuthControlsInner({ variant }: { variant: "light" | "dark" }) {
   }
 
   return (
-    <div className="auth-controls relative z-50 flex shrink-0 flex-wrap items-center gap-2">
+    <div className="auth-controls flex min-w-0 flex-wrap items-center gap-2">
       <UserButton afterSignOutUrl="/" />
     </div>
   );

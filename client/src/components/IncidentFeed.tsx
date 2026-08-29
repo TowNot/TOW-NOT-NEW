@@ -66,7 +66,7 @@ export function IncidentFeed({
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-5 py-6">
+    <section className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-5 px-4 py-6 sm:px-5">
       <div
         className="flex flex-wrap gap-2"
         role="group"

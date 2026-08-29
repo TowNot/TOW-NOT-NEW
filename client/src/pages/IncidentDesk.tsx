@@ -1,8 +1,15 @@
 import { useEffect } from "react";
+import { CollapsibleSection } from "../components/CollapsibleSection";
 import { Header } from "../components/Header";
 import { IncidentFeed } from "../components/IncidentFeed";
 import { PoliceAlertsSettings } from "../components/PoliceAlertsSettings";
 import { SmsSettings } from "../components/SmsSettings";
+import {
+  FILTER_PANEL_SUBTITLE,
+  FILTER_PANEL_TITLE,
+  SMS_PANEL_SUBTITLE,
+  SMS_PANEL_TITLE,
+} from "../design/copy";
 import { useAlertOnNewIncidents } from "../hooks/useAlertOnNewIncidents";
 import { useDeskFilterPreferences } from "../hooks/useDeskFilterPreferences";
 import { useIncidents } from "../hooks/useIncidents";
@@ -15,7 +22,7 @@ import { isPoliceIncident } from "../lib/policeAlerts";
 import { getZone, incidentInZone } from "../lib/zones";
 
 /**
- * Public live desk (`/desk`, `/dashboard`, …). Zone preference uses Clerk when
+ * Community road alerts desk (`/desk`, `/dashboard`, …). Zone preference uses Clerk when
  * signed in; guests keep `selectedZoneId` in React state + localStorage only.
  * Push tags always match the single active city.
  */
@@ -54,19 +61,25 @@ export function IncidentDesk({ user }: { user?: ZoneUser | null }) {
   usePushAlertBridge();
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="page-shell min-h-screen overflow-x-clip">
       <Header
         connected={connected}
         health={health}
         zoneId={activeZone.id}
         onZoneChange={(id) => void saveZone(id)}
       />
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-5 pt-6">
-        <PoliceAlertsSettings
-          enabled={policeAlertsEnabled}
-          onToggle={togglePoliceAlerts}
-        />
-        <SmsSettings />
+      <div className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-3 px-4 pt-4 sm:px-5 sm:pt-6">
+        <CollapsibleSection title={FILTER_PANEL_TITLE} subtitle={FILTER_PANEL_SUBTITLE}>
+          <PoliceAlertsSettings
+            enabled={policeAlertsEnabled}
+            onToggle={togglePoliceAlerts}
+          />
+        </CollapsibleSection>
+        <CollapsibleSection title={SMS_PANEL_TITLE} subtitle={SMS_PANEL_SUBTITLE}>
+          <div className="sms-settings-embedded">
+            <SmsSettings />
+          </div>
+        </CollapsibleSection>
       </div>
       <IncidentFeed
         incidents={zoneIncidents}

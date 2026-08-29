@@ -7,6 +7,7 @@ import { PrivacyPage } from "./pages/PrivacyPage";
 import { RefundPolicyPage } from "./pages/RefundPolicyPage";
 import { SelectZonePage } from "./pages/SelectZonePage";
 import { TermsPage } from "./pages/TermsPage";
+import { accountPortalUrl } from "./lib/clerkPortal";
 import { isClerkConfigured } from "./lib/clerkKey";
 import { resolveSelectedZoneId, type ZoneUser } from "./hooks/useSelectedZone";
 
@@ -21,6 +22,26 @@ const LEGAL_PATHS = new Set([
   "/disclaimer",
   "/acceptable-use",
 ]);
+
+/** Retired design-preview URLs — send visitors to the live app. */
+function isRetiredPreviewPath(path: string): boolean {
+  return (
+    path === "/design-preview" ||
+    path === "/designs" ||
+    path === "/option-1" ||
+    path.startsWith("/option-1/") ||
+    path === "/option-2" ||
+    path.startsWith("/option-2/") ||
+    path === "/option-3" ||
+    path.startsWith("/option-3/") ||
+    path === "/option-4" ||
+    path.startsWith("/option-4/") ||
+    path === "/option-5" ||
+    path.startsWith("/option-5/") ||
+    path === "/option-6" ||
+    path.startsWith("/option-6/")
+  );
+}
 
 function LegalRoute({ path }: { path: string }) {
   if (path === "/privacy") return <PrivacyPage />;
@@ -40,7 +61,6 @@ export default function App() {
 
 function ClerkAwareApp() {
   const { isLoaded, isSignedIn, user } = useUser();
-  // Never block the desk on Clerk handshake — show signed-out until auth resolves.
   return (
     <AppShell
       isSignedIn={isLoaded ? Boolean(isSignedIn) : false}
@@ -61,12 +81,27 @@ function AppShell({
   const zoneId = resolveSelectedZoneId(user);
   const onWelcome = path === "/welcome" || path === "/select-zone";
   const onLegal = LEGAL_PATHS.has(path);
+  const onGetStarted = path === "/get-started";
+
+  if (isRetiredPreviewPath(path)) {
+    window.location.replace("/");
+    return null;
+  }
 
   if (onLegal) {
     return <LegalRoute path={path} />;
   }
 
-  if (isSignedIn && !zoneId && path !== "/" && !onWelcome) {
+  if (onGetStarted) {
+    window.location.replace(isSignedIn ? "/welcome" : accountPortalUrl("sign-up"));
+    return null;
+  }
+
+  if (path === "/") {
+    return <LandingPage isSignedIn={isSignedIn} />;
+  }
+
+  if (isSignedIn && !zoneId && (path === "/dashboard" || path === "/desk")) {
     window.location.replace("/welcome");
     return null;
   }
@@ -76,7 +111,7 @@ function AppShell({
     return null;
   }
 
-  if (path === "/") return <LandingPage />;
   if (onWelcome) return <SelectZonePage user={user} />;
+
   return <IncidentDesk user={user} />;
 }

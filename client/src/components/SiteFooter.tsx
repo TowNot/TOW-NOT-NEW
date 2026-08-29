@@ -6,7 +6,31 @@ const LEGAL_LINKS = [
   { href: "/acceptable-use", label: "Acceptable Use Policy" },
 ] as const;
 
-export function SiteFooter() {
+export function SiteFooter({ dark = false }: { dark?: boolean }) {
+  if (dark) {
+    return (
+      <footer className="landing-footer">
+        <div className="mx-auto flex max-w-5xl flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-white">AlertNav</p>
+            <p className="mt-1 text-xs text-indigo-100/65">Real-time incident monitoring</p>
+          </div>
+          <nav className="flex flex-wrap gap-x-4 gap-y-2" aria-label="Legal">
+            {LEGAL_LINKS.map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                className="text-xs font-medium text-indigo-100/65 no-underline hover:text-white"
+              >
+                {link.label}
+              </a>
+            ))}
+          </nav>
+        </div>
+      </footer>
+    );
+  }
+
   return (
     <footer className="border-t border-line bg-white">
       <div className="mx-auto flex max-w-5xl flex-col gap-4 px-5 py-6 sm:flex-row sm:items-center sm:justify-between">
@@ -14,10 +38,7 @@ export function SiteFooter() {
           <p className="text-sm font-semibold text-cobalt">AlertNav</p>
           <p className="mt-1 text-xs text-gray-500">Real-time incident monitoring</p>
         </div>
-        <nav
-          className="flex flex-wrap gap-x-4 gap-y-2"
-          aria-label="Legal"
-        >
+        <nav className="flex flex-wrap gap-x-4 gap-y-2" aria-label="Legal">
           {LEGAL_LINKS.map((link) => (
             <a
               key={link.href}

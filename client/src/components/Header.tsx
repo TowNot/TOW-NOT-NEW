@@ -12,28 +12,27 @@ interface HeaderProps {
 
 export function Header({ connected, health, zoneId, onZoneChange }: HeaderProps) {
   return (
-    <header className="border-b border-line bg-panel">
-      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center gap-3">
-          <a href="/" className="text-2xl font-bold tracking-tight text-cobalt no-underline">
+    <header className="app-header">
+      <div className="mx-auto flex max-w-6xl min-w-0 flex-col gap-3 px-4 py-4 sm:px-5 md:flex-row md:items-center md:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
+          <a href="/" className="header-logo shrink-0 text-xl font-bold tracking-tight no-underline sm:text-2xl">
             AlertNav
           </a>
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">
+          <div className="hidden sm:block">
+            <p className="header-tagline text-[11px] font-semibold uppercase tracking-[0.18em]">
               Live incident desk
             </p>
           </div>
-          {/* Static placeholder only — no weather API or scraper. */}
           <StaticRoadWeatherIndicator />
         </div>
 
-        <nav className="flex flex-wrap items-center gap-2" aria-label="Status">
-          <ZoneSwitcher value={zoneId} onChange={onZoneChange} />
+        <nav className="flex min-w-0 flex-wrap items-center gap-2" aria-label="Status">
+          <ZoneSwitcher value={zoneId} onChange={onZoneChange} dark />
           <StatusChip
             live={connected && health?.status === "ok"}
             label={connected ? "feed live" : "feed offline"}
           />
-          <AuthControls />
+          <AuthControls variant="dark" />
         </nav>
       </div>
     </header>
@@ -44,7 +43,7 @@ export function Header({ connected, health, zoneId, onZoneChange }: HeaderProps)
 function StaticRoadWeatherIndicator() {
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-md border border-line bg-ink px-2.5 py-1.5 text-gray-400"
+      className="header-chip header-chip-dark hidden items-center gap-1.5 rounded-full px-2.5 py-1.5 text-gray-400 sm:inline-flex"
       title="Road conditions — coming soon"
       aria-label="Road conditions placeholder"
       role="img"
@@ -72,8 +71,10 @@ function StaticRoadWeatherIndicator() {
 
 function StatusChip({ live, label }: { live: boolean; label: string }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-md border border-line bg-ink px-3 py-2 text-[11px] font-semibold uppercase tracking-widest text-gray-600">
-      <span className={`h-2 w-2 rounded-full ${live ? "bg-maps" : "bg-gray-400"}`} />
+    <span className="header-chip header-chip-dark header-chip-live inline-flex items-center gap-2 rounded-full text-[11px] font-semibold uppercase tracking-widest">
+      <span
+        className={`h-2 w-2 shrink-0 rounded-full ${live ? "bg-accent shadow-[0_0_8px_rgba(34,211,238,0.8)]" : "bg-gray-500"}`}
+      />
       {label}
     </span>
   );
