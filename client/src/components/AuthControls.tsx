@@ -1,5 +1,4 @@
-import { UserButton, useAuth, useClerk } from "@clerk/clerk-react";
-import type { MouseEvent } from "react";
+import { UserButton, useAuth } from "@clerk/clerk-react";
 import { isClerkConfigured } from "../lib/clerkKey";
 
 const ACCOUNT_HOST = "https://accounts.alertnav.com";
@@ -16,7 +15,7 @@ function accountPortalUrl(path: "sign-in" | "sign-up"): string {
 
 /**
  * Sign-in / sign-up for guests; profile when signed in.
- * Uses direct Account Portal links so taps work in PWAs (Clerk modal/wrapper buttons often don't).
+ * Plain Account Portal links so taps work in installed PWAs (Clerk button wrappers often don't receive touches).
  */
 export function AuthControls({ variant = "light" }: { variant?: "light" | "dark" }) {
   if (!isClerkConfigured()) return null;
@@ -26,7 +25,6 @@ export function AuthControls({ variant = "light" }: { variant?: "light" | "dark"
 
 function AuthControlsInner({ variant }: { variant: "light" | "dark" }) {
   const { isLoaded, isSignedIn } = useAuth();
-  const clerk = useClerk();
   const dark = variant === "dark";
 
   if (!isLoaded || !isSignedIn) {
@@ -36,33 +34,14 @@ function AuthControlsInner({ variant }: { variant: "light" | "dark" }) {
     const signUpClass = dark
       ? "btn-auth-compact btn-auth-dark-primary"
       : "rounded-md bg-cobalt px-3 py-2 text-xs font-semibold tracking-wide text-white hover:brightness-110";
-
-    const goSignIn = (event: MouseEvent<HTMLAnchorElement>) => {
-      if (!clerk.loaded) return;
-      event.preventDefault();
-      void clerk.redirectToSignIn({ redirectUrl: welcomeRedirectUrl() });
-    };
-
-    const goSignUp = (event: MouseEvent<HTMLAnchorElement>) => {
-      if (!clerk.loaded) return;
-      event.preventDefault();
-      void clerk.redirectToSignUp({ redirectUrl: welcomeRedirectUrl() });
-    };
+    const touchTarget = "relative z-50 inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center no-underline touch-manipulation";
 
     return (
       <div className="auth-controls relative z-50 flex shrink-0 flex-wrap items-center gap-2">
-        <a
-          href={accountPortalUrl("sign-in")}
-          onClick={goSignIn}
-          className={`${signInClass} relative z-50 inline-flex cursor-pointer no-underline`}
-        >
+        <a href={accountPortalUrl("sign-in")} className={`${signInClass} ${touchTarget}`}>
           Sign in
         </a>
-        <a
-          href={accountPortalUrl("sign-up")}
-          onClick={goSignUp}
-          className={`${signUpClass} relative z-50 inline-flex cursor-pointer no-underline`}
-        >
+        <a href={accountPortalUrl("sign-up")} className={`${signUpClass} ${touchTarget}`}>
           Sign up
         </a>
       </div>
