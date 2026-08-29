@@ -1,3 +1,5 @@
+import { FOOTER_TAGLINE } from "../design/copy";
+
 const LEGAL_LINKS = [
   { href: "/terms", label: "Terms & Conditions" },
   { href: "/privacy", label: "Privacy Policy" },
@@ -13,7 +15,7 @@ export function SiteFooter({ dark = false }: { dark?: boolean }) {
         <div className="mx-auto flex max-w-5xl flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-semibold text-white">AlertNav</p>
-            <p className="mt-1 text-xs text-indigo-100/65">Real-time incident monitoring</p>
+            <p className="mt-1 text-xs text-indigo-100/65">{FOOTER_TAGLINE}</p>
           </div>
           <nav className="flex flex-wrap gap-x-4 gap-y-2" aria-label="Legal">
             {LEGAL_LINKS.map((link) => (
@@ -36,7 +38,7 @@ export function SiteFooter({ dark = false }: { dark?: boolean }) {
       <div className="mx-auto flex max-w-5xl flex-col gap-4 px-5 py-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm font-semibold text-cobalt">AlertNav</p>
-          <p className="mt-1 text-xs text-gray-500">Real-time incident monitoring</p>
+          <p className="mt-1 text-xs text-gray-500">{FOOTER_TAGLINE}</p>
         </div>
         <nav className="flex flex-wrap gap-x-4 gap-y-2" aria-label="Legal">
           {LEGAL_LINKS.map((link) => (

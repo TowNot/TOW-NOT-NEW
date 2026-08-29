@@ -11,20 +11,7 @@ export const SETUP_STEPS = [
   { number: "3", title: "Download the app", detail: "Install AlertNav on your phone." },
 ] as const;
 
-export const NAV_FEATURES = [
-  {
-    name: "Waze",
-    detail: "One tap opens the pin in Waze for turn-by-turn guidance.",
-  },
-  {
-    name: "Google Maps",
-    detail: "Or jump straight into Google Maps with the same coordinates.",
-  },
-  {
-    name: "Community alerts",
-    detail: "Nearby disruptions from your city — filtered the way you want them.",
-  },
-] as const;
+export const FOOTER_TAGLINE = "Community-driven road safety";
 
 export const FILTER_PANEL_TITLE = "Filters";
 

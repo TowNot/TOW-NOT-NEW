@@ -5,7 +5,6 @@ import {
   APP_DESCRIPTION,
   BRAND_TAGLINE,
   HERO_HEADLINE,
-  NAV_FEATURES,
   SETUP_STEPS,
 } from "../design/copy";
 import { accountPortalUrl } from "../lib/clerkPortal";
@@ -90,29 +89,6 @@ export function LandingPage({ isSignedIn = false }: { isSignedIn?: boolean }) {
                 </li>
               ))}
             </ol>
-          </div>
-        </section>
-
-        <section
-          className="mx-auto max-w-5xl px-4 pb-12 pt-2 sm:px-5 sm:pb-16 sm:pt-4"
-          aria-label="How AlertNav helps"
-        >
-          <p className="section-label text-indigo-200/60">Built for your commute</p>
-          <div className="grid gap-4 md:grid-cols-3">
-            {NAV_FEATURES.map((feature, index) => (
-              <article key={feature.name} className="feature-card">
-                <span
-                  className={`feature-icon ${
-                    index === 0 ? "feature-icon-brand" : "feature-icon-accent"
-                  }`}
-                  aria-hidden
-                >
-                  ●
-                </span>
-                <h2 className="mt-3 text-lg font-bold text-white">{feature.name}</h2>
-                <p className="mt-2 text-sm leading-relaxed text-indigo-100/70">{feature.detail}</p>
-              </article>
-            ))}
           </div>
         </section>
       </main>
