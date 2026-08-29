@@ -1,4 +1,5 @@
 import { AuthControls } from "../components/AuthControls";
+import { GetStartedButton } from "../components/GetStartedButton";
 import { SiteFooter } from "../components/SiteFooter";
 import {
   APP_DESCRIPTION,
@@ -7,9 +8,8 @@ import {
   NAV_FEATURES,
   SETUP_STEPS,
 } from "../design/copy";
-import { accountPortalUrl } from "../lib/clerkPortal";
 
-/** Option 1 — Aurora (dark hero, glass card, collapsible desk). Live app. */
+/** Option 1 — Aurora (dark hero, glass card). Public landing — no desk/install shortcuts. */
 export function LandingPage({ isSignedIn = false }: { isSignedIn?: boolean }) {
   return (
     <div className="landing-shell min-h-screen text-white" style={{ backgroundColor: "#0f172a" }}>
@@ -22,20 +22,12 @@ export function LandingPage({ isSignedIn = false }: { isSignedIn?: boolean }) {
             AlertNav
           </a>
           <nav className="landing-header-nav" aria-label="Primary">
-            <a href="/dashboard" className="btn-outline-cobalt btn-header-compact no-underline">
-              Live desk
-            </a>
             {isSignedIn ? (
-              <a href="/welcome" className="btn-secondary btn-header-compact no-underline">
+              <a href="/get-started" className="btn-secondary btn-header-compact no-underline">
                 Continue setup
               </a>
             ) : (
-              <a
-                href={accountPortalUrl("sign-up")}
-                className="btn-secondary btn-header-compact no-underline"
-              >
-                Get started
-              </a>
+              <GetStartedButton className="btn-secondary btn-header-compact" />
             )}
             <AuthControls variant="dark" />
           </nav>
@@ -58,13 +50,11 @@ export function LandingPage({ isSignedIn = false }: { isSignedIn?: boolean }) {
             </p>
             <div className="mt-6 flex flex-wrap gap-3 sm:mt-8">
               {isSignedIn ? (
-                <a href="/welcome" className="btn-secondary btn-cta-pair no-underline">
+                <a href="/get-started" className="btn-secondary btn-cta-pair no-underline">
                   Continue setup
                 </a>
               ) : (
-                <a href={accountPortalUrl("sign-up")} className="btn-secondary btn-cta-pair no-underline">
-                  Get started
-                </a>
+                <GetStartedButton className="btn-secondary btn-cta-pair" />
               )}
             </div>
 
@@ -105,29 +95,6 @@ export function LandingPage({ isSignedIn = false }: { isSignedIn?: boolean }) {
       </main>
 
       <SiteFooter dark />
-
-      <a
-        href="/dashboard"
-        className="landing-alerts-fab no-underline"
-        aria-label="Open road alerts"
-        title="Road alerts"
-      >
-        <span className="landing-alerts-fab-ring" aria-hidden />
-        <svg className="landing-alerts-fab-icon" viewBox="0 0 24 24" fill="none" aria-hidden>
-          <path
-            d="M12 3a5.5 5.5 0 0 0-5.5 5.5v2.1l-.9 1.8a1 1 0 0 0 .9 1.45h11a1 1 0 0 0 .9-1.45l-.9-1.8V8.5A5.5 5.5 0 0 0 12 3Z"
-            stroke="currentColor"
-            strokeWidth="1.75"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M10 18.5a2 2 0 0 0 4 0"
-            stroke="currentColor"
-            strokeWidth="1.75"
-            strokeLinecap="round"
-          />
-        </svg>
-      </a>
     </div>
   );
 }

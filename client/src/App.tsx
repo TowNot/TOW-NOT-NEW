@@ -1,13 +1,13 @@
 import { useUser } from "@clerk/clerk-react";
 import { AcceptableUsePage } from "./pages/AcceptableUsePage";
 import { DisclaimerPage } from "./pages/DisclaimerPage";
+import { GetStartedPage } from "./pages/GetStartedPage";
 import { IncidentDesk } from "./pages/IncidentDesk";
 import { LandingPage } from "./pages/LandingPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
 import { RefundPolicyPage } from "./pages/RefundPolicyPage";
 import { SelectZonePage } from "./pages/SelectZonePage";
 import { TermsPage } from "./pages/TermsPage";
-import { accountPortalUrl } from "./lib/clerkPortal";
 import { isClerkConfigured } from "./lib/clerkKey";
 import { resolveSelectedZoneId, type ZoneUser } from "./hooks/useSelectedZone";
 
@@ -82,6 +82,7 @@ function AppShell({
   const onWelcome = path === "/welcome" || path === "/select-zone";
   const onLegal = LEGAL_PATHS.has(path);
   const onGetStarted = path === "/get-started";
+  const onDesk = path === "/dashboard" || path === "/desk";
 
   if (isRetiredPreviewPath(path)) {
     window.location.replace("/");
@@ -93,15 +94,19 @@ function AppShell({
   }
 
   if (onGetStarted) {
-    window.location.replace(isSignedIn ? "/welcome" : accountPortalUrl("sign-up"));
-    return null;
+    return <GetStartedPage user={user} />;
   }
 
   if (path === "/") {
     return <LandingPage isSignedIn={isSignedIn} />;
   }
 
-  if (isSignedIn && !zoneId && (path === "/dashboard" || path === "/desk")) {
+  if (onDesk && !isSignedIn) {
+    window.location.replace("/get-started");
+    return null;
+  }
+
+  if (isSignedIn && !zoneId && onDesk) {
     window.location.replace("/welcome");
     return null;
   }

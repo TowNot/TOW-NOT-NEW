@@ -844,3 +844,18 @@ body,
     padding-right: 0.75rem;
   }
 }
+
+/* Progressier auto-install FAB — only use our onboarding "Download" button */
+.progressier-widget,
+.progressier-install-banner {
+  display: none !important;
+}
+
+.progressier-install-button.btn-secondary {
+  border: none;
+  cursor: pointer;
+}
+
+.progressier-install-button.btn-secondary:disabled {
+  cursor: not-allowed;
+}
