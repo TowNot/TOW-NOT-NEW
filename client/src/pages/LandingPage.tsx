@@ -14,9 +14,19 @@ const headerAuthTouch =
   "inline-flex min-h-[2.25rem] cursor-pointer items-center justify-center touch-manipulation";
 
 function LandingHeaderNav({ isSignedIn }: { isSignedIn: boolean }) {
+  const liveDeskLink = (
+    <a
+      href="/dashboard"
+      className={`btn-outline-cobalt px-4 py-2 text-xs tracking-wide no-underline ${headerAuthTouch}`}
+    >
+      Live desk
+    </a>
+  );
+
   if (isSignedIn && isClerkConfigured()) {
     return (
       <nav className="landing-header-nav shrink-0" aria-label="Primary">
+        {liveDeskLink}
         <UserButton afterSignOutUrl="/" />
       </nav>
     );
@@ -30,6 +40,7 @@ function LandingHeaderNav({ isSignedIn }: { isSignedIn: boolean }) {
       >
         Sign in
       </a>
+      {liveDeskLink}
       <a
         href={accountPortalUrl("sign-up")}
         className={`btn-primary px-4 py-2 text-xs tracking-wide no-underline ${headerAuthTouch}`}
@@ -40,7 +51,7 @@ function LandingHeaderNav({ isSignedIn }: { isSignedIn: boolean }) {
   );
 }
 
-/** Option 1 — Aurora (dark hero, glass card). Public landing — no desk/install shortcuts. */
+/** Option 1 — Aurora (dark hero, glass card). Public landing with Live desk shortcut. */
 export function LandingPage({ isSignedIn = false }: { isSignedIn?: boolean }) {
   return (
     <div className="landing-shell min-h-screen text-white" style={{ backgroundColor: "#0f172a" }}>
