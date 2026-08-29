@@ -6,13 +6,25 @@ import { isClerkConfigured } from "../lib/clerkKey";
  * Sign-in / sign-up for guests; profile when signed in.
  * Plain Account Portal links so taps work in installed PWAs.
  */
-export function AuthControls({ variant = "light" }: { variant?: "light" | "dark" }) {
+export function AuthControls({
+  variant = "light",
+  signUpLabel = "Sign up",
+}: {
+  variant?: "light" | "dark";
+  signUpLabel?: string;
+}) {
   if (!isClerkConfigured()) return null;
 
-  return <AuthControlsInner variant={variant} />;
+  return <AuthControlsInner variant={variant} signUpLabel={signUpLabel} />;
 }
 
-function AuthControlsInner({ variant }: { variant: "light" | "dark" }) {
+function AuthControlsInner({
+  variant,
+  signUpLabel,
+}: {
+  variant: "light" | "dark";
+  signUpLabel: string;
+}) {
   const { isLoaded, isSignedIn } = useAuth();
   const dark = variant === "dark";
 
@@ -35,7 +47,7 @@ function AuthControlsInner({ variant }: { variant: "light" | "dark" }) {
           href={accountPortalUrl("sign-up")}
           className={`btn-primary px-4 py-2 text-xs tracking-wide no-underline ${touchTarget}`}
         >
-          Sign up
+          {signUpLabel}
         </a>
       </div>
     );

@@ -1,4 +1,4 @@
-import { AuthControls } from "../components/AuthControls";
+import { UserButton } from "@clerk/clerk-react";
 import { GetStartedButton } from "../components/GetStartedButton";
 import { SiteFooter } from "../components/SiteFooter";
 import {
@@ -8,6 +8,38 @@ import {
   NAV_FEATURES,
   SETUP_STEPS,
 } from "../design/copy";
+import { accountPortalUrl } from "../lib/clerkPortal";
+import { isClerkConfigured } from "../lib/clerkKey";
+
+const headerAuthTouch =
+  "inline-flex min-h-[2.25rem] cursor-pointer items-center justify-center touch-manipulation";
+
+function LandingHeaderNav({ isSignedIn }: { isSignedIn: boolean }) {
+  if (isSignedIn && isClerkConfigured()) {
+    return (
+      <nav className="landing-header-nav shrink-0" aria-label="Primary">
+        <UserButton afterSignOutUrl="/" />
+      </nav>
+    );
+  }
+
+  return (
+    <nav className="landing-header-nav shrink-0" aria-label="Primary">
+      <a
+        href={accountPortalUrl("sign-in")}
+        className={`btn-auth-light ${headerAuthTouch} no-underline`}
+      >
+        Sign in
+      </a>
+      <a
+        href={accountPortalUrl("sign-up")}
+        className={`btn-primary px-4 py-2 text-xs tracking-wide no-underline ${headerAuthTouch}`}
+      >
+        Start Free Trial
+      </a>
+    </nav>
+  );
+}
 
 /** Option 1 — Aurora (dark hero, glass card). Public landing — no desk/install shortcuts. */
 export function LandingPage({ isSignedIn = false }: { isSignedIn?: boolean }) {
@@ -21,16 +53,7 @@ export function LandingPage({ isSignedIn = false }: { isSignedIn?: boolean }) {
           >
             AlertNav
           </a>
-          <nav className="landing-header-nav" aria-label="Primary">
-            {isSignedIn ? (
-              <a href="/get-started" className="btn-secondary btn-header-compact no-underline">
-                Continue setup
-              </a>
-            ) : (
-              <GetStartedButton className="btn-secondary btn-header-compact" />
-            )}
-            <AuthControls variant="dark" />
-          </nav>
+          <LandingHeaderNav isSignedIn={isSignedIn} />
         </div>
       </header>
 
@@ -54,7 +77,7 @@ export function LandingPage({ isSignedIn = false }: { isSignedIn?: boolean }) {
                   Continue setup
                 </a>
               ) : (
-                <GetStartedButton className="btn-secondary btn-cta-pair" />
+                <GetStartedButton className="btn-secondary btn-cta-pair" label="Start Your Free Trial" />
               )}
             </div>
 
