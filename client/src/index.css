@@ -485,6 +485,21 @@ body {
   backdrop-filter: blur(20px);
 }
 
+.landing-hero-panel {
+  text-align: center;
+}
+
+.landing-hero-cta {
+  display: flex;
+  justify-content: center;
+}
+
+.landing-hero-cta .btn-cta-pair {
+  width: auto;
+  max-width: 100%;
+  text-align: center;
+}
+
 .feature-card {
   padding: 1.375rem 1.5rem;
   border-radius: 1.125rem;
@@ -533,6 +548,8 @@ body {
   border-radius: 1rem;
   border: 1px solid rgb(255 255 255 / 10%);
   background: rgb(255 255 255 / 5%);
+  align-items: center;
+  text-align: center;
 }
 
 .landing-step-number {

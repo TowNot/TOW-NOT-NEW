@@ -62,15 +62,15 @@ export function LandingPage({ isSignedIn = false }: { isSignedIn?: boolean }) {
           <div className="landing-hero-glow landing-hero-glow-b" aria-hidden />
           <div className="landing-hero-glow landing-hero-glow-c" aria-hidden />
 
-          <div className="hero-panel relative px-4 py-6 sm:px-6 sm:py-10 md:px-10 md:py-14">
+          <div className="hero-panel landing-hero-panel relative px-4 py-6 sm:px-6 sm:py-10 md:px-10 md:py-14">
             <p className="section-label text-indigo-200/80">{BRAND_TAGLINE}</p>
-            <h1 className="max-w-3xl text-3xl font-bold leading-[1.1] tracking-tight text-white sm:text-4xl md:text-5xl">
+            <h1 className="mx-auto max-w-3xl text-3xl font-bold leading-[1.1] tracking-tight text-white sm:text-4xl md:text-5xl">
               {HERO_HEADLINE}
             </h1>
-            <p className="mt-4 max-w-2xl text-base leading-relaxed text-indigo-100/80 sm:mt-5 sm:text-lg md:text-xl">
+            <p className="landing-hero-description mx-auto mt-4 max-w-2xl text-base leading-relaxed text-indigo-100/80 sm:mt-5 sm:text-lg md:text-xl">
               {APP_DESCRIPTION}
             </p>
-            <div className="mt-6 flex flex-wrap gap-3 sm:mt-8">
+            <div className="landing-hero-cta mt-6 sm:mt-8">
               {isSignedIn ? (
                 <a href="/get-started" className="btn-secondary btn-cta-pair no-underline">
                   Continue setup
@@ -82,7 +82,7 @@ export function LandingPage({ isSignedIn = false }: { isSignedIn?: boolean }) {
 
             <ol className="mt-8 grid gap-3 sm:mt-10 sm:grid-cols-3" aria-label="How to get AlertNav">
               {SETUP_STEPS.map((step) => (
-                <li key={step.number} className="landing-step-card">
+                <li key={step.number} className="landing-step-card flex flex-col items-center text-center">
                   <span className="landing-step-number">{step.number}</span>
                   <p className="mt-2 text-sm font-bold text-white">{step.title}</p>
                   <p className="mt-1 text-xs leading-relaxed text-indigo-100/65">{step.detail}</p>
