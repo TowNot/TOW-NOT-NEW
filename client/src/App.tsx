@@ -110,14 +110,8 @@ function AppShell({
     return <LandingPage isSignedIn={isSignedIn} />;
   }
 
-  if (onDesk && !isSignedIn) {
-    window.location.replace("/get-started");
-    return null;
-  }
-
-  if (isSignedIn && !zoneId && onDesk) {
-    window.location.replace("/welcome");
-    return null;
+  if (onDesk) {
+    return <IncidentDesk user={user} />;
   }
 
   if (isSignedIn && zoneId && onWelcome) {
