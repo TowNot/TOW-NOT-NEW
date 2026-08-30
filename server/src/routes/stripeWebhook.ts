@@ -6,6 +6,7 @@ import { logger } from "../logger";
 import {
   activateSubscription,
   revokeSubscription,
+  type SubscriptionStatus,
 } from "../store/subscriptionStore";
 
 function sessionEmail(session: Stripe.Checkout.Session): string | null {
@@ -27,21 +28,67 @@ function subscriptionIdOf(value: string | Stripe.Subscription | null): string | 
   return value.id;
 }
 
+function localStatusFromStripe(stripeStatus: Stripe.Subscription.Status): SubscriptionStatus {
+  if (stripeStatus === "active") return "active";
+  if (stripeStatus === "trialing") return "trialing";
+  if (stripeStatus === "canceled" || stripeStatus === "incomplete_expired") return "canceled";
+  return "inactive";
+}
+
+async function stripeCustomerEmail(customerId: string | null): Promise<string | null> {
+  if (!customerId) return null;
+  const stripe = getStripe();
+  if (!stripe) return null;
+  try {
+    const customer = await stripe.customers.retrieve(customerId);
+    if (!customer.deleted && typeof customer.email === "string") {
+      return customer.email;
+    }
+  } catch (error) {
+    logger.warn("Could not load Stripe customer email", {
+      customerId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+  return null;
+}
+
+async function resolveCheckoutStatus(
+  stripeSubscriptionId: string | null,
+): Promise<SubscriptionStatus> {
+  if (!stripeSubscriptionId) return "active";
+  const stripe = getStripe();
+  if (!stripe) return "active";
+  try {
+    const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+    return localStatusFromStripe(subscription.status);
+  } catch (error) {
+    logger.warn("Could not load Stripe subscription on checkout — defaulting to active", {
+      stripeSubscriptionId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return "active";
+  }
+}
+
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session): Promise<void> {
   const email = sessionEmail(session);
   const stripeCustomerId = customerIdOf(session.customer);
   const stripeSubscriptionId = subscriptionIdOf(session.subscription);
   const clientReferenceId = session.client_reference_id?.trim() || null;
+  const status = await resolveCheckoutStatus(stripeSubscriptionId);
 
   const record = await activateSubscription({
     email,
     stripeCustomerId,
     stripeSubscriptionId,
     clientReferenceId,
+    status,
   });
 
-  logger.info("Stripe checkout completed — subscription active", {
+  logger.info("Stripe checkout completed — subscription entitled", {
     email: record.email,
+    status: record.status,
     stripeCustomerId: record.stripeCustomerId,
     stripeSubscriptionId: record.stripeSubscriptionId,
     clientReferenceId: record.clientReferenceId,
@@ -49,24 +96,44 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session): Promis
   });
 }
 
-async function handleSubscriptionDeleted(subscription: Stripe.Subscription): Promise<void> {
-  let email: string | null = null;
+async function handleSubscriptionUpdated(subscription: Stripe.Subscription): Promise<void> {
   const stripeCustomerId = customerIdOf(subscription.customer);
-  const stripe = getStripe();
+  const email = await stripeCustomerEmail(stripeCustomerId);
+  const status = localStatusFromStripe(subscription.status);
 
-  if (stripe && stripeCustomerId) {
-    try {
-      const customer = await stripe.customers.retrieve(stripeCustomerId);
-      if (!customer.deleted && typeof customer.email === "string") {
-        email = customer.email;
-      }
-    } catch (error) {
-      logger.warn("Could not load Stripe customer email on subscription.deleted", {
-        stripeCustomerId,
-        error: error instanceof Error ? error.message : String(error),
+  if (status === "canceled" || status === "inactive") {
+    const record = await revokeSubscription({
+      email,
+      stripeCustomerId,
+      stripeSubscriptionId: subscription.id,
+    });
+    if (record) {
+      logger.info("Stripe subscription updated — access revoked", {
+        email: record.email,
+        stripeStatus: subscription.status,
+        localStatus: record.status,
       });
     }
+    return;
   }
+
+  const record = await activateSubscription({
+    email,
+    stripeCustomerId,
+    stripeSubscriptionId: subscription.id,
+    status,
+  });
+
+  logger.info("Stripe subscription updated — access synced", {
+    email: record.email,
+    stripeStatus: subscription.status,
+    localStatus: record.status,
+  });
+}
+
+async function handleSubscriptionDeleted(subscription: Stripe.Subscription): Promise<void> {
+  const stripeCustomerId = customerIdOf(subscription.customer);
+  const email = await stripeCustomerEmail(stripeCustomerId);
 
   const record = await revokeSubscription({
     email,
@@ -128,6 +195,10 @@ export async function stripeWebhookHandler(req: Request, res: Response): Promise
       }
       case "customer.subscription.deleted": {
         await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
+        break;
+      }
+      case "customer.subscription.updated": {
+        await handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
         break;
       }
       default:

@@ -3,14 +3,13 @@ import { useUser } from "@clerk/clerk-react";
 import { AcceptableUsePage } from "./pages/AcceptableUsePage";
 import { DisclaimerPage } from "./pages/DisclaimerPage";
 import { GetStartedPage } from "./pages/GetStartedPage";
-import { IncidentDesk } from "./pages/IncidentDesk";
 import { LandingPage } from "./pages/LandingPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
 import { RefundPolicyPage } from "./pages/RefundPolicyPage";
-import { SelectZonePage } from "./pages/SelectZonePage";
 import { TermsPage } from "./pages/TermsPage";
+import { ProtectedDeskRoute, ProtectedWelcomeRoute } from "./components/SubscriptionGate";
 import { isClerkConfigured } from "./lib/clerkKey";
-import { resolveSelectedZoneId, type ZoneUser } from "./hooks/useSelectedZone";
+import { type ZoneUser } from "./hooks/useSelectedZone";
 
 function currentPath(): string {
   return window.location.pathname.replace(/\/+$/, "") || "/";
@@ -87,7 +86,6 @@ function AppShell({
   const path = currentPath();
   usePageTheme(path);
 
-  const zoneId = resolveSelectedZoneId(user);
   const onWelcome = path === "/welcome" || path === "/select-zone";
   const onLegal = LEGAL_PATHS.has(path);
   const onGetStarted = path === "/get-started";
@@ -111,15 +109,13 @@ function AppShell({
   }
 
   if (onDesk) {
-    return <IncidentDesk user={user} />;
+    return <ProtectedDeskRoute user={user} />;
   }
 
-  if (isSignedIn && zoneId && onWelcome) {
-    window.location.replace("/dashboard");
-    return null;
+  if (onWelcome) {
+    return <ProtectedWelcomeRoute user={user} />;
   }
 
-  if (onWelcome) return <SelectZonePage user={user} />;
-
-  return <IncidentDesk user={user} />;
+  window.location.replace("/");
+  return null;
 }

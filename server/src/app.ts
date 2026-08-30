@@ -9,6 +9,7 @@ import { ensureAudioDir, resolveAudioRoot } from "./audioStorage";
 import { config } from "./config";
 import type { PushDispatcher } from "./dispatch/pushDispatcher";
 import { logger } from "./logger";
+import { requireActiveSubscription } from "./middleware/requireActiveSubscription";
 import { requireClerkAuth } from "./middleware/requireClerkAuth";
 import { createIncidentRouter } from "./routes/incidents";
 import { healthRouter } from "./routes/health";
@@ -110,10 +111,20 @@ export function createApp(store: IncidentStore, dispatcher: PushDispatcher): exp
     }),
   );
 
-  // Health + incident snapshot/SSE stay public (EventSource cannot send Bearer tokens).
-  // /api/health is also mounted before Clerk above for Railway cold-start probes.
-  app.use("/api/incidents", createIncidentRouter(store));
-  app.use("/api/sources", createSourcesRouter(store));
+  // Live incident feeds require sign-in + active/trialing subscription.
+  // EventSource sends same-origin session cookies (no Authorization header).
+  app.use(
+    "/api/incidents",
+    requireClerkAuth,
+    requireActiveSubscription,
+    createIncidentRouter(store),
+  );
+  app.use(
+    "/api/sources",
+    requireClerkAuth,
+    requireActiveSubscription,
+    createSourcesRouter(store),
+  );
 
   // Authenticated API surfaces
   app.use("/api/push", requireClerkAuth, createPushRouter(dispatcher));

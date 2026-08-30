@@ -3,7 +3,7 @@ import { prisma } from "../db/prisma";
 import { invalidateActiveMonitoredCitiesCache } from "../engine/activeMonitoredCities";
 import { logger } from "../logger";
 
-export type SubscriptionStatus = "active" | "canceled" | "inactive";
+export type SubscriptionStatus = "active" | "trialing" | "canceled" | "inactive";
 
 export interface SubscriptionRecord {
   /** Normalized lowercase email — primary match key for Payment Link checkouts. */
@@ -83,8 +83,18 @@ export async function findSubscriptionByClientReferenceId(
   return row ? toRecord(row) : null;
 }
 
+export function isEntitledSubscriptionStatus(status: SubscriptionStatus | undefined): boolean {
+  return status === "active" || status === "trialing";
+}
+
+export async function isSubscriptionEntitled(email: string): Promise<boolean> {
+  const record = await findSubscriptionByEmail(email);
+  return isEntitledSubscriptionStatus(record?.status);
+}
+
+/** @deprecated Prefer isSubscriptionEntitled — kept for existing callers. */
 export async function isSubscriptionActive(email: string): Promise<boolean> {
-  return (await findSubscriptionByEmail(email))?.status === "active";
+  return isSubscriptionEntitled(email);
 }
 
 export async function listSubscriptions(): Promise<SubscriptionRecord[]> {
@@ -101,6 +111,7 @@ export async function activateSubscription(input: {
   stripeCustomerId?: string | null;
   stripeSubscriptionId?: string | null;
   clientReferenceId?: string | null;
+  status?: SubscriptionStatus;
 }): Promise<SubscriptionRecord> {
   const emailRaw = input.email?.trim() ?? "";
   const email = emailRaw ? normalizeEmail(emailRaw) : "";
@@ -125,6 +136,12 @@ export async function activateSubscription(input: {
   }
 
   const key = email || existing!.email;
+  const nextStatus =
+    input.status && isEntitledSubscriptionStatus(input.status)
+      ? input.status
+      : input.status === "canceled" || input.status === "inactive"
+        ? input.status
+        : "active";
   if (existing && existing.email !== key) {
     invalidateEmail(existing.email);
     await prisma.subscription.delete({ where: { email: existing.email } }).catch(() => undefined);
@@ -134,13 +151,13 @@ export async function activateSubscription(input: {
     where: { email: key },
     create: {
       email: key,
-      status: "active" satisfies PrismaSubscriptionStatus,
+      status: nextStatus satisfies PrismaSubscriptionStatus,
       stripeCustomerId: customerId,
       stripeSubscriptionId: subscriptionId,
       clientReferenceId,
     },
     update: {
-      status: "active",
+      status: nextStatus,
       stripeCustomerId: customerId ?? undefined,
       stripeSubscriptionId: subscriptionId ?? undefined,
       clientReferenceId: clientReferenceId ?? undefined,
@@ -190,7 +207,7 @@ export async function revokeSubscription(input: {
 export async function subscriptionStoreStats(): Promise<{ total: number; active: number }> {
   const [total, active] = await Promise.all([
     prisma.subscription.count(),
-    prisma.subscription.count({ where: { status: "active" } }),
+    prisma.subscription.count({ where: { status: { in: ["active", "trialing"] } } }),
   ]);
   return { total, active };
 }

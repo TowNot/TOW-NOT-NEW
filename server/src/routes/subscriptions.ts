@@ -1,13 +1,43 @@
+import { getAuth } from "@clerk/express";
 import { Router } from "express";
+import { clerkPrimaryEmail } from "../lib/clerkUserEmail";
 import {
   findSubscriptionByEmail,
-  isSubscriptionActive,
+  isEntitledSubscriptionStatus,
+  isSubscriptionEntitled,
   listSubscriptions,
   subscriptionStoreStats,
 } from "../store/subscriptionStore";
 
 export function createSubscriptionsRouter(): Router {
   const router = Router();
+
+  router.get("/me", async (req, res, next) => {
+    try {
+      const auth = getAuth(req);
+      if (!auth.isAuthenticated || !auth.userId) {
+        res.status(401).json({ error: "Unauthorized — sign in required" });
+        return;
+      }
+
+      const email = await clerkPrimaryEmail(auth.userId);
+      if (!email) {
+        res.json({ active: false, status: "inactive", email: null });
+        return;
+      }
+
+      const record = await findSubscriptionByEmail(email);
+      const entitled = isEntitledSubscriptionStatus(record?.status);
+      res.json({
+        email,
+        active: entitled,
+        status: record?.status ?? "inactive",
+        subscription: record,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
 
   router.get("/status", async (req, res, next) => {
     try {
@@ -19,7 +49,7 @@ export function createSubscriptionsRouter(): Router {
       const record = await findSubscriptionByEmail(email);
       res.json({
         email: email.trim().toLowerCase(),
-        active: await isSubscriptionActive(email),
+        active: await isSubscriptionEntitled(email),
         subscription: record,
       });
     } catch (error) {

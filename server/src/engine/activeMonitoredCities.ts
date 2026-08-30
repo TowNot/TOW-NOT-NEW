@@ -40,7 +40,7 @@ export async function getActiveMonitoredCities(): Promise<string[]> {
         select: { selectedCity: true },
       }),
       prisma.subscription.findMany({
-        where: { status: "active" },
+        where: { status: { in: ["active", "trialing"] } },
         select: { selectedCity: true },
       }),
       prisma.smsSubscriber.findMany({

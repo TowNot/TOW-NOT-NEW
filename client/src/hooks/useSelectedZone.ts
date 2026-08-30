@@ -33,6 +33,13 @@ export function resolveSelectedZoneId(user?: ZoneUser | null): ZoneId | null {
   return DEFAULT_ZONE_ID;
 }
 
+/** True when the user explicitly picked a city (metadata or localStorage). */
+export function resolveHasZonePreference(user?: ZoneUser | null): boolean {
+  if (metadataZoneId(user)) return true;
+  const local = readLocalZoneId();
+  return Boolean(local && isZoneEnabledForDesk(local));
+}
+
 async function persistZoneToServer(zoneId: ZoneId): Promise<void> {
   await fetch("/api/user/city", {
     method: "PUT",

@@ -32,11 +32,10 @@ export function useIncidents(): IncidentState {
 
     async function loadSnapshot(): Promise<void> {
       try {
-        // Live feed is public — EventSource cannot send Authorization headers,
-        // so /api/incidents and /api/incidents/stream stay ungated.
-        const response = await fetch("/api/incidents", { credentials: "same-origin" });
+        const response = await fetch("/api/incidents", { credentials: "include" });
         if (response.status === 401 || response.status === 403) {
-          console.error("Live incident API blocked by auth/paywall", response.status);
+          if (!cancelled) setConnected(false);
+          return;
         }
         if (!response.ok) throw new Error("Failed to load incidents");
         const body = (await response.json()) as { incidents: Incident[] };
