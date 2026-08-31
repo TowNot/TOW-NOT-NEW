@@ -68,8 +68,19 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
   const { active: subscribed, loading: subscriptionLoading, refresh } = useSubscriptionStatus();
   const { selectedZoneId, saveZone } = useSelectedZone(user);
   const [zoneBusy, setZoneBusy] = useState<ZoneId | null>(null);
-  const [isYearly, setIsYearly] = useState(false);
   const zones = selectableCoverageZones();
+
+  const monthlyCheckoutUrl = buildStripeCheckoutUrl({
+    email: accountEmail,
+    clientReferenceId: clerkUser?.id ?? user?.id ?? null,
+    billing: "monthly",
+  });
+
+  const yearlyCheckoutUrl = buildStripeCheckoutUrl({
+    email: accountEmail,
+    clientReferenceId: clerkUser?.id ?? user?.id ?? null,
+    billing: "yearly",
+  });
 
   const checkoutSuccess = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
@@ -82,12 +93,6 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
     const timer = window.setInterval(() => void refresh(), 3000);
     return () => window.clearInterval(timer);
   }, [checkoutSuccess, refresh]);
-
-  const checkoutUrl = buildStripeCheckoutUrl({
-    email: accountEmail,
-    clientReferenceId: clerkUser?.id ?? user?.id ?? null,
-    billing: isYearly ? "yearly" : "monthly",
-  });
 
   const accountDone = Boolean(isSignedIn);
   const subscribeDone = subscribed;
@@ -124,7 +129,7 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
   return (
     <div className="page-shell min-h-screen overflow-x-clip">
       <header className="app-header">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-4">
+        <div className="mx-auto flex max-w-4xl items-center justify-between px-5 py-4">
           <a href="/" className="header-logo text-xl font-bold tracking-tight no-underline">
             AlertNav
           </a>
@@ -132,7 +137,7 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-4 py-10 sm:px-5">
+      <main className="mx-auto max-w-4xl px-4 py-10 sm:px-5">
         <p className="section-label">Get started</p>
         <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">
           Set up AlertNav
@@ -166,16 +171,13 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
               <p className="text-sm text-accent-deep">Subscription active</p>
             ) : (
               <div className="space-y-4">
-                <BillingToggle isYearly={isYearly} onChange={setIsYearly} />
-                <PricingCard isYearly={isYearly} />
-                <div className="flex flex-wrap items-center gap-3">
-                  <a href={checkoutUrl} className="btn-primary px-5 py-2.5 text-sm no-underline">
-                    Start your 7-Day Free Trial
-                  </a>
-                  {subscriptionLoading ? (
-                    <span className="text-xs text-muted">Checking subscription…</span>
-                  ) : null}
-                </div>
+                <PricingPlansGrid
+                  monthlyCheckoutUrl={monthlyCheckoutUrl}
+                  yearlyCheckoutUrl={yearlyCheckoutUrl}
+                />
+                {subscriptionLoading ? (
+                  <p className="text-xs text-muted">Checking subscription…</p>
+                ) : null}
               </div>
             )}
           </OnboardingStep>
@@ -263,52 +265,57 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
   );
 }
 
-function BillingToggle({
-  isYearly,
-  onChange,
+const PLAN_FEATURES = [
+  "Live accident & traffic alerts",
+  "Multi-zone coverage",
+  "Push notifications on your phone",
+  "Cancel anytime via Stripe",
+] as const;
+
+function PricingPlansGrid({
+  monthlyCheckoutUrl,
+  yearlyCheckoutUrl,
 }: {
-  isYearly: boolean;
-  onChange: (yearly: boolean) => void;
+  monthlyCheckoutUrl: string;
+  yearlyCheckoutUrl: string;
 }) {
   return (
-    <div
-      className="billing-toggle"
-      role="group"
-      aria-label="Billing frequency"
-    >
-      <button
-        type="button"
-        className={`billing-toggle-option ${!isYearly ? "billing-toggle-option-active" : ""}`}
-        aria-pressed={!isYearly}
-        onClick={() => onChange(false)}
-      >
-        Monthly
-      </button>
-      <button
-        type="button"
-        className={`billing-toggle-option ${isYearly ? "billing-toggle-option-active" : ""}`}
-        aria-pressed={isYearly}
-        onClick={() => onChange(true)}
-      >
-        Yearly
-        <span className="billing-save-badge">Save ~17%</span>
-      </button>
-    </div>
-  );
-}
+    <div className="pricing-plans-grid">
+      <article className="pricing-plan-card">
+        <h3 className="pricing-plan-title">Monthly</h3>
+        <p className="pricing-plan-price">$59.99 CAD / month</p>
+        <ul className="pricing-plan-features">
+          {PLAN_FEATURES.map((feature) => (
+            <li key={feature}>{feature}</li>
+          ))}
+        </ul>
+        <a
+          href={monthlyCheckoutUrl}
+          className="pricing-plan-cta btn-outline-light mt-auto w-full px-5 py-2.5 text-sm no-underline"
+        >
+          Start 7-Day Free Trial
+        </a>
+      </article>
 
-function PricingCard({ isYearly }: { isYearly: boolean }) {
-  return (
-    <div className="pricing-card">
-      <p className="pricing-card-price">
-        {isYearly ? "$599.00 CAD / year" : "$59.99 CAD / month"}
-      </p>
-      <p className="pricing-card-trial">Start your 7-Day Free Trial</p>
-      <p className="pricing-card-note">
-        {isYearly
-          ? "Billed annually after your trial. Cancel anytime via Stripe."
-          : "Billed monthly after your trial. Cancel anytime via Stripe."}
-      </p>
+      <article className="pricing-plan-card pricing-plan-card-featured">
+        <div className="pricing-plan-badges">
+          <span className="pricing-plan-badge-free">2 Months Free</span>
+          <span className="pricing-plan-badge-popular">Popular</span>
+        </div>
+        <h3 className="pricing-plan-title">Yearly</h3>
+        <p className="pricing-plan-price">$599.00 CAD / year</p>
+        <ul className="pricing-plan-features">
+          {PLAN_FEATURES.map((feature) => (
+            <li key={feature}>{feature}</li>
+          ))}
+        </ul>
+        <a
+          href={yearlyCheckoutUrl}
+          className="pricing-plan-cta btn-primary mt-auto w-full px-5 py-2.5 text-sm no-underline"
+        >
+          Start 7-Day Free Trial
+        </a>
+      </article>
     </div>
   );
 }
