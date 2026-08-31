@@ -68,6 +68,7 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
   const { active: subscribed, loading: subscriptionLoading, refresh } = useSubscriptionStatus();
   const { selectedZoneId, saveZone } = useSelectedZone(user);
   const [zoneBusy, setZoneBusy] = useState<ZoneId | null>(null);
+  const [isYearly, setIsYearly] = useState(false);
   const zones = selectableCoverageZones();
 
   const checkoutSuccess = useMemo(() => {
@@ -85,6 +86,7 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
   const checkoutUrl = buildStripeCheckoutUrl({
     email: accountEmail,
     clientReferenceId: clerkUser?.id ?? user?.id ?? null,
+    billing: isYearly ? "yearly" : "monthly",
   });
 
   const accountDone = Boolean(isSignedIn);
@@ -163,13 +165,17 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
             {subscribeDone ? (
               <p className="text-sm text-accent-deep">Subscription active</p>
             ) : (
-              <div className="flex flex-wrap items-center gap-3">
-                <a href={checkoutUrl} className="btn-primary px-5 py-2.5 text-sm no-underline">
-                  Subscribe now
-                </a>
-                {subscriptionLoading ? (
-                  <span className="text-xs text-muted">Checking subscription…</span>
-                ) : null}
+              <div className="space-y-4">
+                <BillingToggle isYearly={isYearly} onChange={setIsYearly} />
+                <PricingCard isYearly={isYearly} />
+                <div className="flex flex-wrap items-center gap-3">
+                  <a href={checkoutUrl} className="btn-primary px-5 py-2.5 text-sm no-underline">
+                    Start your 7-Day Free Trial
+                  </a>
+                  {subscriptionLoading ? (
+                    <span className="text-xs text-muted">Checking subscription…</span>
+                  ) : null}
+                </div>
               </div>
             )}
           </OnboardingStep>
@@ -253,6 +259,56 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
           </OnboardingStep>
         </ol>
       </main>
+    </div>
+  );
+}
+
+function BillingToggle({
+  isYearly,
+  onChange,
+}: {
+  isYearly: boolean;
+  onChange: (yearly: boolean) => void;
+}) {
+  return (
+    <div
+      className="billing-toggle"
+      role="group"
+      aria-label="Billing frequency"
+    >
+      <button
+        type="button"
+        className={`billing-toggle-option ${!isYearly ? "billing-toggle-option-active" : ""}`}
+        aria-pressed={!isYearly}
+        onClick={() => onChange(false)}
+      >
+        Monthly
+      </button>
+      <button
+        type="button"
+        className={`billing-toggle-option ${isYearly ? "billing-toggle-option-active" : ""}`}
+        aria-pressed={isYearly}
+        onClick={() => onChange(true)}
+      >
+        Yearly
+        <span className="billing-save-badge">Save ~17%</span>
+      </button>
+    </div>
+  );
+}
+
+function PricingCard({ isYearly }: { isYearly: boolean }) {
+  return (
+    <div className="pricing-card">
+      <p className="pricing-card-price">
+        {isYearly ? "$599.00 CAD / year" : "$59.99 CAD / month"}
+      </p>
+      <p className="pricing-card-trial">Start your 7-Day Free Trial</p>
+      <p className="pricing-card-note">
+        {isYearly
+          ? "Billed annually after your trial. Cancel anytime via Stripe."
+          : "Billed monthly after your trial. Cancel anytime via Stripe."}
+      </p>
     </div>
   );
 }
