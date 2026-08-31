@@ -265,12 +265,7 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
   );
 }
 
-const PLAN_FEATURES = [
-  "Live accident & traffic alerts",
-  "Multi-zone coverage",
-  "Push notifications on your phone",
-  "Cancel anytime via Stripe",
-] as const;
+const PLAN_FEATURES = ["Cancel anytime via Stripe"] as const;
 
 function PricingPlansGrid({
   monthlyCheckoutUrl,
