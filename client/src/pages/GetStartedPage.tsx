@@ -1,13 +1,12 @@
 import { useUser } from "@clerk/clerk-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 import { AuthControls } from "../components/AuthControls";
 import { GetStartedButton } from "../components/GetStartedButton";
 import { SiteFooter } from "../components/SiteFooter";
-import { useSelectedZone, type ZoneUser } from "../hooks/useSelectedZone";
+import { type ZoneUser } from "../hooks/useSelectedZone";
 import { useSubscriptionStatus } from "../hooks/useSubscriptionStatus";
 import { isClerkConfigured } from "../lib/clerkKey";
 import { buildStripeCheckoutUrl } from "../lib/stripeCheckout";
-import { selectableCoverageZones, type ZoneId } from "../lib/zones";
 
 const ONBOARDING_STEPS = [
   {
@@ -23,7 +22,7 @@ const ONBOARDING_STEPS = [
   {
     number: "3",
     title: "Download the app",
-    detail: "Install AlertNav on your phone for push alerts on nearby disruptions.",
+    detail: "Install AlertNav on your phone to finish setup in the app.",
   },
 ] as const;
 
@@ -66,9 +65,6 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
     clerkUser?.emailAddresses?.[0]?.emailAddress ??
     null;
   const { active: subscribed, loading: subscriptionLoading, refresh } = useSubscriptionStatus();
-  const { selectedZoneId, saveZone } = useSelectedZone(user);
-  const [zoneBusy, setZoneBusy] = useState<ZoneId | null>(null);
-  const zones = selectableCoverageZones();
 
   const monthlyCheckoutUrl = buildStripeCheckoutUrl({
     email: accountEmail,
@@ -96,7 +92,6 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
 
   const accountDone = Boolean(isSignedIn);
   const subscribeDone = subscribed;
-  const zoneDone = Boolean(selectedZoneId);
 
   if (!isSignedIn) {
     return (
@@ -183,79 +178,24 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
           </OnboardingStep>
 
           <OnboardingStep
-            done={zoneDone}
-            active={subscribeDone && !zoneDone}
+            done={false}
+            active={subscribeDone}
             step={ONBOARDING_STEPS[2]}
           >
             {!subscribeDone ? (
               <p className="text-sm text-muted">Available after you subscribe.</p>
             ) : (
-              <div className="space-y-4">
-                <div>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted">
-                    Choose your coverage zone
-                  </p>
-                  <ul className="grid gap-2 sm:grid-cols-2">
-                    {zones.map((zone) => (
-                      <li key={zone.id}>
-                        <button
-                          type="button"
-                          disabled={zoneBusy !== null}
-                          onClick={() => {
-                            setZoneBusy(zone.id);
-                            void saveZone(zone.id).finally(() => setZoneBusy(null));
-                          }}
-                          className={
-                            selectedZoneId === zone.id
-                              ? "w-full rounded-xl border border-brand/30 bg-brand-soft px-4 py-3 text-left text-sm font-semibold text-brand-deep"
-                              : "w-full rounded-xl border border-line bg-surface px-4 py-3 text-left text-sm font-semibold text-foreground hover:border-brand/25"
-                          }
-                        >
-                          {zone.name}
-                          {zoneBusy === zone.id ? (
-                            <span className="mt-1 block text-xs font-normal text-muted">
-                              Saving…
-                            </span>
-                          ) : selectedZoneId === zone.id ? (
-                            <span className="mt-1 block text-xs font-normal text-brand">
-                              Selected
-                            </span>
-                          ) : (
-                            <span className="mt-1 block text-xs font-normal text-muted">
-                              {zone.region}
-                            </span>
-                          )}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted">
-                    Download the app
-                  </p>
-                  <button
-                    type="button"
-                    disabled={!zoneDone}
-                    className="progressier-install-button btn-secondary px-5 py-2.5 text-sm disabled:opacity-60"
-                  >
-                    Download AlertNav
-                  </button>
-                  {!zoneDone ? (
-                    <p className="mt-2 text-xs text-muted">Pick a zone first.</p>
-                  ) : (
-                    <p className="mt-2 text-xs text-muted">
-                      On iPhone: follow the Add to Home Screen steps. On Android: use the install
-                      prompt.
-                    </p>
-                  )}
-                  {zoneDone ? (
-                    <a href="/dashboard" className="btn-outline-light mt-4 inline-flex px-5 py-2.5 text-sm no-underline">
-                      Open live desk
-                    </a>
-                  ) : null}
-                </div>
+              <div>
+                <button
+                  type="button"
+                  className="progressier-install-button btn-secondary px-5 py-2.5 text-sm"
+                >
+                  Install AlertNav
+                </button>
+                <p className="mt-3 max-w-md text-xs leading-relaxed text-muted">
+                  On iPhone: follow the Add to Home Screen steps. On Android: use the install
+                  prompt.
+                </p>
               </div>
             )}
           </OnboardingStep>
