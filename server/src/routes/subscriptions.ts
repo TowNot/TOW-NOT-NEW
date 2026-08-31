@@ -5,8 +5,6 @@ import {
   findSubscriptionByEmail,
   isEntitledSubscriptionStatus,
   isSubscriptionEntitled,
-  listSubscriptions,
-  subscriptionStoreStats,
 } from "../store/subscriptionStore";
 
 export function createSubscriptionsRouter(): Router {
@@ -41,35 +39,30 @@ export function createSubscriptionsRouter(): Router {
 
   router.get("/status", async (req, res, next) => {
     try {
-      const email = typeof req.query.email === "string" ? req.query.email.trim() : "";
-      if (!email) {
-        res.status(400).json({ error: "Query param email is required" });
+      const auth = getAuth(req);
+      if (!auth.isAuthenticated || !auth.userId) {
+        res.status(401).json({ error: "Unauthorized — sign in required" });
         return;
       }
+
+      const ownEmail = await clerkPrimaryEmail(auth.userId);
+      const requested =
+        typeof req.query.email === "string" ? req.query.email.trim().toLowerCase() : "";
+      const email = requested || ownEmail || "";
+      if (!email) {
+        res.status(400).json({ error: "No email on file for this account" });
+        return;
+      }
+      if (ownEmail && email !== ownEmail) {
+        res.status(403).json({ error: "Forbidden — cannot query another user's subscription" });
+        return;
+      }
+
       const record = await findSubscriptionByEmail(email);
       res.json({
-        email: email.trim().toLowerCase(),
+        email,
         active: await isSubscriptionEntitled(email),
         subscription: record,
-      });
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  router.get("/summary", async (_req, res, next) => {
-    try {
-      const stats = await subscriptionStoreStats();
-      const sample = (await listSubscriptions())
-        .slice(0, 5)
-        .map((row) => ({
-          email: row.email.replace(/(^.).*(@.*$)/, "$1***$2"),
-          status: row.status,
-          updatedAt: row.updatedAt,
-        }));
-      res.json({
-        ...stats,
-        sample,
       });
     } catch (error) {
       next(error);

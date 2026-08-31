@@ -9,7 +9,7 @@ import { ensureAudioDir, resolveAudioRoot } from "./audioStorage";
 import { config } from "./config";
 import type { PushDispatcher } from "./dispatch/pushDispatcher";
 import { logger } from "./logger";
-import { requireActiveSubscription } from "./middleware/requireActiveSubscription";
+import { requireEntitledUser } from "./middleware/requireEntitledUser";
 import { requireClerkAuth } from "./middleware/requireClerkAuth";
 import { createIncidentRouter } from "./routes/incidents";
 import { healthRouter } from "./routes/health";
@@ -48,7 +48,7 @@ export function createApp(store: IncidentStore, dispatcher: PushDispatcher): exp
       }),
     );
   } else {
-    logger.warn("Clerk keys missing — auth middleware disabled (desk stays public)", {
+    logger.error("Clerk keys missing — paid APIs will reject all requests until configured", {
       hasPublishableKey: Boolean(config.clerkPublishableKey),
       hasSecretKey: Boolean(config.clerkSecretKey),
     });
@@ -102,36 +102,29 @@ export function createApp(store: IncidentStore, dispatcher: PushDispatcher): exp
   ensureAudioDir();
   app.use(
     "/audio",
+    ...requireEntitledUser,
     express.static(resolveAudioRoot(), {
       index: false,
       maxAge: "1h",
       setHeaders(res) {
-        res.setHeader("Cache-Control", "public, max-age=3600");
+        res.setHeader("Cache-Control", "private, max-age=3600");
       },
     }),
   );
 
   // Live incident feeds require sign-in + active/trialing subscription.
   // EventSource sends same-origin session cookies (no Authorization header).
-  app.use(
-    "/api/incidents",
-    requireClerkAuth,
-    requireActiveSubscription,
-    createIncidentRouter(store),
-  );
-  app.use(
-    "/api/sources",
-    requireClerkAuth,
-    requireActiveSubscription,
-    createSourcesRouter(store),
-  );
+  app.use("/api/incidents", ...requireEntitledUser, createIncidentRouter(store));
+  app.use("/api/sources", ...requireEntitledUser, createSourcesRouter(store));
 
-  // Authenticated API surfaces
-  app.use("/api/push", requireClerkAuth, createPushRouter(dispatcher));
-  app.use("/api/sms", requireClerkAuth, createSmsRouter());
+  // Desk-adjacent APIs — same entitlement gate as the live feed.
+  app.use("/api/push", ...requireEntitledUser, createPushRouter(dispatcher));
+  app.use("/api/sms", ...requireEntitledUser, createSmsRouter());
+  app.use("/api/me", ...requireEntitledUser, createMeRouter());
+  app.use("/api/user", ...requireEntitledUser, createUserRouter());
+
+  // Subscription lookup for the signed-in account only (onboarding UI).
   app.use("/api/subscriptions", requireClerkAuth, createSubscriptionsRouter());
-  app.use("/api/me", requireClerkAuth, createMeRouter());
-  app.use("/api/user", requireClerkAuth, createUserRouter());
 
   return app;
 }

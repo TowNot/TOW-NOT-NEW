@@ -9,6 +9,7 @@ import { RefundPolicyPage } from "./pages/RefundPolicyPage";
 import { TermsPage } from "./pages/TermsPage";
 import { ProtectedDeskRoute, ProtectedWelcomeRoute } from "./components/SubscriptionGate";
 import { isClerkConfigured } from "./lib/clerkKey";
+import { isProtectedDeskPath, isProtectedOnboardingPath } from "./lib/protectedRoutes";
 import { type ZoneUser } from "./hooks/useSelectedZone";
 
 function currentPath(): string {
@@ -86,10 +87,10 @@ function AppShell({
   const path = currentPath();
   usePageTheme(path);
 
-  const onWelcome = path === "/welcome" || path === "/select-zone";
+  const onWelcome = isProtectedOnboardingPath(path);
   const onLegal = LEGAL_PATHS.has(path);
   const onGetStarted = path === "/get-started";
-  const onDesk = path === "/dashboard" || path === "/desk";
+  const onDesk = isProtectedDeskPath(path);
 
   if (isRetiredPreviewPath(path)) {
     window.location.replace("/");
