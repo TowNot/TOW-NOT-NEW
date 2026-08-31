@@ -1,11 +1,20 @@
+/**
+ * POST /api/webhooks/stripe
+ *
+ * Verifies Stripe signatures against STRIPE_WEBHOOK_SECRET (raw body required).
+ * Persists subscription state in Postgres keyed by checkout email + Stripe ids.
+ */
 import type { Request, Response } from "express";
 import type Stripe from "stripe";
 import { config } from "../config";
+import { clerkPrimaryEmail } from "../lib/clerkUserEmail";
 import { getStripe, verifyStripeWebhook } from "../stripe/client";
 import { logger } from "../logger";
 import {
   activateSubscription,
+  isEntitledSubscriptionStatus,
   revokeSubscription,
+  updateSubscriptionStatus,
   type SubscriptionStatus,
 } from "../store/subscriptionStore";
 
@@ -28,10 +37,24 @@ function subscriptionIdOf(value: string | Stripe.Subscription | null): string | 
   return value.id;
 }
 
+function invoiceSubscriptionId(invoice: Stripe.Invoice): string | null {
+  const subscription = invoice.parent?.subscription_details?.subscription ?? null;
+  return subscriptionIdOf(subscription);
+}
+
 function localStatusFromStripe(stripeStatus: Stripe.Subscription.Status): SubscriptionStatus {
   if (stripeStatus === "active") return "active";
   if (stripeStatus === "trialing") return "trialing";
   if (stripeStatus === "canceled" || stripeStatus === "incomplete_expired") return "canceled";
+  // past_due, unpaid, paused, incomplete — desk access blocked until Stripe recovers
+  if (
+    stripeStatus === "past_due" ||
+    stripeStatus === "unpaid" ||
+    stripeStatus === "paused" ||
+    stripeStatus === "incomplete"
+  ) {
+    return "inactive";
+  }
   return "inactive";
 }
 
@@ -53,6 +76,26 @@ async function stripeCustomerEmail(customerId: string | null): Promise<string | 
   return null;
 }
 
+async function resolveCheckoutEmail(session: Stripe.Checkout.Session): Promise<string | null> {
+  const fromSession = sessionEmail(session);
+  if (fromSession) return fromSession;
+
+  const clientReferenceId = session.client_reference_id?.trim();
+  if (clientReferenceId) {
+    try {
+      const clerkEmail = await clerkPrimaryEmail(clientReferenceId);
+      if (clerkEmail) return clerkEmail;
+    } catch (error) {
+      logger.warn("Could not resolve checkout email from Clerk client_reference_id", {
+        clientReferenceId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  return stripeCustomerEmail(customerIdOf(session.customer));
+}
+
 async function resolveCheckoutStatus(
   stripeSubscriptionId: string | null,
 ): Promise<SubscriptionStatus> {
@@ -72,7 +115,7 @@ async function resolveCheckoutStatus(
 }
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session): Promise<void> {
-  const email = sessionEmail(session);
+  const email = await resolveCheckoutEmail(session);
   const stripeCustomerId = customerIdOf(session.customer);
   const stripeSubscriptionId = subscriptionIdOf(session.subscription);
   const clientReferenceId = session.client_reference_id?.trim() || null;
@@ -101,34 +144,41 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription): Pro
   const email = await stripeCustomerEmail(stripeCustomerId);
   const status = localStatusFromStripe(subscription.status);
 
-  if (status === "canceled" || status === "inactive") {
-    const record = await revokeSubscription({
+  if (isEntitledSubscriptionStatus(status)) {
+    const record = await activateSubscription({
       email,
       stripeCustomerId,
       stripeSubscriptionId: subscription.id,
+      status,
     });
-    if (record) {
-      logger.info("Stripe subscription updated — access revoked", {
-        email: record.email,
-        stripeStatus: subscription.status,
-        localStatus: record.status,
-      });
-    }
+    logger.info("Stripe subscription updated — access synced", {
+      email: record.email,
+      stripeStatus: subscription.status,
+      localStatus: record.status,
+    });
     return;
   }
 
-  const record = await activateSubscription({
+  const record = await updateSubscriptionStatus({
     email,
     stripeCustomerId,
     stripeSubscriptionId: subscription.id,
     status,
   });
 
-  logger.info("Stripe subscription updated — access synced", {
-    email: record.email,
-    stripeStatus: subscription.status,
-    localStatus: record.status,
-  });
+  if (record) {
+    logger.info("Stripe subscription updated — access downgraded", {
+      email: record.email,
+      stripeStatus: subscription.status,
+      localStatus: record.status,
+    });
+  } else {
+    logger.warn("Stripe subscription updated — no matching local subscriber", {
+      stripeCustomerId,
+      stripeSubscriptionId: subscription.id,
+      stripeStatus: subscription.status,
+    });
+  }
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription): Promise<void> {
@@ -154,6 +204,33 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription): Pro
     stripeCustomerId: record.stripeCustomerId,
     stripeSubscriptionId: record.stripeSubscriptionId,
   });
+}
+
+async function handleInvoicePaymentFailed(invoice: Stripe.Invoice): Promise<void> {
+  const stripeCustomerId = customerIdOf(invoice.customer);
+  const stripeSubscriptionId = invoiceSubscriptionId(invoice);
+  const email = await stripeCustomerEmail(stripeCustomerId);
+
+  const record = await updateSubscriptionStatus({
+    email,
+    stripeCustomerId,
+    stripeSubscriptionId,
+    status: "inactive",
+  });
+
+  if (record) {
+    logger.info("Stripe invoice payment failed — subscription marked inactive", {
+      email: record.email,
+      invoiceId: invoice.id,
+      stripeSubscriptionId: record.stripeSubscriptionId,
+    });
+  } else {
+    logger.warn("invoice.payment_failed with no matching local subscriber", {
+      stripeCustomerId,
+      stripeSubscriptionId,
+      invoiceId: invoice.id,
+    });
+  }
 }
 
 export async function stripeWebhookHandler(req: Request, res: Response): Promise<void> {
@@ -193,12 +270,16 @@ export async function stripeWebhookHandler(req: Request, res: Response): Promise
         await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
         break;
       }
+      case "customer.subscription.updated": {
+        await handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
+        break;
+      }
       case "customer.subscription.deleted": {
         await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
         break;
       }
-      case "customer.subscription.updated": {
-        await handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
+      case "invoice.payment_failed": {
+        await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice);
         break;
       }
       default:

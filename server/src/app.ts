@@ -87,8 +87,8 @@ export function createApp(store: IncidentStore, dispatcher: PushDispatcher): exp
     }),
   );
 
-  // Stripe needs the raw body for signature verification — mount before json().
-  // Webhook stays public (Stripe signs with its own secret).
+  // Stripe webhook — raw body + signature verification (STRIPE_WEBHOOK_SECRET).
+  // Must stay public; Stripe signs requests with its own secret.
   app.post(
     "/api/webhooks/stripe",
     express.raw({ type: "application/json" }),

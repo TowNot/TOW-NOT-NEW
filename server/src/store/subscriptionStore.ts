@@ -179,6 +179,19 @@ export async function revokeSubscription(input: {
   stripeCustomerId?: string | null;
   stripeSubscriptionId?: string | null;
 }): Promise<SubscriptionRecord | null> {
+  return updateSubscriptionStatus({
+    ...input,
+    status: "canceled",
+  });
+}
+
+/** Sync Stripe subscription state for renewals, plan changes, or payment failures. */
+export async function updateSubscriptionStatus(input: {
+  email?: string | null;
+  stripeCustomerId?: string | null;
+  stripeSubscriptionId?: string | null;
+  status: SubscriptionStatus;
+}): Promise<SubscriptionRecord | null> {
   const email = input.email?.trim() ? normalizeEmail(input.email) : "";
   const customerId = input.stripeCustomerId?.trim() || null;
   const subscriptionId = input.stripeSubscriptionId?.trim() || null;
@@ -192,7 +205,7 @@ export async function revokeSubscription(input: {
   const row = await prisma.subscription.update({
     where: { email: existing.email },
     data: {
-      status: "canceled",
+      status: input.status,
       stripeSubscriptionId: subscriptionId ?? existing.stripeSubscriptionId ?? undefined,
       stripeCustomerId: customerId ?? existing.stripeCustomerId ?? undefined,
     },
