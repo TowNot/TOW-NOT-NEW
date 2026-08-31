@@ -1,4 +1,5 @@
 import { UserButton } from "@clerk/clerk-react";
+import { useEffect, useState } from "react";
 import { GetStartedButton } from "../components/GetStartedButton";
 import { SiteFooter } from "../components/SiteFooter";
 import {
@@ -9,6 +10,11 @@ import {
 } from "../design/copy";
 import { accountPortalUrl } from "../lib/clerkPortal";
 import { isClerkConfigured } from "../lib/clerkKey";
+import {
+  clearSessionReplacedFromUrl,
+  readSessionReplacedFromUrl,
+  SESSION_REPLACED_MESSAGE,
+} from "../lib/deviceSession";
 
 const headerAuthTouch =
   "inline-flex min-h-[2.25rem] cursor-pointer items-center justify-center touch-manipulation";
@@ -42,8 +48,22 @@ function LandingHeaderNav({ isSignedIn }: { isSignedIn: boolean }) {
 
 /** Option 1 — Aurora (dark hero, glass card). Public landing — no desk shortcuts. */
 export function LandingPage({ isSignedIn = false }: { isSignedIn?: boolean }) {
+  const [sessionReplaced] = useState(() => readSessionReplacedFromUrl());
+
+  useEffect(() => {
+    if (sessionReplaced) clearSessionReplacedFromUrl();
+  }, [sessionReplaced]);
+
   return (
     <div className="landing-shell min-h-screen text-white" style={{ backgroundColor: "#0f172a" }}>
+      {sessionReplaced ? (
+        <div
+          className="border-b border-indigo-400/30 bg-indigo-950/80 px-4 py-3 text-center text-sm text-indigo-100"
+          role="status"
+        >
+          {SESSION_REPLACED_MESSAGE}
+        </div>
+      ) : null}
       <header className="landing-header">
         <div className="landing-header-inner mx-auto max-w-5xl px-4 py-4 sm:px-5 sm:py-5">
           <a

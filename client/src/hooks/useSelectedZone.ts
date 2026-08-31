@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { apiFetch } from "../lib/apiFetch";
 import {
   DEFAULT_ZONE_ID,
   getZone,
@@ -41,9 +42,8 @@ export function resolveHasZonePreference(user?: ZoneUser | null): boolean {
 }
 
 async function persistZoneToServer(zoneId: ZoneId): Promise<void> {
-  await fetch("/api/user/city", {
+  await apiFetch("/api/user/city", {
     method: "PUT",
-    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ selectedCity: zoneId }),
   });
@@ -68,7 +68,7 @@ export function useSelectedZone(user?: ZoneUser | null) {
     }
 
     let cancelled = false;
-    void fetch("/api/user/city", { credentials: "include" })
+    void apiFetch("/api/user/city")
       .then(async (res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (cancelled) return;

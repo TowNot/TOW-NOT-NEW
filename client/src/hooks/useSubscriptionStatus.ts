@@ -1,5 +1,6 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useCallback, useEffect, useState } from "react";
+import { apiFetch } from "../lib/apiFetch";
 
 interface SubscriptionStatus {
   active: boolean;
@@ -25,7 +26,7 @@ export function useSubscriptionStatus(): SubscriptionStatus {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/subscriptions/me", { credentials: "include" });
+      const response = await apiFetch("/api/subscriptions/me");
       if (response.status === 401) {
         setActive(false);
         return;

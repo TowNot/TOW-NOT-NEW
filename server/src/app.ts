@@ -11,6 +11,7 @@ import type { PushDispatcher } from "./dispatch/pushDispatcher";
 import { logger } from "./logger";
 import { requireEntitledUser } from "./middleware/requireEntitledUser";
 import { requireClerkAuth } from "./middleware/requireClerkAuth";
+import { requireMatchingSession } from "./middleware/requireMatchingSession";
 import { createIncidentRouter } from "./routes/incidents";
 import { healthRouter } from "./routes/health";
 import { createPushRouter } from "./routes/push";
@@ -121,10 +122,10 @@ export function createApp(store: IncidentStore, dispatcher: PushDispatcher): exp
   app.use("/api/push", ...requireEntitledUser, createPushRouter(dispatcher));
   app.use("/api/sms", ...requireEntitledUser, createSmsRouter());
   app.use("/api/me", ...requireEntitledUser, createMeRouter());
-  app.use("/api/user", ...requireEntitledUser, createUserRouter());
+  app.use("/api/user", requireClerkAuth, requireMatchingSession, createUserRouter());
 
-  // Subscription lookup for the signed-in account only (onboarding UI).
-  app.use("/api/subscriptions", requireClerkAuth, createSubscriptionsRouter());
+  // Subscription lookup for the signed-in account (onboarding UI).
+  app.use("/api/subscriptions", requireClerkAuth, requireMatchingSession, createSubscriptionsRouter());
 
   return app;
 }

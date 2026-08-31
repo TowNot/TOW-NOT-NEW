@@ -8,6 +8,7 @@ import { PrivacyPage } from "./pages/PrivacyPage";
 import { RefundPolicyPage } from "./pages/RefundPolicyPage";
 import { TermsPage } from "./pages/TermsPage";
 import { ProtectedDeskRoute, ProtectedWelcomeRoute } from "./components/SubscriptionGate";
+import { useDeviceSessionTakeover } from "./hooks/useDeviceSessionTakeover";
 import { isClerkConfigured } from "./lib/clerkKey";
 import { isProtectedDeskPath, isProtectedOnboardingPath } from "./lib/protectedRoutes";
 import { type ZoneUser } from "./hooks/useSelectedZone";
@@ -62,6 +63,7 @@ export default function App() {
 
 function ClerkAwareApp() {
   const { isLoaded, isSignedIn, user } = useUser();
+  useDeviceSessionTakeover();
   return (
     <AppShell
       isSignedIn={isLoaded ? Boolean(isSignedIn) : false}

@@ -34,6 +34,7 @@ model UserPreference {
   clerkUserId           String   @id @map("clerk_user_id")
   selectedCity          String   @default("london") @map("selected_city")
   notificationsEnabled  Boolean  @default(true) @map("notifications_enabled")
+  currentSessionToken   String?  @map("current_session_token")
   createdAt             DateTime @default(now()) @map("created_at")
   updatedAt             DateTime @updatedAt @map("updated_at")
 

@@ -2,16 +2,58 @@ import { clerkClient, getAuth } from "@clerk/express";
 import { Router } from "express";
 import { isKnownCityId } from "../engine/coverageZones";
 import { logger } from "../logger";
+import { readSessionTokenFromRequest, SESSION_REPLACED_MESSAGE } from "../lib/sessionToken";
 import {
+  claimUserSessionToken,
   getUserSelectedCity,
   updateSmsSubscriberSelectedCity,
   updateSubscriptionSelectedCity,
   upsertUserSelectedCity,
+  userSessionTokenMatches,
 } from "../store/userPreferenceStore";
 import { toE164 } from "../sms/e164";
 
 export function createUserRouter(): Router {
   const router = Router();
+
+  router.post("/session/claim", async (req, res, next) => {
+    try {
+      const auth = getAuth(req);
+      if (!auth.isAuthenticated || !auth.userId) {
+        res.status(401).json({ error: "Unauthorized — sign in required" });
+        return;
+      }
+
+      const sessionToken = await claimUserSessionToken(auth.userId);
+      res.json({ sessionToken });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/session/verify", async (req, res, next) => {
+    try {
+      const auth = getAuth(req);
+      if (!auth.isAuthenticated || !auth.userId) {
+        res.status(401).json({ error: "Unauthorized — sign in required" });
+        return;
+      }
+
+      const presented = readSessionTokenFromRequest(req.headers, req.query.session);
+      const valid = await userSessionTokenMatches(auth.userId, presented);
+      if (!valid) {
+        res.status(409).json({
+          code: "session_replaced",
+          error: SESSION_REPLACED_MESSAGE,
+        });
+        return;
+      }
+
+      res.json({ valid: true });
+    } catch (error) {
+      next(error);
+    }
+  });
 
   router.get("/city", async (req, res, next) => {
     try {

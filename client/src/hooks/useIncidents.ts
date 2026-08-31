@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { apiFetch, ensureDeviceSession, incidentStreamUrl } from "../lib/apiFetch";
 import { isIncidentVisibleOnDesk } from "../lib/incidentAge";
 import type { HealthStatus, Incident } from "../types";
 
@@ -32,7 +33,10 @@ export function useIncidents(): IncidentState {
 
     async function loadSnapshot(): Promise<void> {
       try {
-        const response = await fetch("/api/incidents", { credentials: "include" });
+        await ensureDeviceSession();
+        if (cancelled) return;
+
+        const response = await apiFetch("/api/incidents");
         if (response.status === 401 || response.status === 403) {
           if (!cancelled) setConnected(false);
           return;
@@ -47,30 +51,34 @@ export function useIncidents(): IncidentState {
 
     void loadSnapshot();
 
-    const source = new EventSource("/api/incidents/stream");
-    sourceRef.current = source;
+    void ensureDeviceSession().then(() => {
+      if (cancelled) return;
 
-    source.addEventListener("snapshot", (event) => {
-      const payload = JSON.parse((event as MessageEvent).data) as Incident[];
-      setIncidents(sortIncidentsDesc(payload));
-      setConnected(true);
+      const source = new EventSource(incidentStreamUrl());
+      sourceRef.current = source;
+
+      source.addEventListener("snapshot", (event) => {
+        const payload = JSON.parse((event as MessageEvent).data) as Incident[];
+        setIncidents(sortIncidentsDesc(payload));
+        setConnected(true);
+      });
+
+      source.addEventListener("upsert", (event) => {
+        const incident = JSON.parse((event as MessageEvent).data) as Incident;
+        setIncidents((current) =>
+          sortIncidentsDesc(current.filter((item) => item.id !== incident.id).concat(incident)),
+        );
+      });
+
+      source.addEventListener("expire", (event) => {
+        const incident = JSON.parse((event as MessageEvent).data) as Incident;
+        setIncidents((current) => current.filter((item) => item.id !== incident.id));
+      });
+
+      source.onerror = () => {
+        setConnected(false);
+      };
     });
-
-    source.addEventListener("upsert", (event) => {
-      const incident = JSON.parse((event as MessageEvent).data) as Incident;
-      setIncidents((current) =>
-        sortIncidentsDesc(current.filter((item) => item.id !== incident.id).concat(incident)),
-      );
-    });
-
-    source.addEventListener("expire", (event) => {
-      const incident = JSON.parse((event as MessageEvent).data) as Incident;
-      setIncidents((current) => current.filter((item) => item.id !== incident.id));
-    });
-
-    source.onerror = () => {
-      setConnected(false);
-    };
 
     const healthTimer = window.setInterval(async () => {
       try {
@@ -96,7 +104,8 @@ export function useIncidents(): IncidentState {
 
     return () => {
       cancelled = true;
-      source.close();
+      sourceRef.current?.close();
+      sourceRef.current = null;
       window.clearInterval(healthTimer);
       window.clearInterval(ageTimer);
     };

@@ -1,4 +1,5 @@
 import { type FormEvent, useEffect, useState } from "react";
+import { apiFetch } from "../lib/apiFetch";
 
 const STORAGE_KEY = "alertnav-sms-phone";
 
@@ -34,7 +35,7 @@ export function SmsSettings() {
     } catch {
       // Private browsing.
     }
-    void fetch("/api/sms/status", { credentials: "include" })
+    void apiFetch("/api/sms/status")
       .then(async (res) => {
         if (res.status === 401) {
           setConfigured(null);
@@ -63,9 +64,8 @@ export function SmsSettings() {
     setError(null);
     setMessage(null);
     try {
-      const response = await fetch("/api/sms/opt-in", {
+      const response = await apiFetch("/api/sms/opt-in", {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone }),
       });
@@ -96,9 +96,8 @@ export function SmsSettings() {
     setError(null);
     setMessage(null);
     try {
-      const response = await fetch("/api/sms/opt-in", {
+      const response = await apiFetch("/api/sms/opt-in", {
         method: "DELETE",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: target }),
       });

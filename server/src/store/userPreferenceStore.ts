@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { prisma } from "../db/prisma";
 import { invalidateActiveMonitoredCitiesCache, normalizeCityId } from "../engine/activeMonitoredCities";
 import { logger } from "../logger";
@@ -92,4 +93,51 @@ export async function updateSmsSubscriberSelectedCity(
     data: { selectedCity: city },
   });
   invalidateActiveMonitoredCitiesCache();
+}
+
+export async function getUserSessionToken(clerkUserId: string): Promise<string | null> {
+  const id = clerkUserId.trim();
+  if (!id) return null;
+  try {
+    const row = await prisma.userPreference.findUnique({
+      where: { clerkUserId: id },
+      select: { currentSessionToken: true },
+    });
+    return row?.currentSessionToken ?? null;
+  } catch (error) {
+    logger.warn("Failed to read user session token", {
+      clerkUserId: id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
+/** Issue a new session token — always succeeds for a valid Clerk user (replaces any prior device). */
+export async function claimUserSessionToken(clerkUserId: string): Promise<string> {
+  const id = clerkUserId.trim();
+  if (!id) throw new Error("Invalid user id");
+
+  const token = randomUUID();
+  await prisma.userPreference.upsert({
+    where: { clerkUserId: id },
+    create: {
+      clerkUserId: id,
+      selectedCity: DEFAULT_CITY,
+      notificationsEnabled: true,
+      currentSessionToken: token,
+    },
+    update: { currentSessionToken: token },
+  });
+  return token;
+}
+
+export async function userSessionTokenMatches(
+  clerkUserId: string,
+  presentedToken: string | null,
+): Promise<boolean> {
+  const stored = await getUserSessionToken(clerkUserId);
+  if (!stored) return true;
+  if (!presentedToken) return false;
+  return stored === presentedToken;
 }
