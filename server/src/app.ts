@@ -17,7 +17,7 @@ import { createIncidentRouter } from "./routes/incidents";
 import { healthRouter } from "./routes/health";
 import { createPushRouter } from "./routes/push";
 import { createSmsRouter } from "./routes/sms";
-import { createSourcesRouter } from "./routes/sources";
+import { createSourcesRouter, createSourcesStatusRouter } from "./routes/sources";
 import { createSubscriptionsRouter } from "./routes/subscriptions";
 import { createMeRouter } from "./routes/me";
 import { createUserRouter } from "./routes/user";
@@ -117,6 +117,12 @@ export function createApp(store: IncidentStore, dispatcher: PushDispatcher): exp
   // Live incident feeds require sign-in + active/trialing subscription.
   // EventSource sends same-origin session cookies (no Authorization header).
   app.use("/api/incidents", ...requireEntitledUser, createIncidentRouter(store));
+  app.use(
+    "/api/sources/status",
+    ...requireEntitledUser,
+    requireAdmin,
+    createSourcesStatusRouter(store),
+  );
   app.use("/api/sources", ...requireEntitledUser, createSourcesRouter(store));
 
   // Manual push APIs — admin only; live incident pushes use the notification worker.

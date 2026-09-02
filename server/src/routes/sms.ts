@@ -1,6 +1,11 @@
 import { Router } from "express";
 import { isTwilioConfigured } from "../sms/twilioClient";
 import {
+  isTwilioVerifyConfigured,
+  sendSmsVerificationCode,
+  verifySmsVerificationCode,
+} from "../sms/twilioVerify";
+import {
   addSmsSubscriber,
   removeSmsSubscriber,
   smsSubscriberCount,
@@ -13,6 +18,7 @@ export function createSmsRouter(): Router {
     try {
       res.json({
         configured: isTwilioConfigured(),
+        verifyConfigured: isTwilioVerifyConfigured(),
         subscribers: await smsSubscriberCount(),
       });
     } catch (error) {
@@ -20,11 +26,29 @@ export function createSmsRouter(): Router {
     }
   });
 
+  router.post("/verify/start", async (req, res) => {
+    const phone = typeof req.body?.phone === "string" ? req.body.phone : "";
+    try {
+      const result = await sendSmsVerificationCode(phone);
+      res.status(200).json({ ok: true, phone: result.phone });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to send verification code";
+      const status = message.includes("not configured") ? 503 : 400;
+      res.status(status).json({ error: message });
+    }
+  });
+
   router.post("/opt-in", async (req, res) => {
     const phone = typeof req.body?.phone === "string" ? req.body.phone : "";
+    const code = typeof req.body?.code === "string" ? req.body.code : "";
     const zoneId = typeof req.body?.zoneId === "string" ? req.body.zoneId : undefined;
     try {
-      const result = await addSmsSubscriber(phone, zoneId);
+      if (!isTwilioVerifyConfigured()) {
+        res.status(503).json({ error: "SMS verification is not configured on the server" });
+        return;
+      }
+      const verified = await verifySmsVerificationCode(phone, code);
+      const result = await addSmsSubscriber(verified.phone, zoneId);
       res.status(result.created ? 201 : 200).json({
         ok: true,
         phone: result.phone,

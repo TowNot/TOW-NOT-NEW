@@ -141,6 +141,8 @@ export const config = {
   twilioAccountSid: process.env.TWILIO_ACCOUNT_SID?.trim() || "",
   twilioAuthToken: process.env.TWILIO_AUTH_TOKEN?.trim() || "",
   twilioFromNumber: process.env.TWILIO_FROM_NUMBER?.trim() || "+12494025882",
+  /** Twilio Verify service SID (VA...) — required for SMS opt-in OTP. */
+  twilioVerifyServiceSid: process.env.TWILIO_VERIFY_SERVICE_SID?.trim() || "",
   stripeSecretKey: process.env.STRIPE_SECRET_KEY?.trim() || "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET?.trim() || "",
   stripeCheckoutUrl:
