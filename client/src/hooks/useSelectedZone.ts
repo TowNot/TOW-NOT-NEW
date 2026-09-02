@@ -53,6 +53,7 @@ export function useSelectedZone(user?: ZoneUser | null) {
   /** Local React state so guests (no Clerk) can switch zones without a remount. */
   const [localZoneId, setLocalZoneId] = useState<ZoneId | null>(() => readLocalZoneId());
   const [savedCityId, setSavedCityId] = useState<ZoneId | null>(null);
+  const [cityLoading, setCityLoading] = useState(() => Boolean(user?.id));
 
   const metadataId = metadataZoneId(user);
   const localEnabled =
@@ -64,10 +65,12 @@ export function useSelectedZone(user?: ZoneUser | null) {
   useEffect(() => {
     if (!user?.id) {
       setSavedCityId(null);
+      setCityLoading(false);
       return;
     }
 
     let cancelled = false;
+    setCityLoading(true);
     void apiFetch("/api/user/city")
       .then(async (res) => (res.ok ? res.json() : null))
       .then((data) => {
@@ -79,7 +82,10 @@ export function useSelectedZone(user?: ZoneUser | null) {
           setLocalZoneId(city);
         }
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setCityLoading(false);
+      });
 
     return () => {
       cancelled = true;
@@ -129,6 +135,7 @@ export function useSelectedZone(user?: ZoneUser | null) {
     selectedZoneId,
     zone,
     hasPreference,
+    cityLoading,
     saveZone,
     fallbackZone: getZone(DEFAULT_ZONE_ID)!,
   };

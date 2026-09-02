@@ -3,9 +3,10 @@ import { useEffect, useMemo, type ReactNode } from "react";
 import { AuthControls } from "../components/AuthControls";
 import { GetStartedButton } from "../components/GetStartedButton";
 import { SiteFooter } from "../components/SiteFooter";
-import { type ZoneUser } from "../hooks/useSelectedZone";
+import { type ZoneUser, useSelectedZone } from "../hooks/useSelectedZone";
 import { useSubscriptionStatus } from "../hooks/useSubscriptionStatus";
 import { isClerkConfigured } from "../lib/clerkKey";
+import { destinationCta, resolveAppDestination } from "../lib/onboarding";
 import { buildStripeCheckoutUrl } from "../lib/stripeCheckout";
 
 const ONBOARDING_STEPS = [
@@ -60,11 +61,13 @@ function GetStartedPageNoAuth() {
 
 function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
   const { isSignedIn, user: clerkUser } = useUser();
+  const zoneUser = user ?? clerkUser ?? null;
   const accountEmail =
     clerkUser?.primaryEmailAddress?.emailAddress ??
     clerkUser?.emailAddresses?.[0]?.emailAddress ??
     null;
   const { active: subscribed, loading: subscriptionLoading, refresh } = useSubscriptionStatus();
+  const { hasPreference, cityLoading } = useSelectedZone(zoneUser);
 
   const monthlyCheckoutUrl = buildStripeCheckoutUrl({
     email: accountEmail,
@@ -92,6 +95,18 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
 
   const accountDone = Boolean(isSignedIn);
   const subscribeDone = subscribed;
+  const installDone = subscribeDone;
+  const nextDestination = resolveAppDestination({
+    isSignedIn: Boolean(isSignedIn),
+    subscribed: subscribeDone,
+    hasZone: hasPreference,
+  });
+  const nextCta = destinationCta(nextDestination);
+
+  useEffect(() => {
+    if (!checkoutSuccess || !subscribeDone || subscriptionLoading || cityLoading) return;
+    window.location.replace(nextDestination);
+  }, [checkoutSuccess, subscribeDone, subscriptionLoading, cityLoading, nextDestination]);
 
   if (!isSignedIn) {
     return (
@@ -147,6 +162,24 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
           </p>
         ) : null}
 
+        {subscribeDone ? (
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <a href={nextCta.href} className="btn-primary px-5 py-2.5 text-sm no-underline">
+              {nextCta.label}
+            </a>
+            {nextDestination === "/dashboard" ? (
+              <p className="text-sm text-muted">
+                Your subscription is active. Install the app below for push alerts, or open the desk
+                now.
+              </p>
+            ) : (
+              <p className="text-sm text-muted">
+                Your subscription is active. Pick your coverage city to open the live desk.
+              </p>
+            )}
+          </div>
+        ) : null}
+
         <ol className="mt-10 space-y-4">
           <OnboardingStep done={accountDone} active={!accountDone} step={ONBOARDING_STEPS[0]}>
             <p className="text-sm text-muted">
@@ -178,8 +211,8 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
           </OnboardingStep>
 
           <OnboardingStep
-            done={false}
-            active={subscribeDone}
+            done={installDone}
+            active={subscribeDone && !installDone}
             step={ONBOARDING_STEPS[2]}
           >
             {!subscribeDone ? (
@@ -194,8 +227,14 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
                 </button>
                 <p className="mt-3 max-w-md text-xs leading-relaxed text-muted">
                   On iPhone: follow the Add to Home Screen steps. On Android: use the install
-                  prompt.
+                  prompt. You can install anytime — it does not block dashboard access.
                 </p>
+                <a
+                  href={nextCta.href}
+                  className="mt-4 inline-flex text-sm font-semibold text-accent-deep no-underline hover:underline"
+                >
+                  {nextCta.label} →
+                </a>
               </div>
             )}
           </OnboardingStep>

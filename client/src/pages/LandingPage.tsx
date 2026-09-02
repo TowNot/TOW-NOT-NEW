@@ -15,6 +15,9 @@ import {
   readSessionReplacedFromUrl,
   SESSION_REPLACED_MESSAGE,
 } from "../lib/deviceSession";
+import { destinationCta, resolveAppDestination } from "../lib/onboarding";
+import { type ZoneUser, useSelectedZone } from "../hooks/useSelectedZone";
+import { useSubscriptionStatus } from "../hooks/useSubscriptionStatus";
 
 const headerAuthTouch =
   "inline-flex min-h-[2.25rem] cursor-pointer items-center justify-center touch-manipulation";
@@ -47,8 +50,24 @@ function LandingHeaderNav({ isSignedIn }: { isSignedIn: boolean }) {
 }
 
 /** Option 1 — Aurora (dark hero, glass card). Public landing — no desk shortcuts. */
-export function LandingPage({ isSignedIn = false }: { isSignedIn?: boolean }) {
+export function LandingPage({
+  isSignedIn = false,
+  user = null,
+}: {
+  isSignedIn?: boolean;
+  user?: ZoneUser | null;
+}) {
   const [sessionReplaced] = useState(() => readSessionReplacedFromUrl());
+  const zoneUser = user;
+  const { active: subscribed, loading: subscriptionLoading } = useSubscriptionStatus();
+  const { hasPreference, cityLoading } = useSelectedZone(isSignedIn ? zoneUser : null);
+  const setupLoading = isSignedIn && (subscriptionLoading || cityLoading);
+  const destination = resolveAppDestination({
+    isSignedIn,
+    subscribed,
+    hasZone: hasPreference,
+  });
+  const heroCta = destinationCta(destination);
 
   useEffect(() => {
     if (sessionReplaced) clearSessionReplacedFromUrl();
@@ -92,9 +111,13 @@ export function LandingPage({ isSignedIn = false }: { isSignedIn?: boolean }) {
             </p>
             <div className="landing-hero-cta mt-6 sm:mt-8">
               {isSignedIn ? (
-                <a href="/get-started" className="btn-secondary btn-cta-pair no-underline">
-                  Continue setup
-                </a>
+                setupLoading ? (
+                  <span className="btn-secondary btn-cta-pair inline-flex opacity-80">Loading…</span>
+                ) : (
+                  <a href={heroCta.href} className="btn-secondary btn-cta-pair no-underline">
+                    {heroCta.label}
+                  </a>
+                )
               ) : (
                 <GetStartedButton className="btn-secondary btn-cta-pair" label="Start Your Free Trial" />
               )}

@@ -10,6 +10,7 @@ import { TermsPage } from "./pages/TermsPage";
 import { ProtectedDeskRoute, ProtectedWelcomeRoute } from "./components/SubscriptionGate";
 import { useDeviceSessionTakeover } from "./hooks/useDeviceSessionTakeover";
 import { isClerkConfigured } from "./lib/clerkKey";
+import { signInUrl } from "./lib/onboarding";
 import { isProtectedDeskPath, isProtectedOnboardingPath } from "./lib/protectedRoutes";
 import { type ZoneUser } from "./hooks/useSelectedZone";
 
@@ -107,8 +108,15 @@ function AppShell({
     return <GetStartedPage user={user} />;
   }
 
+  if (path === "/login") {
+    const params = new URLSearchParams(window.location.search);
+    const returnPath = params.get("return") || "/dashboard";
+    window.location.replace(signInUrl(returnPath));
+    return null;
+  }
+
   if (path === "/") {
-    return <LandingPage isSignedIn={isSignedIn} />;
+    return <LandingPage isSignedIn={isSignedIn} user={user} />;
   }
 
   if (onDesk) {
