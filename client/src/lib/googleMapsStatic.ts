@@ -10,9 +10,8 @@ import type { IncidentSource } from "../types";
 export const MAP_THUMB_WIDTH = 600;
 export const MAP_THUMB_HEIGHT = 300;
 
-const DEFAULT_PREVIEW_ZOOM = 14;
-const MIN_PREVIEW_ZOOM = 12;
-const MAX_PREVIEW_ZOOM = 16;
+/** Fixed zoom for card thumbnails — independent of poller tile zoom (often 12). */
+const CARD_PREVIEW_ZOOM = 14;
 
 export function resolveGoogleMapsApiKey(): string {
   const fromVite =
@@ -33,14 +32,9 @@ export function showTrafficMapThumbnail(source: IncidentSource): boolean {
   return source === "waze" || source === "google_maps";
 }
 
-function clampPreviewZoom(zoom?: number | null): number {
-  if (typeof zoom !== "number" || !Number.isFinite(zoom)) return DEFAULT_PREVIEW_ZOOM;
-  return Math.min(MAX_PREVIEW_ZOOM, Math.max(MIN_PREVIEW_ZOOM, Math.round(zoom)));
-}
-
 /**
  * Single Static Maps request — always the preview source of truth for cards.
- * No OSM tiles, no scraper-provided map images.
+ * Poller metadata (googleMapsZoom) is not used; card zoom stays fixed at 14.
  */
 export function buildGoogleStaticMapUrl(
   lat: number,
@@ -49,23 +43,20 @@ export function buildGoogleStaticMapUrl(
   options?: {
     width?: number;
     height?: number;
-    zoom?: number | null;
   },
 ): string {
   const width = options?.width ?? MAP_THUMB_WIDTH;
   const height = options?.height ?? MAP_THUMB_HEIGHT;
-  const zoom = clampPreviewZoom(options?.zoom);
   const center = `${lat},${lng}`;
   const size = `${width}x${height}`;
   const marker = `color:red|${center}`;
   const params = new URLSearchParams({
     center,
-    zoom: String(zoom),
+    zoom: String(CARD_PREVIEW_ZOOM),
     size,
     maptype: "roadmap",
     markers: marker,
     key: apiKey,
   });
-  // Intentionally omit `scale` (defaults to 1) for predictable card sizing.
   return `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`;
 }

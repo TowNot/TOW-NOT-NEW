@@ -7,19 +7,17 @@ import {
 interface IncidentMapThumbnailProps {
   lat: number;
   lng: number;
-  /** Optional Google Maps zoom from the incident; clamped for card previews. */
-  zoom?: number | null;
 }
 
 /**
  * Incident card map preview — Google Static Maps only.
- * Legacy OSM tile collages and scraper map images are not used.
+ * Uses a fixed card zoom; poller metadata (googleMapsZoom) is not used here.
  */
-export function IncidentMapThumbnail({ lat, lng, zoom }: IncidentMapThumbnailProps) {
+export function IncidentMapThumbnail({ lat, lng }: IncidentMapThumbnailProps) {
   const apiKey = useMemo(() => resolveGoogleMapsApiKey(), []);
   const googleSrc = useMemo(
-    () => (apiKey ? buildGoogleStaticMapUrl(lat, lng, apiKey, { zoom }) : null),
-    [apiKey, lat, lng, zoom],
+    () => (apiKey ? buildGoogleStaticMapUrl(lat, lng, apiKey) : null),
+    [apiKey, lat, lng],
   );
 
   if (!googleSrc) {
