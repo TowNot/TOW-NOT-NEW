@@ -5,6 +5,7 @@ import {
   sessionReplacedRedirectUrl,
   setDeviceSessionToken,
 } from "./deviceSession";
+import { isSessionTakenOver, markSessionTakenOver } from "./sessionTakeover";
 
 export const SESSION_TOKEN_HEADER = "x-alertnav-session";
 export const SESSION_REPLACED_EVENT = "alertnav:session-replaced";
@@ -52,10 +53,15 @@ export async function ensureDeviceSession(): Promise<string | null> {
 }
 
 function notifySessionReplaced(): void {
+  markSessionTakenOver();
   window.dispatchEvent(new Event(SESSION_REPLACED_EVENT));
 }
 
 export async function apiFetch(input: RequestInfo | URL, init: ApiFetchInit = {}): Promise<Response> {
+  if (isSessionTakenOver() && !init.skipSessionHeader) {
+    throw new SessionReplacedError();
+  }
+
   const headers = new Headers(init.headers);
   if (!init.skipSessionHeader) {
     await ensureDeviceSession();

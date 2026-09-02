@@ -1,8 +1,10 @@
 import { useUser } from "@clerk/clerk-react";
 import { IncidentDesk } from "../pages/IncidentDesk";
 import { SelectZonePage } from "../pages/SelectZonePage";
+import { SessionTakenOverModal } from "./SessionTakenOverModal";
 import { isClerkConfigured } from "../lib/clerkKey";
 import { loginRedirectUrl } from "../lib/onboarding";
+import { useSessionTakeover } from "../lib/sessionTakeover";
 
 function redirect(to: string): null {
   window.location.replace(to);
@@ -17,6 +19,7 @@ function currentReturnPath(): string {
 /** Block desk until the user is signed in. Subscription is enforced on APIs + in-desk banner. */
 export function ProtectedDeskRoute({ user }: { user: Parameters<typeof IncidentDesk>[0]["user"] }) {
   const { isLoaded, isSignedIn } = useUser();
+  const sessionTakenOver = useSessionTakeover();
 
   if (!isClerkConfigured()) {
     return redirect("/get-started");
@@ -30,7 +33,12 @@ export function ProtectedDeskRoute({ user }: { user: Parameters<typeof IncidentD
     return redirect(loginRedirectUrl(currentReturnPath()));
   }
 
-  return <IncidentDesk user={user} />;
+  return (
+    <div className={sessionTakenOver ? "session-takeover-desk" : undefined}>
+      <IncidentDesk user={user} />
+      {sessionTakenOver ? <SessionTakenOverModal /> : null}
+    </div>
+  );
 }
 
 /** Zone picker for signed-in users who want to change city. */

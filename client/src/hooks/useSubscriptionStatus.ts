@@ -43,7 +43,10 @@ export function useSubscriptionStatus(): SubscriptionStatus {
       const body = (await response.json()) as { active?: boolean };
       setActive(Boolean(body.active));
     } catch (caught) {
-      if (caught instanceof SessionReplacedError) return;
+      if (caught instanceof SessionReplacedError) {
+        setActive(false);
+        return;
+      }
       setActive(false);
       setError(caught instanceof Error ? caught.message : "Unable to check subscription status");
     } finally {

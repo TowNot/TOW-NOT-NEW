@@ -8,10 +8,19 @@ import {
 } from "../lib/apiFetch";
 import { clearDeviceSessionToken } from "../lib/deviceSession";
 import { isClerkConfigured } from "../lib/clerkKey";
+import { isProtectedDeskPath } from "../lib/protectedRoutes";
+import { isSessionTakenOver, markSessionTakenOver } from "../lib/sessionTakeover";
 
-const VERIFY_INTERVAL_MS = 45_000;
+const VERIFY_INTERVAL_MS = 15_000;
 
-/** Claim a single active session on login; poll so other devices are signed out quietly. */
+function currentPath(): string {
+  return window.location.pathname.replace(/\/+$/, "") || "/";
+}
+
+/**
+ * Claim a single active session on login; poll so other devices are signed out.
+ * On the desk, lock the UI in place (Spotify model) instead of hard-redirecting.
+ */
 export function useDeviceSessionTakeover(): void {
   const { isLoaded, isSignedIn } = useAuth();
   const { signOut } = useClerk();
@@ -29,11 +38,17 @@ export function useDeviceSessionTakeover(): void {
     void ensureDeviceSession();
 
     const onSessionReplaced = () => {
-      if (!cancelled) handleSessionReplaced(() => signOut());
+      if (cancelled) return;
+      markSessionTakenOver();
+      // Desk stays put with the lockout modal; elsewhere redirect quietly.
+      if (!isProtectedDeskPath(currentPath())) {
+        handleSessionReplaced(() => signOut());
+      }
     };
     window.addEventListener(SESSION_REPLACED_EVENT, onSessionReplaced);
 
     const timer = window.setInterval(() => {
+      if (cancelled || isSessionTakenOver()) return;
       void verifyDeviceSession().then((valid) => {
         if (!valid && !cancelled) onSessionReplaced();
       });
