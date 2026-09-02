@@ -96,14 +96,13 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
   const installDone = subscribeDone;
   const nextDestination = resolveAppDestination({
     isSignedIn: Boolean(isSignedIn),
-    subscribed: subscribeDone,
   });
   const nextCta = destinationCta(nextDestination);
 
   useEffect(() => {
     if (!checkoutSuccess || !subscribeDone || subscriptionLoading) return;
-    window.location.replace(nextDestination);
-  }, [checkoutSuccess, subscribeDone, subscriptionLoading, nextDestination]);
+    window.location.replace("/dashboard");
+  }, [checkoutSuccess, subscribeDone, subscriptionLoading]);
 
   if (!isSignedIn) {
     return (

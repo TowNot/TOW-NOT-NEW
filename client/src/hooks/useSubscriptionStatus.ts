@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+import { useUser } from "@clerk/clerk-react";
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch, ensureDeviceSession, SessionReplacedError } from "../lib/apiFetch";
 
@@ -10,13 +10,18 @@ interface SubscriptionStatus {
 }
 
 export function useSubscriptionStatus(): SubscriptionStatus {
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn } = useUser();
   const [active, setActive] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    if (!isLoaded || !isSignedIn) {
+    if (!isLoaded) {
+      setLoading(true);
+      return;
+    }
+
+    if (!isSignedIn) {
       setActive(false);
       setLoading(false);
       setError(null);

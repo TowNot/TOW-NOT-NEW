@@ -17,6 +17,7 @@ import { usePoliceAlertsPreference } from "../hooks/usePoliceAlertsPreference";
 import { useProgressier } from "../hooks/useProgressier";
 import { usePushAlertBridge } from "../hooks/usePushAlertBridge";
 import { useSelectedZone, type ZoneUser } from "../hooks/useSelectedZone";
+import { useSubscriptionStatus } from "../hooks/useSubscriptionStatus";
 import { syncIncidentRegistry } from "../lib/incidentRegistry";
 import { isPoliceIncident } from "../lib/policeAlerts";
 import { getZone, incidentInZone } from "../lib/zones";
@@ -28,6 +29,7 @@ import { getZone, incidentInZone } from "../lib/zones";
  */
 export function IncidentDesk({ user }: { user?: ZoneUser | null }) {
   const { incidents, connected, health } = useIncidents();
+  const { active: subscribed, loading: subscriptionLoading } = useSubscriptionStatus();
   const { selectedZoneId, saveZone, fallbackZone } = useSelectedZone(user);
   const { enabled: policeAlertsEnabled, togglePoliceAlerts } = usePoliceAlertsPreference();
   const {
@@ -68,6 +70,17 @@ export function IncidentDesk({ user }: { user?: ZoneUser | null }) {
         zoneId={activeZone.id}
         onZoneChange={(id) => void saveZone(id)}
       />
+      {!subscriptionLoading && !subscribed ? (
+        <div className="mx-auto w-full min-w-0 max-w-6xl px-4 sm:px-5">
+          <div className="rounded-xl border border-amber-300/40 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            Your subscription is not active yet.{" "}
+            <a href="/get-started" className="font-semibold underline">
+              Finish setup
+            </a>{" "}
+            to unlock live alerts. If you already paid, give it a minute and refresh.
+          </div>
+        </div>
+      ) : null}
       <div className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-3 px-4 pt-4 sm:px-5 sm:pt-6">
         <CollapsibleSection title={FILTER_PANEL_TITLE} subtitle={FILTER_PANEL_SUBTITLE}>
           <PoliceAlertsSettings
