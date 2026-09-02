@@ -1102,17 +1102,3 @@ body,
   min-height: 2.75rem;
 }
 
-.session-takeover-secondary {
-  display: inline-block;
-  margin-top: 1rem;
-  font-size: 0.8125rem;
-  line-height: 1.4;
-  color: rgba(165, 180, 252, 0.95);
-  text-decoration: underline;
-  text-underline-offset: 0.15em;
-}
-
-.session-takeover-secondary:hover {
-  color: #c7d2fe;
-}
-

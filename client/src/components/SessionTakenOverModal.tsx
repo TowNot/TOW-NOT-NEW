@@ -27,9 +27,6 @@ export function SessionTakenOverModal() {
         <button type="button" className="btn-primary session-takeover-primary" onClick={onLogBackIn}>
           Log back in here
         </button>
-        <a href="/get-started" className="session-takeover-secondary">
-          Need multiple dispatchers? Add a seat to your plan
-        </a>
       </div>
     </div>
   );
