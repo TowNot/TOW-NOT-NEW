@@ -96,6 +96,7 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
   const installDone = subscribeDone;
   const nextDestination = resolveAppDestination({
     isSignedIn: Boolean(isSignedIn),
+    subscribed: subscribeDone,
   });
   const nextCta = destinationCta(nextDestination);
 

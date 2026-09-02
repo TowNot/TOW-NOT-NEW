@@ -8,7 +8,7 @@ export function isProtectedDeskPath(path: string): boolean {
   );
 }
 
-/** Post-login flows that require auth; subscription checked inside the gate component. */
+/** Post-login flows that require auth only (subscription not required to pick a city). */
 export const PROTECTED_ONBOARDING_PATHS = ["/welcome", "/select-zone"] as const;
 
 export function isProtectedOnboardingPath(path: string): boolean {

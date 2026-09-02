@@ -1,6 +1,8 @@
 import { useUser } from "@clerk/clerk-react";
+import { useSubscriptionStatus } from "../hooks/useSubscriptionStatus";
 import { IncidentDesk } from "../pages/IncidentDesk";
 import { SelectZonePage } from "../pages/SelectZonePage";
+import { RouteLoadingShell } from "./RouteLoadingShell";
 import { SessionTakenOverModal } from "./SessionTakenOverModal";
 import { isClerkConfigured } from "../lib/clerkKey";
 import { loginRedirectUrl } from "../lib/onboarding";
@@ -16,21 +18,26 @@ function currentReturnPath(): string {
   return path === "/login" ? "/dashboard" : path;
 }
 
-/** Block desk until the user is signed in. Subscription is enforced on APIs + in-desk banner. */
+/** Block desk until signed in with an active or trialing subscription. */
 export function ProtectedDeskRoute({ user }: { user: Parameters<typeof IncidentDesk>[0]["user"] }) {
   const { isLoaded, isSignedIn } = useUser();
+  const { active: subscribed, loading: subscriptionLoading } = useSubscriptionStatus();
   const sessionTakenOver = useSessionTakeover();
 
   if (!isClerkConfigured()) {
     return redirect("/get-started");
   }
 
-  if (!isLoaded) {
-    return null;
+  if (!isLoaded || subscriptionLoading) {
+    return <RouteLoadingShell label="Checking your access…" />;
   }
 
   if (!isSignedIn) {
     return redirect(loginRedirectUrl(currentReturnPath()));
+  }
+
+  if (!subscribed) {
+    return redirect("/get-started");
   }
 
   return (

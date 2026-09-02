@@ -17,6 +17,10 @@ export function createPushRouter(dispatcher: PushDispatcher): Router {
   router.post("/send", async (req, res, next) => {
     try {
       const payload = req.body as PushPayload;
+      if (!payload.zoneId?.trim()) {
+        res.status(400).json({ error: "zoneId is required — broadcast pushes are not allowed" });
+        return;
+      }
       const receipt = await dispatcher.send(payload, "dispatch");
       res.status(201).json({ ok: true, receipt });
     } catch (error) {

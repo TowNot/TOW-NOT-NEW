@@ -16,8 +16,10 @@ export function signInUrl(returnPath?: string): string {
 
 export function resolveAppDestination(options: {
   isSignedIn: boolean;
+  subscribed?: boolean;
 }): AppDestination {
   if (!options.isSignedIn) return "/get-started";
+  if (options.subscribed !== true) return "/get-started";
   return "/dashboard";
 }
 

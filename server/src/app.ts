@@ -9,6 +9,7 @@ import { ensureAudioDir, resolveAudioRoot } from "./audioStorage";
 import { config } from "./config";
 import type { PushDispatcher } from "./dispatch/pushDispatcher";
 import { logger } from "./logger";
+import { requireAdmin } from "./middleware/requireAdmin";
 import { requireEntitledUser } from "./middleware/requireEntitledUser";
 import { requireClerkAuth } from "./middleware/requireClerkAuth";
 import { requireMatchingSession } from "./middleware/requireMatchingSession";
@@ -118,8 +119,8 @@ export function createApp(store: IncidentStore, dispatcher: PushDispatcher): exp
   app.use("/api/incidents", ...requireEntitledUser, createIncidentRouter(store));
   app.use("/api/sources", ...requireEntitledUser, createSourcesRouter(store));
 
-  // Desk-adjacent APIs — same entitlement gate as the live feed.
-  app.use("/api/push", ...requireEntitledUser, createPushRouter(dispatcher));
+  // Manual push APIs — admin only; live incident pushes use the notification worker.
+  app.use("/api/push", ...requireEntitledUser, requireAdmin, createPushRouter(dispatcher));
   app.use("/api/sms", ...requireEntitledUser, createSmsRouter());
   app.use("/api/me", ...requireEntitledUser, createMeRouter());
   app.use("/api/user", requireClerkAuth, requireMatchingSession, createUserRouter());

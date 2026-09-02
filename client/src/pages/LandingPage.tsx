@@ -1,4 +1,4 @@
-import { UserButton } from "@clerk/clerk-react";
+import { UserButton, useUser } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
 import { GetStartedButton } from "../components/GetStartedButton";
 import { InstallAlertNavButton, INSTALL_APP_HINT } from "../components/InstallAlertNavButton";
@@ -9,6 +9,7 @@ import {
   HERO_HEADLINE,
   SETUP_STEPS,
 } from "../design/copy";
+import { useSubscriptionStatus } from "../hooks/useSubscriptionStatus";
 import { accountPortalUrl } from "../lib/clerkPortal";
 import { isClerkConfigured } from "../lib/clerkKey";
 import {
@@ -21,11 +22,19 @@ import { destinationCta, resolveAppDestination } from "../lib/onboarding";
 const headerAuthTouch =
   "inline-flex min-h-[2.25rem] cursor-pointer items-center justify-center touch-manipulation";
 
-function LandingHeaderNav({ isSignedIn }: { isSignedIn: boolean }) {
-  if (isSignedIn && isClerkConfigured()) {
+function LandingHeaderNav({ isSignedIn, accountReady }: { isSignedIn: boolean; accountReady: boolean }) {
+  if (isSignedIn && isClerkConfigured() && accountReady) {
     return (
       <nav className="landing-header-nav shrink-0" aria-label="Primary">
         <UserButton afterSignOutUrl="/" />
+      </nav>
+    );
+  }
+
+  if (!accountReady && isClerkConfigured()) {
+    return (
+      <nav className="landing-header-nav shrink-0" aria-label="Primary" aria-busy="true">
+        <span className="landing-header-loading" aria-hidden />
       </nav>
     );
   }
@@ -48,11 +57,57 @@ function LandingHeaderNav({ isSignedIn }: { isSignedIn: boolean }) {
   );
 }
 
-/** Option 1 — Aurora (dark hero, glass card). Public landing — no desk shortcuts. */
-export function LandingPage({ isSignedIn = false }: { isSignedIn?: boolean }) {
+interface LandingPageViewProps {
+  isSignedIn: boolean;
+  subscribed: boolean;
+  accountReady: boolean;
+}
+
+function LandingHeroCta({ isSignedIn, subscribed, accountReady }: LandingPageViewProps) {
+  if (!accountReady) {
+    return (
+      <div className="landing-hero-cta mt-6 sm:mt-8">
+        <button
+          type="button"
+          className="btn-secondary btn-cta-pair landing-cta-loading"
+          disabled
+          aria-busy="true"
+        >
+          <span className="landing-cta-spinner" aria-hidden />
+          Loading…
+        </button>
+      </div>
+    );
+  }
+
+  if (isSignedIn) {
+    const heroCta = destinationCta(resolveAppDestination({ isSignedIn: true, subscribed }));
+    return (
+      <>
+        <div className="landing-hero-cta mt-6 sm:mt-8">
+          <div className="landing-hero-cta-group">
+            <a href={heroCta.href} className="btn-secondary btn-cta-pair no-underline">
+              {heroCta.label}
+            </a>
+            <InstallAlertNavButton />
+          </div>
+        </div>
+        <p className="mx-auto mt-4 max-w-md text-xs leading-relaxed text-indigo-100/65 sm:text-sm">
+          {INSTALL_APP_HINT}
+        </p>
+      </>
+    );
+  }
+
+  return (
+    <div className="landing-hero-cta mt-6 sm:mt-8">
+      <GetStartedButton className="btn-secondary btn-cta-pair" label="Start Your Free Trial" />
+    </div>
+  );
+}
+
+function LandingPageView({ isSignedIn, subscribed, accountReady }: LandingPageViewProps) {
   const [sessionReplaced] = useState(() => readSessionReplacedFromUrl());
-  const destination = resolveAppDestination({ isSignedIn });
-  const heroCta = destinationCta(destination);
 
   useEffect(() => {
     if (sessionReplaced) clearSessionReplacedFromUrl();
@@ -76,7 +131,7 @@ export function LandingPage({ isSignedIn = false }: { isSignedIn?: boolean }) {
           >
             AlertNav
           </a>
-          <LandingHeaderNav isSignedIn={isSignedIn} />
+          <LandingHeaderNav isSignedIn={isSignedIn} accountReady={accountReady} />
         </div>
       </header>
 
@@ -94,23 +149,11 @@ export function LandingPage({ isSignedIn = false }: { isSignedIn?: boolean }) {
             <p className="landing-hero-description mx-auto mt-4 max-w-2xl text-base leading-relaxed text-indigo-100/80 sm:mt-5 sm:text-lg md:text-xl">
               {APP_DESCRIPTION}
             </p>
-            <div className="landing-hero-cta mt-6 sm:mt-8">
-              {isSignedIn ? (
-                <div className="landing-hero-cta-group">
-                  <a href={heroCta.href} className="btn-secondary btn-cta-pair no-underline">
-                    {heroCta.label}
-                  </a>
-                  <InstallAlertNavButton />
-                </div>
-              ) : (
-                <GetStartedButton className="btn-secondary btn-cta-pair" label="Start Your Free Trial" />
-              )}
-            </div>
-            {isSignedIn ? (
-              <p className="mx-auto mt-4 max-w-md text-xs leading-relaxed text-indigo-100/65 sm:text-sm">
-                {INSTALL_APP_HINT}
-              </p>
-            ) : null}
+            <LandingHeroCta
+              isSignedIn={isSignedIn}
+              subscribed={subscribed}
+              accountReady={accountReady}
+            />
 
             <ol className="mt-8 grid gap-3 sm:mt-10 sm:grid-cols-3" aria-label="How to get AlertNav">
               {SETUP_STEPS.map((step) => (
@@ -146,5 +189,30 @@ export function LandingPage({ isSignedIn = false }: { isSignedIn?: boolean }) {
 
       <SiteFooter dark />
     </div>
+  );
+}
+
+function LandingPageWithAuth() {
+  const { isLoaded, isSignedIn } = useUser();
+  const { active: subscribed, loading: subscriptionLoading } = useSubscriptionStatus();
+  const accountReady = isLoaded && (!isSignedIn || !subscriptionLoading);
+
+  return (
+    <LandingPageView
+      isSignedIn={Boolean(isSignedIn)}
+      subscribed={subscribed}
+      accountReady={accountReady}
+    />
+  );
+}
+
+/** Option 1 — Aurora (dark hero, glass card). Public landing — no desk shortcuts. */
+export function LandingPage({ isSignedIn = false }: { isSignedIn?: boolean }) {
+  if (isClerkConfigured()) {
+    return <LandingPageWithAuth />;
+  }
+
+  return (
+    <LandingPageView isSignedIn={isSignedIn} subscribed={false} accountReady={true} />
   );
 }
