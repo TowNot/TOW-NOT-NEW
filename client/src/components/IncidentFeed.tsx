@@ -196,10 +196,10 @@ export function IncidentFeed({
       {filtered.length === 0 ? (
         <div className="rounded-lg border border-dashed border-line bg-panel px-6 py-16 text-center text-sm text-gray-500">
           {incidents.length === 0
-            ? "Waiting on aggregator pollers…"
+            ? "Loading…"
             : !showAccidents && !showIncidents
               ? "Turn on Accidents or Incidents to see alerts."
-              : "No incidents for the selected filters."}
+              : "No disruptions for the selected filters."}
         </div>
       ) : (
         <ol className="grid gap-3">
