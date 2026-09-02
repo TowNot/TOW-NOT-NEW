@@ -1,6 +1,7 @@
 import { FOOTER_TAGLINE } from "../design/copy";
 
-const LEGAL_LINKS = [
+const FOOTER_LINKS = [
+  { href: "/product-suggestions", label: "Suggestions & questions" },
   { href: "/terms", label: "Terms & Conditions" },
   { href: "/privacy", label: "Privacy Policy" },
   { href: "/refund-policy", label: "Refund Policy" },
@@ -18,7 +19,7 @@ export function SiteFooter({ dark = false }: { dark?: boolean }) {
             <p className="mt-1 text-xs text-indigo-100/65">{FOOTER_TAGLINE}</p>
           </div>
           <nav className="flex flex-wrap gap-x-4 gap-y-2" aria-label="Legal">
-            {LEGAL_LINKS.map((link) => (
+            {FOOTER_LINKS.map((link) => (
               <a
                 key={link.href}
                 href={link.href}
@@ -41,7 +42,7 @@ export function SiteFooter({ dark = false }: { dark?: boolean }) {
           <p className="mt-1 text-xs text-gray-500">{FOOTER_TAGLINE}</p>
         </div>
         <nav className="flex flex-wrap gap-x-4 gap-y-2" aria-label="Legal">
-          {LEGAL_LINKS.map((link) => (
+          {FOOTER_LINKS.map((link) => (
             <a
               key={link.href}
               href={link.href}
