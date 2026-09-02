@@ -505,6 +505,16 @@ body {
   justify-content: center;
 }
 
+.landing-hero-cta-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 100%;
+}
+
 .landing-hero-cta .btn-cta-pair {
   width: auto;
   max-width: 100%;

@@ -1,6 +1,7 @@
 import { UserButton } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
 import { GetStartedButton } from "../components/GetStartedButton";
+import { InstallAlertNavButton, INSTALL_APP_HINT } from "../components/InstallAlertNavButton";
 import { SiteFooter } from "../components/SiteFooter";
 import {
   APP_DESCRIPTION,
@@ -95,13 +96,21 @@ export function LandingPage({ isSignedIn = false }: { isSignedIn?: boolean }) {
             </p>
             <div className="landing-hero-cta mt-6 sm:mt-8">
               {isSignedIn ? (
-                <a href={heroCta.href} className="btn-secondary btn-cta-pair no-underline">
-                  {heroCta.label}
-                </a>
+                <div className="landing-hero-cta-group">
+                  <a href={heroCta.href} className="btn-secondary btn-cta-pair no-underline">
+                    {heroCta.label}
+                  </a>
+                  <InstallAlertNavButton />
+                </div>
               ) : (
                 <GetStartedButton className="btn-secondary btn-cta-pair" label="Start Your Free Trial" />
               )}
             </div>
+            {isSignedIn ? (
+              <p className="mx-auto mt-4 max-w-md text-xs leading-relaxed text-indigo-100/65 sm:text-sm">
+                {INSTALL_APP_HINT}
+              </p>
+            ) : null}
 
             <ol className="mt-8 grid gap-3 sm:mt-10 sm:grid-cols-3" aria-label="How to get AlertNav">
               {SETUP_STEPS.map((step) => (
