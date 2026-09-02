@@ -43,12 +43,12 @@ export function createSmsRouter(): Router {
     const code = typeof req.body?.code === "string" ? req.body.code : "";
     const zoneId = typeof req.body?.zoneId === "string" ? req.body.zoneId : undefined;
     try {
-      if (!isTwilioVerifyConfigured()) {
-        res.status(503).json({ error: "SMS verification is not configured on the server" });
-        return;
+      let verifiedPhone = phone;
+      if (isTwilioVerifyConfigured()) {
+        const verified = await verifySmsVerificationCode(phone, code);
+        verifiedPhone = verified.phone;
       }
-      const verified = await verifySmsVerificationCode(phone, code);
-      const result = await addSmsSubscriber(verified.phone, zoneId);
+      const result = await addSmsSubscriber(verifiedPhone, zoneId);
       res.status(result.created ? 201 : 200).json({
         ok: true,
         phone: result.phone,

@@ -31,6 +31,8 @@ export function SmsSettings() {
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [verifyConfigured, setVerifyConfigured] = useState<boolean | null>(null);
 
+  const otpRequired = verifyConfigured === true;
+
   useEffect(() => {
     try {
       const stored = window.localStorage.getItem(STORAGE_KEY);
@@ -78,6 +80,37 @@ export function SmsSettings() {
     setCode("");
     setError(null);
     setMessage(null);
+  };
+
+  const onSaveDirect = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const response = await apiFetch("/api/sms/opt-in", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone }),
+      });
+      const body = (await response.json()) as { phone?: string; error?: string; created?: boolean };
+      if (response.status === 401) {
+        throw new Error("Sign in to manage SMS alerts");
+      }
+      if (!response.ok || !body.phone) {
+        throw new Error(body.error ?? "Unable to save phone number");
+      }
+      persistLocal(body.phone);
+      setMessage(
+        body.created
+          ? `SMS alerts on for ${body.phone}`
+          : `${body.phone} is already opted in`,
+      );
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to save phone number");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const onSendCode = async (event: FormEvent) => {
@@ -186,21 +219,55 @@ export function SmsSettings() {
         SMS alerts
       </h2>
       <p className="mt-1 text-xs text-gray-500">
-        Opt in to text messages for Waze and fire incidents. We verify your number with a
-        one-time code before saving it.
+        {otpRequired
+          ? "Opt in to text messages for Waze and fire incidents. We verify your number with a one-time code before saving it."
+          : "Opt in to text messages for Waze and fire incidents. Numbers are stored as E.164 (e.g. +15195551212)."}
       </p>
       {configured === false ? (
         <p className="mt-2 font-mono text-[11px] text-amber-700">
-          Twilio is not configured on the server yet — SMS alerts are unavailable.
-        </p>
-      ) : null}
-      {verifyConfigured === false ? (
-        <p className="mt-2 font-mono text-[11px] text-amber-700">
-          SMS verification is not configured yet — add TWILIO_VERIFY_SERVICE_SID on the server.
+          Twilio is not configured on the server yet — your number will still be saved.
         </p>
       ) : null}
 
-      {step === "phone" ? (
+      {verifyConfigured === null ? (
+        <p className="mt-3 text-xs text-gray-500">Loading SMS settings…</p>
+      ) : null}
+
+      {verifyConfigured !== null && !otpRequired && step === "phone" ? (
+        <form className="mt-3 flex flex-wrap items-end gap-2" onSubmit={(e) => void onSaveDirect(e)}>
+          <label className="flex min-w-[16rem] flex-1 flex-col gap-1">
+            <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-gray-500">
+              Mobile number
+            </span>
+            <input
+              type="tel"
+              name="phone"
+              autoComplete="tel"
+              placeholder="519-555-1212"
+              value={phone}
+              onChange={(event) => setPhone(formatAsYouType(event.target.value))}
+              className="rounded-md border border-line bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={busy || !phone.trim()}
+            className="rounded-md bg-gray-900 px-3 py-2 text-xs font-semibold tracking-wide text-white hover:bg-black disabled:opacity-60"
+          >
+            {busy ? "Saving…" : "Save number"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void onRemove()}
+            disabled={busy || !(saved || phone.trim())}
+            className="rounded-md border border-line bg-white px-3 py-2 text-xs font-medium tracking-wide text-gray-700 hover:border-gray-400 disabled:opacity-60"
+          >
+            Turn off SMS
+          </button>
+        </form>
+      ) : null}
+
+      {verifyConfigured !== null && otpRequired && step === "phone" ? (
         <form className="mt-3 flex flex-wrap items-end gap-2" onSubmit={(e) => void onSendCode(e)}>
           <label className="flex min-w-[16rem] flex-1 flex-col gap-1">
             <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-gray-500">
@@ -218,7 +285,7 @@ export function SmsSettings() {
           </label>
           <button
             type="submit"
-            disabled={busy || !phone.trim() || verifyConfigured === false}
+            disabled={busy || !phone.trim()}
             className="rounded-md bg-gray-900 px-3 py-2 text-xs font-semibold tracking-wide text-white hover:bg-black disabled:opacity-60"
           >
             {busy ? "Sending…" : "Send verification code"}
@@ -232,7 +299,9 @@ export function SmsSettings() {
             Turn off SMS
           </button>
         </form>
-      ) : (
+      ) : null}
+
+      {verifyConfigured !== null && otpRequired && step === "verify" ? (
         <form className="mt-3 flex flex-wrap items-end gap-2" onSubmit={(e) => void onConfirmCode(e)}>
           <p className="w-full text-xs text-gray-600">
             Enter the code sent to <span className="font-mono">{verificationTarget}</span>.
@@ -268,7 +337,7 @@ export function SmsSettings() {
             Change number
           </button>
         </form>
-      )}
+      ) : null}
 
       {saved ? (
         <p className="mt-2 font-mono text-[11px] text-gray-500">Saved as {saved}</p>
