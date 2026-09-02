@@ -122,8 +122,8 @@ export function LandingPage({ isSignedIn = false }: { isSignedIn?: boolean }) {
               Have a suggestion or question?
             </h2>
             <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-indigo-100/75 sm:text-base">
-              We review every message and do our best to improve AlertNav based on what dispatchers
-              and drivers tell us.
+              We review every message and do our best to improve AlertNav based on what drivers
+              tell us.
             </p>
             <a
               href="/product-suggestions"
