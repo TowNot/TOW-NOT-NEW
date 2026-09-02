@@ -1,6 +1,7 @@
 import type { Subscription, SubscriptionStatus as PrismaSubscriptionStatus } from "@prisma/client";
 import { prisma } from "../db/prisma";
 import { invalidateActiveMonitoredCitiesCache } from "../engine/activeMonitoredCities";
+import { clerkPrimaryEmail } from "../lib/clerkUserEmail";
 import { logger } from "../logger";
 
 export type SubscriptionStatus = "active" | "trialing" | "canceled" | "inactive";
@@ -90,6 +91,19 @@ export function isEntitledSubscriptionStatus(status: SubscriptionStatus | undefi
 export async function isSubscriptionEntitled(email: string): Promise<boolean> {
   const record = await findSubscriptionByEmail(email);
   return isEntitledSubscriptionStatus(record?.status);
+}
+
+/** Match Stripe checkout by Clerk user id (client_reference_id) or primary email. */
+export async function isClerkUserEntitled(clerkUserId: string): Promise<boolean> {
+  const id = clerkUserId.trim();
+  if (!id) return false;
+
+  const byReference = await findSubscriptionByClientReferenceId(id);
+  if (isEntitledSubscriptionStatus(byReference?.status)) return true;
+
+  const email = await clerkPrimaryEmail(id);
+  if (!email) return false;
+  return isSubscriptionEntitled(email);
 }
 
 /** @deprecated Prefer isSubscriptionEntitled — kept for existing callers. */

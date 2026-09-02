@@ -16,7 +16,6 @@ import {
   SESSION_REPLACED_MESSAGE,
 } from "../lib/deviceSession";
 import { destinationCta, resolveAppDestination } from "../lib/onboarding";
-import { type ZoneUser, useSelectedZone } from "../hooks/useSelectedZone";
 import { useSubscriptionStatus } from "../hooks/useSubscriptionStatus";
 
 const headerAuthTouch =
@@ -50,22 +49,13 @@ function LandingHeaderNav({ isSignedIn }: { isSignedIn: boolean }) {
 }
 
 /** Option 1 — Aurora (dark hero, glass card). Public landing — no desk shortcuts. */
-export function LandingPage({
-  isSignedIn = false,
-  user = null,
-}: {
-  isSignedIn?: boolean;
-  user?: ZoneUser | null;
-}) {
+export function LandingPage({ isSignedIn = false }: { isSignedIn?: boolean }) {
   const [sessionReplaced] = useState(() => readSessionReplacedFromUrl());
-  const zoneUser = user;
   const { active: subscribed, loading: subscriptionLoading } = useSubscriptionStatus();
-  const { hasPreference, cityLoading } = useSelectedZone(isSignedIn ? zoneUser : null);
-  const setupLoading = isSignedIn && (subscriptionLoading || cityLoading);
+  const setupLoading = isSignedIn && subscriptionLoading;
   const destination = resolveAppDestination({
     isSignedIn,
     subscribed,
-    hasZone: hasPreference,
   });
   const heroCta = destinationCta(destination);
 

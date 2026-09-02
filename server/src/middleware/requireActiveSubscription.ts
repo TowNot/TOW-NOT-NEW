@@ -1,7 +1,6 @@
 import { getAuth } from "@clerk/express";
 import type { NextFunction, Request, Response } from "express";
-import { clerkPrimaryEmail } from "../lib/clerkUserEmail";
-import { isSubscriptionEntitled } from "../store/subscriptionStore";
+import { isClerkUserEntitled } from "../store/subscriptionStore";
 
 /**
  * Require an active or trialing Stripe subscription.
@@ -19,8 +18,7 @@ export async function requireActiveSubscription(
   }
 
   try {
-    const email = await clerkPrimaryEmail(auth.userId);
-    if (!email || !(await isSubscriptionEntitled(email))) {
+    if (!(await isClerkUserEntitled(auth.userId))) {
       res.status(403).json({
         error: "Subscription required — start your trial to access live alerts",
       });

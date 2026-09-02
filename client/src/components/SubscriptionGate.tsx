@@ -1,7 +1,6 @@
 import { useUser } from "@clerk/clerk-react";
 import { IncidentDesk } from "../pages/IncidentDesk";
 import { SelectZonePage } from "../pages/SelectZonePage";
-import { useSelectedZone } from "../hooks/useSelectedZone";
 import { useSubscriptionStatus } from "../hooks/useSubscriptionStatus";
 import { isClerkConfigured } from "../lib/clerkKey";
 import { loginRedirectUrl } from "../lib/onboarding";
@@ -16,17 +15,16 @@ function currentReturnPath(): string {
   return path === "/login" ? "/dashboard" : path;
 }
 
-/** Block desk until the user is signed in, subscribed, and has a saved zone. */
-export function ProtectedDeskRoute({ user }: { user: Parameters<typeof useSelectedZone>[0] }) {
+/** Block desk until the user is signed in and subscribed. */
+export function ProtectedDeskRoute({ user }: { user: Parameters<typeof IncidentDesk>[0]["user"] }) {
   const { isLoaded, isSignedIn } = useUser();
   const { active: subscribed, loading: subscriptionLoading } = useSubscriptionStatus();
-  const { hasPreference, cityLoading } = useSelectedZone(user);
 
   if (!isClerkConfigured()) {
     return redirect("/get-started");
   }
 
-  if (!isLoaded || subscriptionLoading || cityLoading) {
+  if (!isLoaded || subscriptionLoading) {
     return null;
   }
 
@@ -38,24 +36,19 @@ export function ProtectedDeskRoute({ user }: { user: Parameters<typeof useSelect
     return redirect("/get-started");
   }
 
-  if (!hasPreference) {
-    return redirect("/welcome");
-  }
-
   return <IncidentDesk user={user} />;
 }
 
-/** Post-login zone picker — only for subscribed users without a saved city. */
-export function ProtectedWelcomeRoute({ user }: { user: Parameters<typeof useSelectedZone>[0] }) {
+/** Optional zone picker for subscribed users who want to change city. */
+export function ProtectedWelcomeRoute({ user }: { user: Parameters<typeof SelectZonePage>[0]["user"] }) {
   const { isLoaded, isSignedIn } = useUser();
   const { active: subscribed, loading: subscriptionLoading } = useSubscriptionStatus();
-  const { hasPreference, cityLoading } = useSelectedZone(user);
 
   if (!isClerkConfigured()) {
     return redirect("/get-started");
   }
 
-  if (!isLoaded || subscriptionLoading || cityLoading) {
+  if (!isLoaded || subscriptionLoading) {
     return null;
   }
 
@@ -65,10 +58,6 @@ export function ProtectedWelcomeRoute({ user }: { user: Parameters<typeof useSel
 
   if (!subscribed) {
     return redirect("/get-started");
-  }
-
-  if (hasPreference) {
-    return redirect("/dashboard");
   }
 
   return <SelectZonePage user={user} />;

@@ -116,7 +116,7 @@ function AppShell({
   }
 
   if (path === "/") {
-    return <LandingPage isSignedIn={isSignedIn} user={user} />;
+    return <LandingPage isSignedIn={isSignedIn} />;
   }
 
   if (onDesk) {

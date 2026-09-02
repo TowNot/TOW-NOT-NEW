@@ -1,6 +1,6 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useCallback, useEffect, useState } from "react";
-import { apiFetch } from "../lib/apiFetch";
+import { apiFetch, ensureDeviceSession, SessionReplacedError } from "../lib/apiFetch";
 
 interface SubscriptionStatus {
   active: boolean;
@@ -26,6 +26,7 @@ export function useSubscriptionStatus(): SubscriptionStatus {
     setLoading(true);
     setError(null);
     try {
+      await ensureDeviceSession();
       const response = await apiFetch("/api/subscriptions/me");
       if (response.status === 401) {
         setActive(false);
@@ -37,6 +38,7 @@ export function useSubscriptionStatus(): SubscriptionStatus {
       const body = (await response.json()) as { active?: boolean };
       setActive(Boolean(body.active));
     } catch (caught) {
+      if (caught instanceof SessionReplacedError) return;
       setActive(false);
       setError(caught instanceof Error ? caught.message : "Unable to check subscription status");
     } finally {

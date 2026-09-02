@@ -3,7 +3,7 @@ import { useEffect, useMemo, type ReactNode } from "react";
 import { AuthControls } from "../components/AuthControls";
 import { GetStartedButton } from "../components/GetStartedButton";
 import { SiteFooter } from "../components/SiteFooter";
-import { type ZoneUser, useSelectedZone } from "../hooks/useSelectedZone";
+import { type ZoneUser } from "../hooks/useSelectedZone";
 import { useSubscriptionStatus } from "../hooks/useSubscriptionStatus";
 import { isClerkConfigured } from "../lib/clerkKey";
 import { destinationCta, resolveAppDestination } from "../lib/onboarding";
@@ -61,13 +61,11 @@ function GetStartedPageNoAuth() {
 
 function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
   const { isSignedIn, user: clerkUser } = useUser();
-  const zoneUser = user ?? clerkUser ?? null;
   const accountEmail =
     clerkUser?.primaryEmailAddress?.emailAddress ??
     clerkUser?.emailAddresses?.[0]?.emailAddress ??
     null;
   const { active: subscribed, loading: subscriptionLoading, refresh } = useSubscriptionStatus();
-  const { hasPreference, cityLoading } = useSelectedZone(zoneUser);
 
   const monthlyCheckoutUrl = buildStripeCheckoutUrl({
     email: accountEmail,
@@ -99,14 +97,13 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
   const nextDestination = resolveAppDestination({
     isSignedIn: Boolean(isSignedIn),
     subscribed: subscribeDone,
-    hasZone: hasPreference,
   });
   const nextCta = destinationCta(nextDestination);
 
   useEffect(() => {
-    if (!checkoutSuccess || !subscribeDone || subscriptionLoading || cityLoading) return;
+    if (!checkoutSuccess || !subscribeDone || subscriptionLoading) return;
     window.location.replace(nextDestination);
-  }, [checkoutSuccess, subscribeDone, subscriptionLoading, cityLoading, nextDestination]);
+  }, [checkoutSuccess, subscribeDone, subscriptionLoading, nextDestination]);
 
   if (!isSignedIn) {
     return (
@@ -172,11 +169,7 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
                 Your subscription is active. Install the app below for push alerts, or open the desk
                 now.
               </p>
-            ) : (
-              <p className="text-sm text-muted">
-                Your subscription is active. Pick your coverage city to open the live desk.
-              </p>
-            )}
+            ) : null}
           </div>
         ) : null}
 
