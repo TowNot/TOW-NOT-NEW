@@ -5,6 +5,7 @@ import {
   incidentSourceDetections,
   sourceLabel,
 } from "../lib/incidentDisplay";
+import { showTrafficMapThumbnail } from "../lib/googleMapsStatic";
 import { IncidentMapThumbnail } from "./IncidentMapThumbnail";
 
 export function IncidentCard({ incident }: { incident: Incident }) {
@@ -12,9 +13,11 @@ export function IncidentCard({ incident }: { incident: Incident }) {
   const wazeUrl = `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
   const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
   const detections = incidentSourceDetections(incident);
-  const showMap = detections.some(
-    (detection) => detection.source === "waze" || detection.source === "google_maps",
-  );
+  const showMap = detections.some((detection) => showTrafficMapThumbnail(detection.source));
+  const mapZoom =
+    incident.googleMapsZoom ??
+    detections.find((detection) => typeof detection.googleMapsZoom === "number")?.googleMapsZoom ??
+    null;
 
   return (
     <article className="grid gap-3 rounded-lg border border-line bg-panel p-4 md:grid-cols-[9rem_1fr_auto]">
@@ -28,7 +31,7 @@ export function IncidentCard({ incident }: { incident: Incident }) {
         </div>
       </div>
       <div className="flex min-w-0 flex-col gap-3 sm:flex-row">
-        {showMap ? <IncidentMapThumbnail lat={lat} lng={lng} /> : null}
+        {showMap ? <IncidentMapThumbnail lat={lat} lng={lng} zoom={mapZoom} /> : null}
         <div className="min-w-0 flex-1">
         <h3 className="text-base font-semibold text-gray-900">{incident.title}</h3>
         <p className="mt-1 text-sm text-gray-600">{incident.description}</p>

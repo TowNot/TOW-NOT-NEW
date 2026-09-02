@@ -696,7 +696,28 @@ body {
   color: var(--color-accent-deep);
 }
 
-/* ── Pricing plans (get-started subscribe step) ────────────── */
+/* Incident card Google Static Maps preview — full-width, 2:1, never cropped oddly */
+.incident-map-thumb {
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 2 / 1;
+  background: #e8eaed;
+}
+
+.incident-map-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+@media (min-width: 640px) {
+  .incident-map-thumb {
+    max-width: 18.75rem;
+  }
+}
+
 
 .pricing-plans-grid {
   display: grid;
