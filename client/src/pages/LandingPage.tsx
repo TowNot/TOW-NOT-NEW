@@ -114,6 +114,25 @@ export function LandingPage({ isSignedIn = false }: { isSignedIn?: boolean }) {
             </ol>
           </div>
         </section>
+
+        <section className="mx-auto max-w-5xl px-4 pb-10 sm:px-5 sm:pb-14">
+          <div className="landing-step-card mx-auto max-w-2xl px-5 py-6 text-center sm:px-8 sm:py-8">
+            <p className="section-label text-indigo-200/80">Product feedback</p>
+            <h2 className="mt-2 text-xl font-bold text-white sm:text-2xl">
+              Have a suggestion or question?
+            </h2>
+            <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-indigo-100/75 sm:text-base">
+              We review every message and do our best to improve AlertNav based on what dispatchers
+              and drivers tell us.
+            </p>
+            <a
+              href="/product-suggestions"
+              className="btn-outline-cobalt mt-5 inline-flex min-h-[2.75rem] items-center justify-center px-6 py-2.5 text-sm no-underline"
+            >
+              Suggestions &amp; questions
+            </a>
+          </div>
+        </section>
       </main>
 
       <SiteFooter dark />
