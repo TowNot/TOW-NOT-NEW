@@ -82,11 +82,7 @@ export function IncidentDesk({ user }: { user?: ZoneUser | null }) {
         </div>
       ) : null}
       <div className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-3 px-4 pt-4 sm:px-5 sm:pt-6">
-        <CollapsibleSection
-          title={FILTER_PANEL_TITLE}
-          subtitle={FILTER_PANEL_SUBTITLE}
-          defaultOpen
-        >
+        <CollapsibleSection title={FILTER_PANEL_TITLE} subtitle={FILTER_PANEL_SUBTITLE}>
           <DeskFiltersPanel
             preferences={deskFilters}
             onToggleAccidents={toggleAccidents}
