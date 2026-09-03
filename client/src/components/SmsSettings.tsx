@@ -256,8 +256,8 @@ export function SmsSettings() {
       </h2>
       <p className="mt-1 text-xs text-gray-500">
         {otpRequired
-          ? "Opt in to text messages for Waze and fire incidents. We verify your number with a one-time code before saving it."
-          : "Opt in to text messages for Waze and fire incidents. Numbers are stored as E.164 (e.g. +15195551212)."}
+          ? "Opt in to text messages. We verify your number with a one-time code before saving it."
+          : "Opt in to text messages. Numbers are stored as E.164 (e.g. +15195551212)."}
       </p>
       {configured === false ? (
         <p className="mt-2 font-mono text-[11px] text-amber-700">
