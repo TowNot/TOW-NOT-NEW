@@ -1230,7 +1230,7 @@ export async function fetchBlocksInsideForZone(zone: {
   const box = match ? zoneToBoundingBox(match) : londonBlocksInsideBox();
   try {
     const alerts = await fetchBlocksInsideBox(box);
-    logger.info(
+    logger.debug(
       `[waze-poller] Polled zone: ${zone.name} | Tiles: ${BLOCKSINSIDE_TILES_PER_ZONE} | Alerts found: ${alerts.length}`,
     );
     return alerts;
@@ -1242,7 +1242,7 @@ export async function fetchBlocksInsideForZone(zone: {
       },
       "BlocksInside city fetch failed",
     );
-    logger.info(
+    logger.debug(
       `[waze-poller] Polled zone: ${zone.name} | Tiles: ${BLOCKSINSIDE_TILES_PER_ZONE} | Alerts found: 0`,
     );
     throw err;
@@ -1279,7 +1279,7 @@ async function fetchBlocksInside(
     const { zone, box } = jobs[i]!;
     try {
       const alerts = await fetchBlocksInsideBox(box);
-      logger.info(
+      logger.debug(
         `[waze-poller] Polled zone: ${zone.name} | Tiles: ${tilesPerZone} | Alerts found: ${alerts.length}`,
       );
       for (const alert of alerts) {
@@ -1296,7 +1296,7 @@ async function fetchBlocksInside(
         },
         "BlocksInside city fetch failed",
       );
-      logger.info(
+      logger.debug(
         `[waze-poller] Polled zone: ${zone.name} | Tiles: ${tilesPerZone} | Alerts found: 0`,
       );
     }

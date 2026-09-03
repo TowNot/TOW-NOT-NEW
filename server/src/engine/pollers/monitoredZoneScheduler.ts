@@ -1,4 +1,9 @@
 import { logger } from "../../logger";
+import {
+  maybeLogDemandSummary,
+  noteDemandCycleCities,
+  noteDemandPollResult,
+} from "../cityDemandSummary";
 
 export interface ZoneSchedulerHandle {
   stop(): void;
@@ -6,6 +11,15 @@ export interface ZoneSchedulerHandle {
 
 /** Delay between cities within one poll cycle so APIs are not burst together. */
 export const ZONE_SCHEDULER_STAGGER_MS = 175;
+
+type DemandProvider = "waze" | "google_maps";
+
+function providerForLabel(label: string): DemandProvider | null {
+  const lower = label.toLowerCase();
+  if (lower.includes("waze")) return "waze";
+  if (lower.includes("google")) return "google_maps";
+  return null;
+}
 
 /**
  * Single interval that, at the start of every cycle:
@@ -22,6 +36,7 @@ export function startMonitoredZoneScheduler<T extends { id: string }>(opts: {
   let timer: NodeJS.Timeout | null = null;
   let stopped = false;
   let cycleInFlight = false;
+  const provider = providerForLabel(opts.label);
 
   const tick = async (): Promise<void> => {
     if (stopped || cycleInFlight) {
@@ -34,8 +49,16 @@ export function startMonitoredZoneScheduler<T extends { id: string }>(opts: {
     cycleInFlight = true;
     try {
       const zones = await opts.resolveZones();
+      if (provider) {
+        noteDemandCycleCities(
+          provider,
+          zones.map((zone) => zone.id),
+        );
+      }
+
       if (zones.length === 0) {
         logger.debug(`${opts.label} cycle idle — no cities with user profiles`);
+        maybeLogDemandSummary();
         return;
       }
 
@@ -52,12 +75,15 @@ export function startMonitoredZoneScheduler<T extends { id: string }>(opts: {
         try {
           await opts.run(zone);
         } catch (error) {
+          if (provider) noteDemandPollResult(provider, zone.id, false);
           logger.warn(`${opts.label} zone cycle failed (isolated)`, {
             zone: zone.id,
             error: error instanceof Error ? error.message : String(error),
           });
         }
       }
+
+      maybeLogDemandSummary();
     } catch (error) {
       logger.warn(`${opts.label} monitored cycle failed`, {
         error: error instanceof Error ? error.message : String(error),

@@ -25,6 +25,7 @@ import {
   ZONE_SCHEDULER_STAGGER_MS,
   type ZoneSchedulerHandle,
 } from "./monitoredZoneScheduler";
+import { noteDemandPollResult } from "../cityDemandSummary";
 
 /** Extreme field-test cadence (15s). Waze uses config.pollIntervalMs (10s). */
 const GOOGLE_MAPS_POLL_INTERVAL_MS = 15_000;
@@ -81,11 +82,13 @@ export class GoogleMapsTrafficPoller {
     try {
       const fetchResult = await fetchOpenWebNinjaGoogleMapsForCity(city);
       const { incidents, stats } = await this.ingestIncidents(fetchResult.incidents);
-      logger.info(
+      noteDemandPollResult("google_maps", city.id, true);
+      logger.debug(
         `[GoogleMaps Poll] city=${city.id} | tiles=${fetchResult.tiles} | fetched=${fetchResult.fetched} | retained=${fetchResult.retained} | pushed=${stats.pushed} | merged=${stats.merged} | duration=${fetchResult.latencyMs || Date.now() - started}ms`,
       );
       return incidents;
     } catch (error) {
+      noteDemandPollResult("google_maps", city.id, false);
       logger.error("OpenWebNinja Google Maps poll failed", {
         city: city.id,
         error: error instanceof Error ? error.message : String(error),

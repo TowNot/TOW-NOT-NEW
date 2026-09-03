@@ -24,6 +24,7 @@ import {
   ZONE_SCHEDULER_STAGGER_MS,
   type ZoneSchedulerHandle,
 } from "./monitoredZoneScheduler";
+import { noteDemandPollResult } from "../cityDemandSummary";
 
 export type { WazeAlert };
 
@@ -136,8 +137,11 @@ export class WazeTrafficPoller {
     if (this.liveProviders().length === 0) return [];
     try {
       const alerts = await fetchBlocksInsideForZone(zone);
-      return await this.ingestAlerts(alerts);
+      const ingested = await this.ingestAlerts(alerts);
+      noteDemandPollResult("waze", zone.id, true);
+      return ingested;
     } catch (error) {
+      noteDemandPollResult("waze", zone.id, false);
       logger.error("Live traffic poll failed", {
         zone: zone.id,
         error: error instanceof Error ? error.message : String(error),
