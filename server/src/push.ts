@@ -158,15 +158,28 @@ export function incidentToPushPayload(incident: Incident): PushPayload {
   const providerLabel = labelForIncident(incident);
   const zoneId = resolveIncidentZoneId(incident);
   const note = incident.description?.trim();
-  // Keep [DG] at the front of the Progressier title so the 50-char cap
-  // doesn't strip the engine tag.
-  const deepgramTitle = /^\[DG\]/.test(incident.title);
+  const base = {
+    severity: incident.severity,
+    incidentId: incident.id,
+    url: `/desk?incident=${encodeURIComponent(incident.id)}`,
+    zoneId: zoneId ?? undefined,
+    pushCategory: pushCategoryForIncident(incident),
+    ...(incident.reporterName ? { reporterName: incident.reporterName } : {}),
+  } as const;
+
+  // Fire dispatch: static copy only — keep routing fields above; never surface STT.
+  if (incident.source === "fire_dispatch") {
+    return {
+      title: "Fire Alert",
+      body: "New disruption reported from AlertNav",
+      ...base,
+    };
+  }
+
   return {
     title: police
       ? "AlertNav · Waze (Police)"
-      : deepgramTitle
-        ? truncate(incident.title, TITLE_MAX)
-        : `AlertNav · ${providerLabel} · ${incident.title}`,
+      : `AlertNav · ${providerLabel} · ${incident.title}`,
     body: police
       ? truncate(
           [
@@ -187,12 +200,7 @@ export function incidentToPushPayload(incident: Incident): PushPayload {
             .join(" · "),
           BODY_MAX,
         ),
-    severity: incident.severity,
-    incidentId: incident.id,
-    url: `/desk?incident=${encodeURIComponent(incident.id)}`,
-    zoneId: zoneId ?? undefined,
-    pushCategory: pushCategoryForIncident(incident),
-    ...(incident.reporterName ? { reporterName: incident.reporterName } : {}),
+    ...base,
   };
 }
 
