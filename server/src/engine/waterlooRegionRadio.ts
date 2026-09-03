@@ -6,8 +6,8 @@
  * - EMS page https://cykf.net/ems-2/ → playlist currently encrypts to a placeholder
  *   ("They_Encrypted_Their_System_Sorry_No_Audio") — no public mount exposed
  *
- * Keep `enabled: false` while London-only ops are active. radioOrchestrator
- * skips these until you flip enabled + lift LONDON_ONLY_INGEST for waterloo.
+ * Fire starts when Prisma demand includes waterloo (or zone stream on kitchener/
+ * cambridge). EMS stays disabled until CYKF publishes a live mount.
  */
 
 export type WaterlooRadioAgency = "fire" | "ems";
@@ -30,7 +30,7 @@ export const WATERLOO_REGION_RADIO_FEEDS: WaterlooRegionRadioFeed[] = [
   {
     id: "waterlooRegionFire",
     zoneId: "waterloo",
-    enabled: false,
+    enabled: true,
     agency: "fire",
     url: "https://cast5.asurahosting.com/proxy/fire12/stream?type=.mp3",
     description: "Waterloo Region Fire Dispatch (CYKF)",

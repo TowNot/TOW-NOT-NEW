@@ -98,9 +98,9 @@ function buildZone(seed: ZoneSeed): CoverageZoneDef {
 
 /**
  * Southern Ontario coverage catalog (geometry + optional radio feeds).
- * Waze / Google Maps scraping is demand-driven from Prisma `selectedCity`
- * (see activeMonitoredCities) — not from seed.enabled.
- * seed.enabled still gates radio/CAD only (plus optional LONDON_ONLY_INGEST).
+ * Waze / Google Maps: Prisma `selectedCity` demand (any catalog city).
+ * Fire / EMS: starts when demanded AND zone/audio is enabled with a real feed.
+ * Pending cities (feedId null) stay maps-only until a feed is assigned.
  */
 const ZONE_SEEDS: ZoneSeed[] = [
   // ── Catalog (scrapers follow user profiles; radio uses enabled) ─────
@@ -143,7 +143,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "haltonHills",
     name: "Halton Hills",
     center: { lat: 43.6475, lng: -79.9197 },
-    enabled: false,
+    enabled: true,
     audio: {
       enabled: true,
       type: "hls",
@@ -156,11 +156,10 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "kitchener",
     name: "Kitchener",
     center: { lat: 43.4587, lng: -80.5129 },
-    enabled: false,
-    // Regional Fire/EMS Icecast mounts live in waterlooRegionRadio.ts (disabled).
-    // Keep a disabled stream stub so the desk can show Fire/EMS agencies later.
+    enabled: true,
+    // Regional Fire Icecast (CYKF). EMS mount still encrypted / unpublished.
     audio: {
-      enabled: false,
+      enabled: true,
       type: "stream",
       url: "https://cast5.asurahosting.com/proxy/fire12/stream?type=.mp3",
       description: "Waterloo Region Fire Dispatch (CYKF)",
@@ -174,9 +173,9 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "waterloo",
     name: "Waterloo",
     center: { lat: 43.4643, lng: -80.5204 },
-    enabled: false,
+    enabled: true,
     audio: {
-      enabled: false,
+      enabled: true,
       type: "stream",
       url: "https://cast5.asurahosting.com/proxy/fire12/stream?type=.mp3",
       description: "Waterloo Region Fire Dispatch (CYKF)",
@@ -190,9 +189,9 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "cambridge",
     name: "Cambridge",
     center: { lat: 43.3972, lng: -80.3114 },
-    enabled: false,
+    enabled: true,
     audio: {
-      enabled: false,
+      enabled: true,
       type: "stream",
       url: "https://cast5.asurahosting.com/proxy/fire12/stream?type=.mp3",
       description: "Waterloo Region Fire Dispatch (CYKF)",
@@ -206,7 +205,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "torontoCore",
     name: "Toronto (Core)",
     center: { lat: 43.6532, lng: -79.3832 },
-    enabled: false,
+    enabled: true,
     audio: {
       enabled: true,
       type: "hls",
@@ -219,7 +218,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "etobicoke",
     name: "Etobicoke",
     center: { lat: 43.6205, lng: -79.5132 },
-    enabled: false,
+    enabled: true,
     audio: {
       enabled: true,
       type: "hls",
@@ -232,7 +231,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "northYork",
     name: "North York",
     center: { lat: 43.7615, lng: -79.4111 },
-    enabled: false,
+    enabled: true,
     audio: {
       enabled: true,
       type: "hls",
@@ -245,7 +244,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "scarborough",
     name: "Scarborough",
     center: { lat: 43.7731, lng: -79.2577 },
-    enabled: false,
+    enabled: true,
     audio: {
       enabled: true,
       type: "hls",
@@ -258,7 +257,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "hamilton",
     name: "Hamilton",
     center: { lat: 43.2557, lng: -79.8711 },
-    enabled: false,
+    enabled: true,
     audio: {
       enabled: true,
       type: "hls",
@@ -271,7 +270,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "burlington",
     name: "Burlington",
     center: { lat: 43.3255, lng: -79.799 },
-    enabled: false,
+    enabled: true,
     audio: {
       enabled: true,
       type: "hls",
@@ -284,7 +283,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "brantford",
     name: "Brantford",
     center: { lat: 43.1408, lng: -80.2632 },
-    enabled: false,
+    enabled: true,
     audio: {
       enabled: true,
       type: "hls",
@@ -297,7 +296,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "barrie",
     name: "Barrie",
     center: { lat: 44.3894, lng: -79.6903 },
-    enabled: false,
+    enabled: true,
     audio: {
       enabled: true,
       type: "hls",
@@ -310,7 +309,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "windsor",
     name: "Windsor",
     center: { lat: 42.3149, lng: -83.0364 },
-    enabled: false,
+    enabled: true,
     audio: {
       enabled: true,
       type: "hls",
@@ -323,7 +322,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "chatham",
     name: "Chatham-Kent",
     center: { lat: 42.4048, lng: -82.191 },
-    enabled: false,
+    enabled: true,
     audio: {
       enabled: true,
       type: "hls",
@@ -333,7 +332,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     scannedAgencies: ["Fire"],
   },
 
-  // ── Pending audio (feedId null) — paused with other non-London zones ─
+  // ── Pending audio (feedId null) — maps-only until a feed is assigned ─
   {
     id: "mississauga",
     name: "Mississauga",
