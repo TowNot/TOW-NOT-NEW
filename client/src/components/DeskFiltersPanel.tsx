@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { IncidentSource } from "../types";
 import type { DeskFilterPreferences } from "../lib/deskFilterPreferences";
 import { PoliceAlertsSettings } from "./PoliceAlertsSettings";
@@ -36,6 +37,8 @@ export function DeskFiltersPanel({
   hasEmsFeed,
 }: DeskFiltersPanelProps) {
   const { showAccidents, showIncidents, waze, google_maps, fire_dispatch } = preferences;
+  /** Decorative only — does not filter the live feed. */
+  const [weatherEnabled, setWeatherEnabled] = useState(true);
 
   const activeSources = new Set<IncidentSource>(
     SOURCE_ORDER.filter((source) => {
@@ -101,7 +104,10 @@ export function DeskFiltersPanel({
               </button>
             );
           })}
-          <StaticWeatherChip />
+          <StaticWeatherChip
+            enabled={weatherEnabled}
+            onToggle={() => setWeatherEnabled((current) => !current)}
+          />
         </div>
       </div>
 
@@ -131,23 +137,32 @@ export function DeskFiltersPanel({
   );
 }
 
-/** Decorative road-conditions cue; not wired to live weather data. */
-function StaticWeatherChip() {
+/** Decorative weather toggle; not wired to live weather data. */
+function StaticWeatherChip({
+  enabled,
+  onToggle,
+}: {
+  enabled: boolean;
+  onToggle: () => void;
+}) {
   return (
-    <span
-      className="inline-flex flex-col items-start rounded-md border border-amber-200 bg-gradient-to-br from-amber-50 to-amber-100 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-amber-900"
-      title="Road conditions preview — decorative only"
-      aria-label="Weather preview Clear 22 degrees"
-      role="img"
+    <button
+      type="button"
+      role="switch"
+      aria-checked={enabled}
+      title="Weather — decorative only"
+      onClick={onToggle}
+      className={
+        enabled
+          ? "rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-amber-900"
+          : "rounded-md border border-line bg-panel px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-gray-500 hover:border-gray-400"
+      }
     >
-      <span className="inline-flex items-center gap-1.5">
-        <span aria-hidden="true">☀️</span>
-        Weather
+      Weather
+      <span className="mt-1 block normal-case tracking-normal text-[10px] font-medium opacity-80">
+        {enabled ? "On" : "Off"}
       </span>
-      <span className="mt-1 font-medium normal-case tracking-normal text-[10px] text-amber-800/90">
-        Clear · 22°C
-      </span>
-    </span>
+    </button>
   );
 }
 
