@@ -20,6 +20,7 @@ import { GoogleMapsTrafficPoller } from "./engine/pollers/googleMapsPoller";
 import { TorontoFireCadPoller } from "./engine/pollers/torontoFireCadPoller";
 import { WazeTrafficPoller } from "./engine/pollers/wazePoller";
 import { RadioIngestionWorker } from "./engine/workers/radioIngestionWorker";
+import { reconcileRadioOrchestrator } from "./engine/workers/radioOrchestrator";
 import { logger } from "./logger";
 import { closeNotificationQueue } from "./queue/notificationQueue";
 import { closeSharedRedis } from "./queue/redisClient";
@@ -110,6 +111,7 @@ const engine = new DataAggregatorEngine(waze, googleMaps, radio, torontoFireCad)
 registerCityDemandScrapers({
   pollWazeZone: (zone) => waze.pollZone(zone),
   pollGoogleMapsCity: (city) => googleMaps.pollCity(city),
+  reconcileRadio: () => reconcileRadioOrchestrator(store),
 });
 
 store.on("created", (incident) => {

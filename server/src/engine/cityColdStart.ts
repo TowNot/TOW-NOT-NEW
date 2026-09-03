@@ -8,6 +8,8 @@ import {
 export interface CityDemandScrapers {
   pollWazeZone: (zone: { id: string; name: string }) => Promise<unknown>;
   pollGoogleMapsCity: (city: GoogleMapsCity) => Promise<unknown>;
+  /** Refresh fire/EMS listeners for Prisma-demanded cities. */
+  reconcileRadio?: () => Promise<void>;
 }
 
 let scrapers: CityDemandScrapers | null = null;
@@ -43,13 +45,16 @@ export async function coldStartCityScrape(cityId: string): Promise<void> {
   const results = await Promise.allSettled([
     scrapers.pollWazeZone({ id: zone.id, name: zone.name }),
     scrapers.pollGoogleMapsCity(gmapsCity),
+    scrapers.reconcileRadio ? scrapers.reconcileRadio() : Promise.resolve(),
   ]);
 
   results.forEach((result, index) => {
     if (result.status === "rejected") {
+      const leg =
+        index === 0 ? "waze" : index === 1 ? "google_maps" : "radio";
       logger.warn("Cold-start scrape leg failed", {
         cityId: zone.id,
-        leg: index === 0 ? "waze" : "google_maps",
+        leg,
         error:
           result.reason instanceof Error
             ? result.reason.message

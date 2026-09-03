@@ -130,7 +130,7 @@ const ZONE_SEEDS: ZoneSeed[] = [
     id: "milton",
     name: "Milton",
     center: { lat: 43.5167, lng: -79.8833 },
-    enabled: false,
+    enabled: true,
     audio: {
       enabled: true,
       type: "hls",
