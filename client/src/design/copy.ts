@@ -15,7 +15,7 @@ export const FOOTER_TAGLINE = "Community-driven road safety";
 
 export const FILTER_PANEL_TITLE = "Filters";
 
-export const FILTER_PANEL_SUBTITLE = "Police alerts & preferences";
+export const FILTER_PANEL_SUBTITLE = "Sources, alert types & weather";
 
 export const SMS_PANEL_TITLE = "SMS alerts";
 

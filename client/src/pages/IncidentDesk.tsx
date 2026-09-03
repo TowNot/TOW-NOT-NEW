@@ -1,8 +1,8 @@
 import { useEffect } from "react";
 import { CollapsibleSection } from "../components/CollapsibleSection";
+import { DeskFiltersPanel } from "../components/DeskFiltersPanel";
 import { Header } from "../components/Header";
 import { IncidentFeed } from "../components/IncidentFeed";
-import { PoliceAlertsSettings } from "../components/PoliceAlertsSettings";
 import { SmsSettings } from "../components/SmsSettings";
 import {
   FILTER_PANEL_SUBTITLE,
@@ -82,10 +82,21 @@ export function IncidentDesk({ user }: { user?: ZoneUser | null }) {
         </div>
       ) : null}
       <div className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-3 px-4 pt-4 sm:px-5 sm:pt-6">
-        <CollapsibleSection title={FILTER_PANEL_TITLE} subtitle={FILTER_PANEL_SUBTITLE}>
-          <PoliceAlertsSettings
-            enabled={policeAlertsEnabled}
-            onToggle={togglePoliceAlerts}
+        <CollapsibleSection
+          title={FILTER_PANEL_TITLE}
+          subtitle={FILTER_PANEL_SUBTITLE}
+          defaultOpen
+        >
+          <DeskFiltersPanel
+            preferences={deskFilters}
+            onToggleAccidents={toggleAccidents}
+            onToggleIncidents={toggleIncidents}
+            onToggleSource={toggleSource}
+            policeAlertsEnabled={policeAlertsEnabled}
+            onTogglePoliceAlerts={togglePoliceAlerts}
+            zoneName={activeZone.name}
+            hasFireFeed={activeZone.hasFireFeed}
+            hasEmsFeed={activeZone.hasEmsFeed}
           />
         </CollapsibleSection>
         <CollapsibleSection title={SMS_PANEL_TITLE} subtitle={SMS_PANEL_SUBTITLE}>
@@ -97,9 +108,6 @@ export function IncidentDesk({ user }: { user?: ZoneUser | null }) {
       <IncidentFeed
         incidents={zoneIncidents}
         preferences={deskFilters}
-        onToggleAccidents={toggleAccidents}
-        onToggleIncidents={toggleIncidents}
-        onToggleSource={toggleSource}
         zoneName={activeZone.name}
         hasFireFeed={activeZone.hasFireFeed}
         hasEmsFeed={activeZone.hasEmsFeed}

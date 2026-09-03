@@ -23,7 +23,6 @@ export function Header({ connected, health, zoneId, onZoneChange }: HeaderProps)
               Live incident desk
             </p>
           </div>
-          <StaticRoadWeatherIndicator />
         </div>
 
         <nav className="flex min-w-0 flex-wrap items-center gap-2" aria-label="Status">
@@ -36,36 +35,6 @@ export function Header({ connected, health, zoneId, onZoneChange }: HeaderProps)
         </nav>
       </div>
     </header>
-  );
-}
-
-/** Decorative road-conditions cue; not wired to live data. */
-function StaticRoadWeatherIndicator() {
-  return (
-    <span
-      className="header-chip header-chip-dark hidden items-center gap-1.5 rounded-full px-2.5 py-1.5 text-gray-400 sm:inline-flex"
-      title="Road conditions — coming soon"
-      aria-label="Road conditions placeholder"
-      role="img"
-    >
-      <svg
-        width="14"
-        height="14"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-      >
-        <circle cx="12" cy="12" r="4" />
-        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-      </svg>
-      <span className="hidden font-mono text-[9px] uppercase tracking-[0.14em] sm:inline">
-        Roads
-      </span>
-    </span>
   );
 }
 
