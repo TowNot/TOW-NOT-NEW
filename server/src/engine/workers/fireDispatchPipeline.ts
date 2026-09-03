@@ -306,7 +306,7 @@ export class FireDispatchProcessor {
       }
     }
 
-    let audioUrl = this.incidentStore.getById(id)?.audioUrl;
+    let audioUrl = this.incidentStore.getById(id)?.audioUrl?.trim() || undefined;
     if (wav && wav.length > 44 && !audioUrl) {
       try {
         audioUrl = await saveFireDispatchAudio(wav, id);

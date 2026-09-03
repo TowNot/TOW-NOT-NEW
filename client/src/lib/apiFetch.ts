@@ -113,3 +113,15 @@ export function incidentStreamUrl(): string {
   const params = new URLSearchParams({ session: token });
   return `/api/incidents/stream?${params.toString()}`;
 }
+
+/** Same-origin media URLs cannot set x-alertnav-session; pass the token as `?session=`. */
+export function withDeviceSessionQuery(path: string): string {
+  const trimmed = path.trim();
+  if (!trimmed) return trimmed;
+  const token = getDeviceSessionToken();
+  if (!token) return trimmed;
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://alertnav.com";
+  const url = trimmed.startsWith("http") ? new URL(trimmed) : new URL(trimmed, origin);
+  url.searchParams.set("session", token);
+  return trimmed.startsWith("http") ? url.toString() : `${url.pathname}${url.search}`;
+}

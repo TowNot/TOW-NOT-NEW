@@ -85,7 +85,7 @@ export class IncidentStore extends EventEmitter {
       timestamp: primaryDetection?.detectedAt ?? existing?.timestamp ?? incident.timestamp,
       lastReportedAt: incident.lastReportedAt ?? existing?.lastReportedAt,
       provider: primaryDetection?.provider ?? existing?.provider ?? incident.provider,
-      audioUrl: incident.audioUrl ?? existing?.audioUrl,
+      audioUrl: incident.audioUrl?.trim() || existing?.audioUrl,
       reporterName: existing?.reporterName ?? incident.reporterName,
       googleMapsZoom: mergeGoogleMapsZoom(existing?.googleMapsZoom, incident.googleMapsZoom),
       rawType: mergeGoogleMapsRawType(existing?.rawType, incident.rawType),

@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import type { Incident, IncidentSeverity, IncidentSource } from "../types";
+import { withDeviceSessionQuery } from "../lib/apiFetch";
 import {
   formatDetectionClock,
   formatSourceDetectionLabel,
@@ -38,15 +40,8 @@ export function IncidentCard({ incident }: { incident: Incident }) {
           </p>
         ) : null}
         <SourceDetectionTimeline detections={detections} incident={incident} />
-        {incident.audioUrl ? (
-          <div className="mt-3">
-            <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.16em] text-orange-700">
-              Dispatch audio
-            </p>
-            <audio controls preload="none" className="h-8 w-full max-w-md">
-              <source src={incident.audioUrl} type="audio/wav" />
-            </audio>
-          </div>
+        {incident.source === "fire_dispatch" || incident.source === "ems" ? (
+          <DispatchAudioPlayer incidentId={incident.id} audioUrl={incident.audioUrl} />
         ) : null}
         <div className="mt-3 flex flex-wrap gap-2">
           <NavLink href={wazeUrl} label="Open in Waze" />
@@ -62,6 +57,53 @@ export function IncidentCard({ incident }: { incident: Incident }) {
         <p className="mt-1 uppercase tracking-widest">{incident.type.replaceAll("_", " ")}</p>
       </div>
     </article>
+  );
+}
+
+function DispatchAudioPlayer({
+  incidentId,
+  audioUrl,
+}: {
+  incidentId: string;
+  audioUrl?: string | null;
+}) {
+  const raw = audioUrl?.trim() ?? "";
+  const src = raw ? withDeviceSessionQuery(raw) : "";
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    console.log("[DispatchAudio]", { incidentId, audioUrl: raw || null, src: src || null });
+  }, [incidentId, raw, src]);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
+
+  if (!raw || failed) {
+    return (
+      <div className="mt-3">
+        <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.16em] text-orange-700">
+          Dispatch audio
+        </p>
+        <p className="font-mono text-[11px] text-gray-400">No Audio</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3">
+      <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.16em] text-orange-700">
+        Dispatch audio
+      </p>
+      <audio
+        controls
+        preload="metadata"
+        className="h-8 w-full max-w-md"
+        onError={() => setFailed(true)}
+      >
+        <source src={src} type="audio/wav" />
+      </audio>
+    </div>
   );
 }
 
