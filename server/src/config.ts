@@ -147,7 +147,7 @@ export const config = {
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET?.trim() || "",
   stripeCheckoutUrl:
     process.env.STRIPE_CHECKOUT_URL?.trim() ||
-    "https://buy.stripe.com/5kQbJ0eL3ahB6ax6dc8Vi00",
+    "https://buy.stripe.com/bJedR832lcpJ42p5988Vi03",
   clerkPublishableKey:
     process.env.CLERK_PUBLISHABLE_KEY?.trim() ||
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim() ||

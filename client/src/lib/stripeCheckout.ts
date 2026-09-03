@@ -1,6 +1,6 @@
-/** Monthly Payment Link — default when no Vite env override is set. */
+/** TEMP: 1-day Stripe test Payment Link (replaces live $59.99 monthly). */
 export const STRIPE_CHECKOUT_URL_MONTHLY =
-  "https://buy.stripe.com/fZucN4cCVfBV42p8lk8Vi01";
+  "https://buy.stripe.com/bJedR832lcpJ42p5988Vi03";
 
 /** Yearly Payment Link. */
 export const STRIPE_CHECKOUT_URL_YEARLY =
@@ -21,10 +21,7 @@ export function resolveStripeCheckoutUrl(billing: BillingInterval = "monthly"): 
     if (fromEnv) return fromEnv;
     return STRIPE_CHECKOUT_URL_YEARLY;
   }
-  const fromEnv =
-    import.meta.env.VITE_STRIPE_CHECKOUT_URL?.trim() ??
-    import.meta.env.VITE_STRIPE_CHECKOUT_URL_MONTHLY?.trim();
-  if (fromEnv) return fromEnv;
+  // TEMP: ignore VITE_STRIPE_CHECKOUT_URL so a stale Railway env cannot keep the $59.99 link live.
   return STRIPE_CHECKOUT_URL_MONTHLY;
 }
 
