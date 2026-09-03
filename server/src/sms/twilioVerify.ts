@@ -63,6 +63,25 @@ function normalizePhone(raw: string): string {
   return phone;
 }
 
+function twilioVerifyUserMessage(error: unknown, fallback: string): string {
+  const message =
+    error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  const lower = message.toLowerCase();
+  if (lower.includes("max") && lower.includes("attempt")) {
+    return "Too many attempts — wait a few minutes and try again";
+  }
+  if (lower.includes("invalid parameter") || lower.includes("invalid 'to'")) {
+    return "Enter a valid mobile number that can receive SMS";
+  }
+  if (lower.includes("not found") || lower.includes("was not found")) {
+    return "SMS verification service is not available — try again later";
+  }
+  if (lower.includes("authenticate") || lower.includes("unauthorized")) {
+    return "SMS verification is not configured on the server";
+  }
+  return fallback;
+}
+
 /** Send a one-time verification code via Twilio Verify (SMS). */
 export async function sendSmsVerificationCode(rawPhone: string): Promise<{ phone: string }> {
   assertVerifyReady();
@@ -80,16 +99,28 @@ export async function sendSmsVerificationCode(rawPhone: string): Promise<{ phone
     throw new Error("SMS verification is not configured on the server");
   }
 
-  const verification = await twilio.verify.v2
-    .services(config.twilioVerifyServiceSid)
-    .verifications.create({ to: phone, channel: "sms" });
+  try {
+    const verification = await twilio.verify.v2
+      .services(config.twilioVerifyServiceSid)
+      .verifications.create({ to: phone, channel: "sms" });
 
-  if (verification.status !== "pending") {
-    throw new Error("Unable to send verification code — try again in a moment");
+    const status = (verification.status ?? "").toLowerCase();
+    if (status === "canceled" || status === "failed" || status === "undelivered") {
+      throw new Error("Unable to send verification code — try again in a moment");
+    }
+
+    lastSendByPhone.set(phone, Date.now());
+    logger.info("[Twilio Verify] sent SMS code", { phone, status: status || "pending" });
+    return { phone };
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("Wait ")) throw error;
+    if (error instanceof Error && error.message.startsWith("Unable to send")) throw error;
+    logger.warn("[Twilio Verify] send failed", {
+      phone,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw new Error(twilioVerifyUserMessage(error, "Unable to send verification code — try again in a moment"));
   }
-
-  lastSendByPhone.set(phone, Date.now());
-  return { phone };
 }
 
 /** Confirm OTP; returns normalized E.164 when approved. */
@@ -109,14 +140,24 @@ export async function verifySmsVerificationCode(
     throw new Error("SMS verification is not configured on the server");
   }
 
-  const check = await twilio.verify.v2
-    .services(config.twilioVerifyServiceSid)
-    .verificationChecks.create({ to: phone, code });
+  try {
+    const check = await twilio.verify.v2
+      .services(config.twilioVerifyServiceSid)
+      .verificationChecks.create({ to: phone, code });
 
-  if (check.status !== "approved") {
-    throw new Error("Invalid or expired verification code");
+    if (check.status !== "approved") {
+      throw new Error("Invalid or expired verification code");
+    }
+
+    lastSendByPhone.delete(phone);
+    logger.info("[Twilio Verify] phone verified", { phone });
+    return { phone };
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("Invalid or expired")) throw error;
+    logger.warn("[Twilio Verify] check failed", {
+      phone,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw new Error(twilioVerifyUserMessage(error, "Invalid or expired verification code"));
   }
-
-  lastSendByPhone.delete(phone);
-  return { phone };
 }

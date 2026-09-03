@@ -45,10 +45,14 @@ export function SmsSettings() {
     }
     void apiFetch("/api/sms/status")
       .then(async (res) => {
-        if (res.status === 401) {
+        if (res.status === 401 || res.status === 403) {
           setConfigured(null);
           setVerifyConfigured(null);
-          setError("Sign in to manage SMS alerts");
+          setError(
+            res.status === 403
+              ? "An active subscription is required to manage SMS alerts"
+              : "Sign in to manage SMS alerts",
+          );
           return;
         }
         const body = (await res.json()) as { configured?: boolean; verifyConfigured?: boolean };
@@ -97,6 +101,9 @@ export function SmsSettings() {
       if (response.status === 401) {
         throw new Error("Sign in to manage SMS alerts");
       }
+      if (response.status === 403) {
+        throw new Error("An active subscription is required to manage SMS alerts");
+      }
       if (!response.ok || !body.phone) {
         throw new Error(body.error ?? "Unable to save phone number");
       }
@@ -113,27 +120,50 @@ export function SmsSettings() {
     }
   };
 
+  const requestCode = async (rawPhone: string) => {
+    const response = await apiFetch("/api/sms/verify/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone: rawPhone }),
+    });
+    const body = (await response.json()) as { phone?: string; error?: string };
+    if (response.status === 401) {
+      throw new Error("Sign in to manage SMS alerts");
+    }
+    if (response.status === 403) {
+      throw new Error("An active subscription is required to manage SMS alerts");
+    }
+    if (!response.ok || !body.phone) {
+      throw new Error(body.error ?? "Unable to send verification code");
+    }
+    setPendingPhone(body.phone);
+    setPhone(body.phone);
+    setStep("verify");
+    setMessage(`Verification code sent to ${body.phone}`);
+  };
+
   const onSendCode = async (event: FormEvent) => {
     event.preventDefault();
     setBusy(true);
     setError(null);
     setMessage(null);
     try {
-      const response = await apiFetch("/api/sms/verify/start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone }),
-      });
-      const body = (await response.json()) as { phone?: string; error?: string };
-      if (response.status === 401) {
-        throw new Error("Sign in to manage SMS alerts");
-      }
-      if (!response.ok || !body.phone) {
-        throw new Error(body.error ?? "Unable to send verification code");
-      }
-      setPendingPhone(body.phone);
-      setStep("verify");
-      setMessage(`Verification code sent to ${body.phone}`);
+      await requestCode(phone);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to send verification code");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onResendCode = async () => {
+    const target = pendingPhone || phone;
+    if (!target) return;
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      await requestCode(target);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to send verification code");
     } finally {
@@ -159,6 +189,9 @@ export function SmsSettings() {
       };
       if (response.status === 401) {
         throw new Error("Sign in to manage SMS alerts");
+      }
+      if (response.status === 403) {
+        throw new Error("An active subscription is required to manage SMS alerts");
       }
       if (!response.ok || !body.phone) {
         throw new Error(body.error ?? "Unable to save phone number");
@@ -191,6 +224,9 @@ export function SmsSettings() {
       const body = (await response.json()) as { error?: string };
       if (response.status === 401) {
         throw new Error("Sign in to manage SMS alerts");
+      }
+      if (response.status === 403) {
+        throw new Error("An active subscription is required to manage SMS alerts");
       }
       if (!response.ok) {
         throw new Error(body.error ?? "Unable to remove phone number");
@@ -327,6 +363,14 @@ export function SmsSettings() {
             className="rounded-md bg-gray-900 px-3 py-2 text-xs font-semibold tracking-wide text-white hover:bg-black disabled:opacity-60"
           >
             {busy ? "Confirming…" : "Confirm & subscribe"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void onResendCode()}
+            disabled={busy}
+            className="rounded-md border border-line bg-white px-3 py-2 text-xs font-medium tracking-wide text-gray-700 hover:border-gray-400 disabled:opacity-60"
+          >
+            Resend code
           </button>
           <button
             type="button"
