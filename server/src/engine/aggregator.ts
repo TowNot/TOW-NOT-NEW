@@ -1,7 +1,7 @@
 import { config } from "../config";
 import { logger } from "../logger";
 import { enabledCoverageZones } from "./coverageZones";
-import { LONDON_ONLY_INGEST, LONDON_ZONE_ID } from "./londonOnly";
+import { LONDON_ONLY_INGEST } from "./londonOnly";
 import { GoogleMapsTrafficPoller } from "./pollers/googleMapsPoller";
 import { TorontoFireCadPoller } from "./pollers/torontoFireCadPoller";
 import { WazeTrafficPoller } from "./pollers/wazePoller";
@@ -19,14 +19,14 @@ export class DataAggregatorEngine {
     const enabled = enabledCoverageZones();
     logger.info("[WAZE API] starting BlocksInside 4-tile Waze scraper", {
       londonOnly: LONDON_ONLY_INGEST,
-      activeZone: LONDON_ZONE_ID,
+      prismaDemandedCities: true,
       wazeApi: Boolean(config.wazeApiKey),
       twilio: Boolean(config.twilioAccountSid && config.twilioAuthToken),
       publicUrl: config.publicUrl,
       filter: '["ACCIDENT","POLICE"]',
       country: config.wazeApiCountry,
       tilesPerCity: 4,
-      cities: enabled.map((zone) => zone.id),
+      radioZones: enabled.map((zone) => zone.id),
       zones: enabled.map((zone) => ({
         id: zone.id,
         box: `${zone.bounds.southWest.lat}, ${zone.bounds.southWest.lng} .. ${zone.bounds.northEast.lat}, ${zone.bounds.northEast.lng}`,
@@ -45,8 +45,8 @@ export class DataAggregatorEngine {
     // CAD no-ops under London-only / when TORONTO_FIRE_CAD_ENABLED is off.
     this.torontoFireCad.start();
     logger.info(
-      "Data aggregator engine running (London-only ingest unless LONDON_ONLY_INGEST=0)",
-      { cities: enabled.map((z) => z.id) },
+      "Data aggregator engine running (Waze/GMaps follow Prisma selectedCity demand)",
+      { radioZones: enabled.map((z) => z.id), londonOnly: LONDON_ONLY_INGEST },
     );
   }
 

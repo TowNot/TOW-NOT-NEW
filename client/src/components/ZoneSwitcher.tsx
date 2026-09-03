@@ -39,7 +39,7 @@ export function ZoneSwitcher({
               ? "max-w-[14rem] bg-transparent text-sm font-semibold text-white outline-none sm:max-w-none"
               : "max-w-[14rem] bg-transparent text-sm font-semibold text-cobalt outline-none sm:max-w-none"
           }
-          aria-label="Active coverage zone"
+          aria-label="Active city (one at a time)"
         >
           {zones.map((zone) => (
             <option key={zone.id} value={zone.id}>

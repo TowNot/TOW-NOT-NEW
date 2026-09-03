@@ -77,8 +77,8 @@ function boundsFromCenter(center: { lat: number; lng: number }): CoverageZoneDef
 import { isIngestZoneAllowed } from "./londonOnly";
 
 function buildZone(seed: ZoneSeed): CoverageZoneDef {
-  // London-only lock (default on) + seed.enabled. Flip LONDON_ONLY_INGEST=0 then
-  // set seed.enabled=true to resume a city without deleting its config.
+  // seed.enabled + optional LONDON_ONLY_INGEST=1 lock radio/CAD only.
+  // Waze/GMaps demand is Prisma selectedCity (activeMonitoredCities).
   const enabled = isIngestZoneAllowed(seed.id) && seed.enabled === true;
   let audio = seed.audio ?? null;
   // Keep feedId/URL for later, but pause audio so radio never starts while zone is off.
@@ -97,14 +97,13 @@ function buildZone(seed: ZoneSeed): CoverageZoneDef {
 }
 
 /**
- * Southern Ontario coverage catalog.
- * STRICT LONDON-ONLY ops: only `london` is ingest-enabled (Waze + GMaps + Fire HLS).
- * Other cities keep centers / feed IDs / stream URLs but zone.enabled=false and
- * audio.enabled is forced off in buildZone until you deliberately scale up.
- * Master lock: server/src/engine/londonOnly.ts (LONDON_ONLY_INGEST, default on).
+ * Southern Ontario coverage catalog (geometry + optional radio feeds).
+ * Waze / Google Maps scraping is demand-driven from Prisma `selectedCity`
+ * (see activeMonitoredCities) — not from seed.enabled.
+ * seed.enabled still gates radio/CAD only (plus optional LONDON_ONLY_INGEST).
  */
 const ZONE_SEEDS: ZoneSeed[] = [
-  // ── Active (London only) ────────────────────────────────────────────
+  // ── Catalog (scrapers follow user profiles; radio uses enabled) ─────
   {
     id: "london",
     name: "London",
@@ -118,7 +117,15 @@ const ZONE_SEEDS: ZoneSeed[] = [
     },
     scannedAgencies: ["Fire", "Public Works"],
   },
-  // ── Paused cities (enabled: false — retained, zero scrape/radio) ────
+  {
+    id: "brampton",
+    name: "Brampton",
+    center: { lat: 43.6833, lng: -79.7667 },
+    enabled: true,
+    audio: hlsPending("Brampton Fire (feed TBD)"),
+    scannedAgencies: [],
+  },
+  // ── Other catalog cities (Waze/GMaps when selectedCity demands them) ─
   {
     id: "milton",
     name: "Milton",
@@ -333,14 +340,6 @@ const ZONE_SEEDS: ZoneSeed[] = [
     center: { lat: 43.589, lng: -79.6441 },
     enabled: false,
     audio: hlsPending("Mississauga Fire (feed TBD)"),
-    scannedAgencies: [],
-  },
-  {
-    id: "brampton",
-    name: "Brampton",
-    center: { lat: 43.6833, lng: -79.7667 },
-    enabled: false,
-    audio: hlsPending("Brampton Fire (feed TBD)"),
     scannedAgencies: [],
   },
   {

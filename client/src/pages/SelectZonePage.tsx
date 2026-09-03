@@ -32,11 +32,11 @@ export function SelectZonePage({ user }: { user?: ZoneUser | null }) {
       <main className="mx-auto max-w-5xl min-w-0 px-4 py-8 sm:px-5 sm:py-12 md:py-16">
         <p className="section-label">Get started</p>
         <h1 className="mt-3 max-w-2xl text-3xl font-bold tracking-tight text-foreground sm:text-4xl md:text-5xl">
-          Choose your coverage zone
+          Choose your city
         </h1>
         <p className="mt-4 max-w-xl text-base text-muted sm:text-lg">
-          Alerts and the live map will focus on the city you pick. You can switch anytime from the
-          dashboard.
+          Pick one city. Scraping, push alerts, and the live feed follow that city — switch anytime
+          from the dashboard.
         </p>
 
         <ul className="mt-8 grid gap-3 sm:mt-12 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">

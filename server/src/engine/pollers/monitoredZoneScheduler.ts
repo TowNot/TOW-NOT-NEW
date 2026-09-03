@@ -1,18 +1,17 @@
 import { logger } from "../../logger";
-import type { ZoneSchedulerHandle } from "./staggeredZoneScheduler";
-import {
-  startStaggeredZoneSchedulers,
-  ZONE_SCHEDULER_STAGGER_MS,
-} from "./staggeredZoneScheduler";
 
-export type { ZoneSchedulerHandle };
-export { ZONE_SCHEDULER_STAGGER_MS };
+export interface ZoneSchedulerHandle {
+  stop(): void;
+}
 
-const REFRESH_MS = 60_000;
+/** Delay between cities within one poll cycle so APIs are not burst together. */
+export const ZONE_SCHEDULER_STAGGER_MS = 175;
 
 /**
- * Starts one timer per monitored zone and refreshes the zone list every ~60s
- * from Postgres user selections (cached in getActiveMonitoredCities).
+ * Single interval that, at the start of every cycle:
+ * 1. Resolves demanded zones (fresh Prisma selectedCity query via resolveZones)
+ * 2. Runs the scraper only for those cities
+ * 3. Skips entirely when the list is empty (zero-user cities sleep)
  */
 export function startMonitoredZoneScheduler<T extends { id: string }>(opts: {
   label: string;
@@ -20,60 +19,74 @@ export function startMonitoredZoneScheduler<T extends { id: string }>(opts: {
   resolveZones: () => Promise<T[]>;
   run: (zone: T) => Promise<void>;
 }): ZoneSchedulerHandle {
-  let scheduler: ZoneSchedulerHandle | null = null;
-  let lastKey = "";
-  let refreshTimer: NodeJS.Timeout | null = null;
+  let timer: NodeJS.Timeout | null = null;
+  let stopped = false;
+  let cycleInFlight = false;
 
-  const reconcile = async (): Promise<void> => {
-    const zones = await opts.resolveZones();
-    const key = zones.map((zone) => zone.id).sort().join(",");
-    if (key === lastKey && scheduler) return;
-
-    lastKey = key;
-    scheduler?.stop();
-
-    if (zones.length === 0) {
-      logger.info(`${opts.label} monitored scheduler idle — no active cities`);
+  const tick = async (): Promise<void> => {
+    if (stopped || cycleInFlight) {
+      if (cycleInFlight) {
+        logger.debug(`${opts.label} poll skipped: previous cycle still running`);
+      }
       return;
     }
 
-    logger.info(`${opts.label} monitored scheduler zones`, {
-      cities: zones.map((zone) => zone.id),
-    });
+    cycleInFlight = true;
+    try {
+      const zones = await opts.resolveZones();
+      if (zones.length === 0) {
+        logger.debug(`${opts.label} cycle idle — no cities with user profiles`);
+        return;
+      }
 
-    scheduler = startStaggeredZoneSchedulers({
-      label: opts.label,
-      zones,
-      intervalMs: opts.intervalMs,
-      zoneId: (zone) => zone.id,
-      run: opts.run,
-    });
-  };
+      logger.debug(`${opts.label} cycle cities from Prisma`, {
+        cities: zones.map((zone) => zone.id),
+      });
 
-  void reconcile().catch((error) => {
-    logger.warn(`${opts.label} initial monitored scheduler reconcile failed`, {
-      error: error instanceof Error ? error.message : String(error),
-    });
-  });
-
-  refreshTimer = setInterval(() => {
-    void reconcile().catch((error) => {
-      logger.warn(`${opts.label} monitored scheduler refresh failed`, {
+      for (let i = 0; i < zones.length; i++) {
+        if (stopped) return;
+        const zone = zones[i]!;
+        if (i > 0) {
+          await sleep(ZONE_SCHEDULER_STAGGER_MS);
+        }
+        try {
+          await opts.run(zone);
+        } catch (error) {
+          logger.warn(`${opts.label} zone cycle failed (isolated)`, {
+            zone: zone.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    } catch (error) {
+      logger.warn(`${opts.label} monitored cycle failed`, {
         error: error instanceof Error ? error.message : String(error),
       });
-    });
-  }, REFRESH_MS);
-  refreshTimer.unref();
+    } finally {
+      cycleInFlight = false;
+    }
+  };
+
+  void tick();
+  timer = setInterval(() => {
+    void tick();
+  }, opts.intervalMs);
+  timer.unref();
 
   return {
     stop() {
-      if (refreshTimer) {
-        clearInterval(refreshTimer);
-        refreshTimer = null;
+      stopped = true;
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
       }
-      scheduler?.stop();
-      scheduler = null;
-      lastKey = "";
     },
   };
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    const t = setTimeout(resolve, ms);
+    t.unref();
+  });
 }

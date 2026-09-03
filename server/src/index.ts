@@ -9,6 +9,7 @@ import { applyClientAssets, applyTerminalHandlers, createApp } from "./app";
 import { config } from "./config";
 import { PushDispatcher } from "./dispatch/pushDispatcher";
 import { DataAggregatorEngine } from "./engine/aggregator";
+import { registerCityDemandScrapers } from "./engine/cityColdStart";
 import { isGoogleMapsClusterUpgrade } from "./engine/googleMaps/clusterUpgrade";
 import {
   googleMapsNotificationBlockReason,
@@ -105,6 +106,11 @@ const googleMaps = new GoogleMapsTrafficPoller(store);
 const radio = new RadioIngestionWorker(store);
 const torontoFireCad = new TorontoFireCadPoller(store);
 const engine = new DataAggregatorEngine(waze, googleMaps, radio, torontoFireCad);
+
+registerCityDemandScrapers({
+  pollWazeZone: (zone) => waze.pollZone(zone),
+  pollGoogleMapsCity: (city) => googleMaps.pollCity(city),
+});
 
 store.on("created", (incident) => {
   if (!shouldNotifyIncident(incident, store)) {

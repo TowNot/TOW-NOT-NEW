@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { config } from "../config";
 import { getProviderRuntimeStats } from "../engine/wazeAggregator";
+import { getActiveMonitoredCities } from "../engine/activeMonitoredCities";
 import { enabledCoverageZones, zoneToBoundingBox } from "../engine/coverageZones";
 import { LONDON_ONLY_INGEST, LONDON_ZONE_ID } from "../engine/londonOnly";
 import { zonePublicSummaries } from "../engine/zones.config";
@@ -18,6 +19,7 @@ async function buildSourcesStatusPayload(store: IncidentStore) {
   const active = store.getActive();
   const providers = getProviderRuntimeStats();
   const blocksinside = providers.blocksinside;
+  const demandedCities = await getActiveMonitoredCities();
 
   const bySource = (source: IncidentSource) =>
     store.getActive().filter((incident) => incident.source === source);
@@ -25,7 +27,9 @@ async function buildSourcesStatusPayload(store: IncidentStore) {
   return {
     checkedAt: new Date().toISOString(),
     londonOnly: LONDON_ONLY_INGEST,
-    activeIngestZones: enabledCoverageZones().map((z) => z.id),
+    demandedCities,
+    activeIngestZones: demandedCities,
+    radioZones: enabledCoverageZones().map((z) => z.id),
     activeZone: LONDON_ONLY_INGEST ? LONDON_ZONE_ID : null,
     pollCenter: {
       lat: config.londonLat,
@@ -123,13 +127,20 @@ export function createSourcesRouter(store: IncidentStore): Router {
     store.getActive().filter((incident) => incident.source === source);
 
   /** Zone catalog for the Live Desk — includes scannedAgencies for UI tags. */
-  router.get("/zones", (_req, res) => {
-    res.json({
-      checkedAt: new Date().toISOString(),
-      londonOnly: LONDON_ONLY_INGEST,
-      activeIngestZones: enabledCoverageZones().map((z) => z.id),
-      zones: zonePublicSummaries(),
-    });
+  router.get("/zones", async (_req, res, next) => {
+    try {
+      const demandedCities = await getActiveMonitoredCities();
+      res.json({
+        checkedAt: new Date().toISOString(),
+        londonOnly: LONDON_ONLY_INGEST,
+        demandedCities,
+        activeIngestZones: demandedCities,
+        radioZones: enabledCoverageZones().map((z) => z.id),
+        zones: zonePublicSummaries(),
+      });
+    } catch (error) {
+      next(error);
+    }
   });
 
   router.get("/waze", (_req, res) => {

@@ -1,7 +1,7 @@
 import { fetch as undiciFetch } from "undici";
 import { config } from "../config";
 import { boundingBox, distanceKm, splitBoundingBox, type BoundingBox } from "./geo";
-import { enabledCoverageZones, zoneToBoundingBox } from "./coverageZones";
+import { enabledCoverageZones, getCoverageZone, zoneToBoundingBox } from "./coverageZones";
 import { getProxyAgent, keepAliveFetch } from "./httpFetch";
 import { logger } from "./pinoCompat";
 import { extractReporterName } from "./reporterName";
@@ -1226,7 +1226,7 @@ export async function fetchBlocksInsideForZone(zone: {
   id: string;
   name: string;
 }): Promise<WazeAlert[]> {
-  const match = enabledCoverageZones().find((candidate) => candidate.id === zone.id);
+  const match = getCoverageZone(zone.id);
   const box = match ? zoneToBoundingBox(match) : londonBlocksInsideBox();
   try {
     const alerts = await fetchBlocksInsideBox(box);

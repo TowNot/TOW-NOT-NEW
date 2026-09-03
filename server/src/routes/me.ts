@@ -1,12 +1,12 @@
 import { clerkClient, getAuth } from "@clerk/express";
 import { Router } from "express";
-import { enabledCoverageZones, isKnownCityId } from "../engine/coverageZones";
+import { countUsersSelectingCity } from "../engine/activeMonitoredCities";
+import { coldStartCityScrape } from "../engine/cityColdStart";
+import { isKnownCityId } from "../engine/coverageZones";
 import { logger } from "../logger";
 import { upsertUserSelectedCity } from "../store/userPreferenceStore";
 
-/** Only zones that are ingest-enabled (London-only today). */
-const ENABLED_ZONE_IDS = new Set(enabledCoverageZones().map((zone) => zone.id));
-
+/** Any catalog city may be selected — scrapers follow Prisma demand. */
 export function createMeRouter(): Router {
   const router = Router();
 
@@ -20,17 +20,16 @@ export function createMeRouter(): Router {
 
       const selectedZoneId =
         typeof req.body?.selectedZoneId === "string" ? req.body.selectedZoneId.trim() : "";
-      if (!ENABLED_ZONE_IDS.has(selectedZoneId)) {
+      if (!isKnownCityId(selectedZoneId)) {
         res.status(400).json({
-          error: "Zone not available (London-only mode)",
-          allowed: [...ENABLED_ZONE_IDS],
+          error: "Unknown zone id",
+          selectedZoneId,
         });
         return;
       }
 
-      if (isKnownCityId(selectedZoneId)) {
-        await upsertUserSelectedCity(auth.userId, selectedZoneId);
-      }
+      const usersAlreadyOnCity = await countUsersSelectingCity(selectedZoneId);
+      await upsertUserSelectedCity(auth.userId, selectedZoneId);
 
       const existing = await clerkClient.users.getUser(auth.userId);
       const nextMeta = { ...(existing.publicMetadata ?? {}), selectedZoneId };
@@ -40,7 +39,16 @@ export function createMeRouter(): Router {
         publicMetadata: nextMeta,
       });
 
-      res.json({ ok: true, selectedZoneId });
+      if (usersAlreadyOnCity === 0) {
+        void coldStartCityScrape(selectedZoneId).catch((error) => {
+          logger.warn("Cold-start scrape failed", {
+            selectedZoneId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
+      }
+
+      res.json({ ok: true, selectedZoneId, coldStart: usersAlreadyOnCity === 0 });
     } catch (error) {
       logger.warn("Failed to persist selectedZoneId on Clerk publicMetadata", {
         error: error instanceof Error ? error.message : String(error),

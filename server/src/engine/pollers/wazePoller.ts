@@ -100,8 +100,7 @@ export class WazeTrafficPoller {
     logger.info("Live traffic aggregator started", {
       intervalMs: config.pollIntervalMs,
       staggerMs: ZONE_SCHEDULER_STAGGER_MS,
-      independentZoneTimers: true,
-      userMonitoredCities: true,
+      prismaDemandedCities: true,
       providers: LIVE_WAZE_PROVIDERS.filter((p) => p === "blocksinside" && config.wazeApiKey),
       wazeApiConfigured: Boolean(config.wazeApiKey),
       filter: '["ACCIDENT","POLICE"]',

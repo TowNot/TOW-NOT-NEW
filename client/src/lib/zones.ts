@@ -295,7 +295,7 @@ function buildClientZone(seed: ZoneSeed): CoverageZone {
 
 export const COVERAGE_ZONES: CoverageZone[] = ZONE_SEEDS.map(buildClientZone);
 
-/** Desk / onboarding city picker — full coverage catalog. */
+/** Desk / onboarding city picker — full coverage catalog (one city at a time). */
 export function selectableCoverageZones(): CoverageZone[] {
   return COVERAGE_ZONES;
 }

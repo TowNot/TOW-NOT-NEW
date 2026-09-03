@@ -1,10 +1,10 @@
 import { config } from "../../config";
 import { boundingBox, distanceKm, splitBoundingBox, type BoundingBox } from "../geo";
 import {
-  enabledCoverageZones,
   getMonitoredCoverageZones,
   zoneCenter,
   zoneToBoundingBox,
+  type CoverageZoneDef,
 } from "../coverageZones";
 import { logger } from "../../logger";
 import type { Incident, IncidentSeverity } from "../../types/incident";
@@ -83,11 +83,8 @@ export interface GoogleMapsCity {
   box?: BoundingBox;
 }
 
-/** OpenWebNinja Google Maps is London-only, even if other zones are enabled. */
-const GOOGLE_MAPS_ZONE_IDS = new Set(["london"]);
-
-function coverageZoneToGoogleMapsCity(
-  zone: ReturnType<typeof enabledCoverageZones>[number],
+export function coverageZoneToGoogleMapsCity(
+  zone: CoverageZoneDef,
 ): GoogleMapsCity {
   const box = zoneToBoundingBox(zone);
   const center = zoneCenter(zone);
@@ -101,16 +98,10 @@ function coverageZoneToGoogleMapsCity(
   };
 }
 
-export const GOOGLE_MAPS_CITIES: GoogleMapsCity[] = enabledCoverageZones()
-  .filter((zone) => GOOGLE_MAPS_ZONE_IDS.has(zone.id))
-  .map(coverageZoneToGoogleMapsCity);
-
-/** Cities selected by active users that OpenWebNinja supports. */
+/** Cities selected in user profiles — full catalog geometry, no static allowlist. */
 export async function getMonitoredGoogleMapsCities(): Promise<GoogleMapsCity[]> {
   const zones = await getMonitoredCoverageZones();
-  return zones
-    .filter((zone) => GOOGLE_MAPS_ZONE_IDS.has(zone.id))
-    .map(coverageZoneToGoogleMapsCity);
+  return zones.map(coverageZoneToGoogleMapsCity);
 }
 
 export interface OpenWebNinjaGoogleMapsRuntime {
@@ -791,8 +782,9 @@ export async function fetchOpenWebNinjaGoogleMapsForCity(
 }
 
 export async function fetchAllOpenWebNinjaGoogleMapsCities(): Promise<Incident[]> {
+  const cities = await getMonitoredGoogleMapsCities();
   const batches = await Promise.allSettled(
-    GOOGLE_MAPS_CITIES.map((city) => fetchOpenWebNinjaGoogleMapsForCity(city)),
+    cities.map((city) => fetchOpenWebNinjaGoogleMapsForCity(city)),
   );
   const merged: Incident[] = [];
   for (const result of batches) {

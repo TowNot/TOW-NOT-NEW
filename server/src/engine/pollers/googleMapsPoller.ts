@@ -54,8 +54,7 @@ export class GoogleMapsTrafficPoller {
     logger.info("[GOOGLE MAPS] starting OpenWebNinja city poller", {
       intervalMs: GOOGLE_MAPS_POLL_INTERVAL_MS,
       staggerMs: ZONE_SCHEDULER_STAGGER_MS,
-      independentZoneTimers: true,
-      userMonitoredCities: true,
+      prismaDemandedCities: true,
       zooms: GOOGLE_MAPS_ZOOM_LEVELS.join("-"),
       tilesPerCity: "4 @ Z11–14; dynamic @ Z15",
       fetchConcurrency: 8,

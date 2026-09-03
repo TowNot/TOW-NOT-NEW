@@ -1,5 +1,7 @@
 import { clerkClient, getAuth } from "@clerk/express";
 import { Router } from "express";
+import { countUsersSelectingCity } from "../engine/activeMonitoredCities";
+import { coldStartCityScrape } from "../engine/cityColdStart";
 import { isKnownCityId } from "../engine/coverageZones";
 import { logger } from "../logger";
 import { readSessionTokenFromRequest, SESSION_REPLACED_MESSAGE } from "../lib/sessionToken";
@@ -90,6 +92,9 @@ export function createUserRouter(): Router {
         return;
       }
 
+      // Count before upsert — 0 means this switch wakes a sleeping city.
+      const usersAlreadyOnCity = await countUsersSelectingCity(selectedCity);
+
       await upsertUserSelectedCity(auth.userId, selectedCity);
 
       const user = await clerkClient.users.getUser(auth.userId);
@@ -121,7 +126,16 @@ export function createUserRouter(): Router {
         publicMetadata: nextMeta,
       });
 
-      res.json({ ok: true, selectedCity });
+      if (usersAlreadyOnCity === 0) {
+        void coldStartCityScrape(selectedCity).catch((error) => {
+          logger.warn("Cold-start scrape failed", {
+            selectedCity,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
+      }
+
+      res.json({ ok: true, selectedCity, coldStart: usersAlreadyOnCity === 0 });
     } catch (error) {
       logger.warn("Failed to persist selected city", {
         error: error instanceof Error ? error.message : String(error),

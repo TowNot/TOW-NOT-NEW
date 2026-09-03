@@ -3,14 +3,28 @@ import { getActiveMonitoredCities, normalizeCityId } from "./activeMonitoredCiti
 import { isIngestZoneAllowed } from "./londonOnly";
 import {
   COVERAGE_ZONES,
+  getCoverageZone,
   type CoverageZoneDef,
 } from "./zones.config";
 
-export { COVERAGE_ZONES, COVERAGE_ZONE_IDS, type CoverageZoneDef } from "./zones.config";
+export {
+  COVERAGE_ZONES,
+  COVERAGE_ZONE_IDS,
+  getCoverageZone,
+  type CoverageZoneDef,
+} from "./zones.config";
 
 /**
- * Zones that may be scraped / radio-listened right now.
- * Honors zone.enabled AND the London-only ingest lock.
+ * Full catalog — geometry for every supported city.
+ * Waze/GMaps demand comes from Prisma selectedCity, not seed.enabled.
+ */
+export function catalogCoverageZones(): CoverageZoneDef[] {
+  return COVERAGE_ZONES;
+}
+
+/**
+ * Zones whose radio/CAD may run (seed.enabled + optional London-only lock).
+ * Does not gate Waze / Google Maps scrapers.
  */
 export function enabledCoverageZones(): CoverageZoneDef[] {
   return COVERAGE_ZONES.filter(
@@ -32,9 +46,9 @@ export function zoneCenter(zone: CoverageZoneDef): { lat: number; lng: number } 
   };
 }
 
-/** Resolve which enabled coverage zone contains a coordinate, if any. */
+/** Resolve which catalog coverage zone contains a coordinate, if any. */
 export function zoneIdForCoordinates(lat: number, lng: number): string | null {
-  for (const zone of enabledCoverageZones()) {
+  for (const zone of catalogCoverageZones()) {
     const { southWest, northEast } = zone.bounds;
     if (
       lat >= southWest.lat &&
@@ -78,10 +92,18 @@ export function zoneFirePushTag(zoneId: string): string {
   return `zone-${zoneId}-fire`;
 }
 
-/** Coverage zones that are both ingest-enabled and selected by active users. */
+/**
+ * Coverage zones demanded by live user profiles (fresh Prisma each call).
+ * Catalog geometry only — ignores seed.enabled so any selected city can scrape.
+ */
 export async function getMonitoredCoverageZones(): Promise<CoverageZoneDef[]> {
-  const active = new Set(await getActiveMonitoredCities());
-  return enabledCoverageZones().filter((zone) => active.has(zone.id));
+  const active = await getActiveMonitoredCities();
+  const zones: CoverageZoneDef[] = [];
+  for (const id of active) {
+    const zone = getCoverageZone(id);
+    if (zone) zones.push(zone);
+  }
+  return zones;
 }
 
 /** Validate a client-provided city id against the full catalog. */
