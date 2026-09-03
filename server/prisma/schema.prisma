@@ -20,6 +20,8 @@ model Subscription {
   stripeCustomerId     String?              @unique @map("stripe_customer_id")
   stripeSubscriptionId String?              @unique @map("stripe_subscription_id")
   clientReferenceId    String?              @map("client_reference_id")
+  /** Sticky — set on first checkout, never cleared when the subscription is canceled. */
+  trialUsed            Boolean              @default(false) @map("trial_used")
   selectedCity         String               @default("london") @map("selected_city")
   createdAt            DateTime             @default(now()) @map("created_at")
   updatedAt            DateTime             @updatedAt @map("updated_at")

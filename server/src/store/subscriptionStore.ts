@@ -14,6 +14,8 @@ export interface SubscriptionRecord {
   stripeSubscriptionId: string | null;
   /** Optional app user id if Payment Link sets client_reference_id. */
   clientReferenceId: string | null;
+  /** True after any checkout; never cleared on cancel. */
+  trialUsed: boolean;
   updatedAt: string;
   createdAt: string;
 }
@@ -29,6 +31,7 @@ function toRecord(row: Subscription): SubscriptionRecord {
     stripeCustomerId: row.stripeCustomerId,
     stripeSubscriptionId: row.stripeSubscriptionId,
     clientReferenceId: row.clientReferenceId,
+    trialUsed: row.trialUsed,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -106,6 +109,20 @@ export async function isClerkUserEntitled(clerkUserId: string): Promise<boolean>
   return isSubscriptionEntitled(email);
 }
 
+/** True if this Clerk account already used a trial (by Clerk id or email). Sticky across cancel. */
+export async function hasClerkUserUsedTrial(clerkUserId: string): Promise<boolean> {
+  const id = clerkUserId.trim();
+  if (!id) return false;
+
+  const byReference = await findSubscriptionByClientReferenceId(id);
+  if (byReference?.trialUsed) return true;
+
+  const email = await clerkPrimaryEmail(id);
+  if (!email) return false;
+  const byEmail = await findSubscriptionByEmail(email);
+  return Boolean(byEmail?.trialUsed);
+}
+
 /** @deprecated Prefer isSubscriptionEntitled — kept for existing callers. */
 export async function isSubscriptionActive(email: string): Promise<boolean> {
   return isSubscriptionEntitled(email);
@@ -169,12 +186,14 @@ export async function activateSubscription(input: {
       stripeCustomerId: customerId,
       stripeSubscriptionId: subscriptionId,
       clientReferenceId,
+      trialUsed: true,
     },
     update: {
       status: nextStatus,
       stripeCustomerId: customerId ?? undefined,
       stripeSubscriptionId: subscriptionId ?? undefined,
       clientReferenceId: clientReferenceId ?? undefined,
+      trialUsed: true,
     },
   });
 

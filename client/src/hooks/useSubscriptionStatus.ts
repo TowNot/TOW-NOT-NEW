@@ -4,6 +4,7 @@ import { apiFetch, ensureDeviceSession, SessionReplacedError } from "../lib/apiF
 
 interface SubscriptionStatus {
   active: boolean;
+  trialUsed: boolean;
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
@@ -12,6 +13,7 @@ interface SubscriptionStatus {
 export function useSubscriptionStatus(): SubscriptionStatus {
   const { isLoaded, isSignedIn } = useUser();
   const [active, setActive] = useState(false);
+  const [trialUsed, setTrialUsed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,6 +25,7 @@ export function useSubscriptionStatus(): SubscriptionStatus {
 
     if (!isSignedIn) {
       setActive(false);
+      setTrialUsed(false);
       setLoading(false);
       setError(null);
       return;
@@ -35,19 +38,23 @@ export function useSubscriptionStatus(): SubscriptionStatus {
       const response = await apiFetch("/api/subscriptions/me");
       if (response.status === 401) {
         setActive(false);
+        setTrialUsed(false);
         return;
       }
       if (!response.ok) {
         throw new Error("Unable to check subscription status");
       }
-      const body = (await response.json()) as { active?: boolean };
+      const body = (await response.json()) as { active?: boolean; trialUsed?: boolean };
       setActive(Boolean(body.active));
+      setTrialUsed(Boolean(body.trialUsed));
     } catch (caught) {
       if (caught instanceof SessionReplacedError) {
         setActive(false);
+        setTrialUsed(false);
         return;
       }
       setActive(false);
+      setTrialUsed(false);
       setError(caught instanceof Error ? caught.message : "Unable to check subscription status");
     } finally {
       setLoading(false);
@@ -58,5 +65,5 @@ export function useSubscriptionStatus(): SubscriptionStatus {
     void refresh();
   }, [refresh]);
 
-  return { active, loading, error, refresh };
+  return { active, trialUsed, loading, error, refresh };
 }

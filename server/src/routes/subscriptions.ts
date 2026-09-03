@@ -4,6 +4,7 @@ import { clerkPrimaryEmail } from "../lib/clerkUserEmail";
 import {
   findSubscriptionByClientReferenceId,
   findSubscriptionByEmail,
+  hasClerkUserUsedTrial,
   isClerkUserEntitled,
   isSubscriptionEntitled,
 } from "../store/subscriptionStore";
@@ -21,12 +22,14 @@ export function createSubscriptionsRouter(): Router {
 
       const email = await clerkPrimaryEmail(auth.userId);
       const entitled = await isClerkUserEntitled(auth.userId);
+      const trialUsed = await hasClerkUserUsedTrial(auth.userId);
       const record =
         (email ? await findSubscriptionByEmail(email) : null) ??
         (await findSubscriptionByClientReferenceId(auth.userId));
       res.json({
         email,
         active: entitled,
+        trialUsed,
         status: record?.status ?? "inactive",
         subscription: record,
       });

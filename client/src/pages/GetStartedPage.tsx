@@ -65,12 +65,13 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
     clerkUser?.primaryEmailAddress?.emailAddress ??
     clerkUser?.emailAddresses?.[0]?.emailAddress ??
     null;
-  const { active: subscribed, loading: subscriptionLoading, refresh } = useSubscriptionStatus();
+  const { active: subscribed, trialUsed, loading: subscriptionLoading, refresh } = useSubscriptionStatus();
 
   const monthlyCheckoutUrl = buildStripeCheckoutUrl({
     email: accountEmail,
     clientReferenceId: clerkUser?.id ?? user?.id ?? null,
     billing: "monthly",
+    hasUsedTrial: trialUsed,
   });
 
   const yearlyCheckoutUrl = buildStripeCheckoutUrl({
@@ -190,16 +191,14 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
           >
             {subscribeDone ? (
               <p className="text-sm text-accent-deep">Subscription active</p>
+            ) : subscriptionLoading ? (
+              <p className="text-sm text-muted">Checking subscription…</p>
             ) : (
-              <div className="space-y-4">
-                <PricingPlansGrid
-                  monthlyCheckoutUrl={monthlyCheckoutUrl}
-                  yearlyCheckoutUrl={yearlyCheckoutUrl}
-                />
-                {subscriptionLoading ? (
-                  <p className="text-xs text-muted">Checking subscription…</p>
-                ) : null}
-              </div>
+              <PricingPlansGrid
+                monthlyCheckoutUrl={monthlyCheckoutUrl}
+                yearlyCheckoutUrl={yearlyCheckoutUrl}
+                monthlyHasUsedTrial={trialUsed}
+              />
             )}
           </OnboardingStep>
 
@@ -242,9 +241,11 @@ const PLAN_FEATURES = ["Cancel anytime via Stripe"] as const;
 function PricingPlansGrid({
   monthlyCheckoutUrl,
   yearlyCheckoutUrl,
+  monthlyHasUsedTrial,
 }: {
   monthlyCheckoutUrl: string;
   yearlyCheckoutUrl: string;
+  monthlyHasUsedTrial: boolean;
 }) {
   return (
     <div className="pricing-plans-grid">
@@ -260,7 +261,7 @@ function PricingPlansGrid({
           href={monthlyCheckoutUrl}
           className="pricing-plan-cta btn-outline-light mt-auto w-full px-5 py-2.5 text-sm no-underline"
         >
-          Start 7-Day Free Trial
+          {monthlyHasUsedTrial ? "Subscribe" : "Start 7-Day Free Trial"}
         </a>
       </article>
 
