@@ -115,12 +115,12 @@ export async function hasClerkUserUsedTrial(clerkUserId: string): Promise<boolea
   if (!id) return false;
 
   const byReference = await findSubscriptionByClientReferenceId(id);
-  if (byReference?.trialUsed) return true;
+  if (byReference?.trialUsed || byReference?.stripeSubscriptionId) return true;
 
   const email = await clerkPrimaryEmail(id);
   if (!email) return false;
   const byEmail = await findSubscriptionByEmail(email);
-  return Boolean(byEmail?.trialUsed);
+  return Boolean(byEmail?.trialUsed || byEmail?.stripeSubscriptionId);
 }
 
 /** @deprecated Prefer isSubscriptionEntitled — kept for existing callers. */

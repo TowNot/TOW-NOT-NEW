@@ -4,6 +4,7 @@ import { isClerkUserEntitled } from "../store/subscriptionStore";
 
 /**
  * Require an active or trialing Stripe subscription.
+ * canceled / inactive / missing → 403 (desk + live APIs locked).
  * Use after `clerkMiddleware()` and `requireClerkAuth`.
  */
 export async function requireActiveSubscription(
@@ -20,7 +21,8 @@ export async function requireActiveSubscription(
   try {
     if (!(await isClerkUserEntitled(auth.userId))) {
       res.status(403).json({
-        error: "Subscription required — start your trial to access live alerts",
+        code: "subscription_required",
+        error: "Subscription required — renew billing to access live alerts",
       });
       return;
     }

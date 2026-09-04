@@ -45,17 +45,18 @@ function invoiceSubscriptionId(invoice: Stripe.Invoice): string | null {
 function localStatusFromStripe(stripeStatus: Stripe.Subscription.Status): SubscriptionStatus {
   if (stripeStatus === "active") return "active";
   if (stripeStatus === "trialing") return "trialing";
-  if (stripeStatus === "canceled" || stripeStatus === "incomplete_expired") return "canceled";
-  // past_due, unpaid, paused, incomplete — desk access blocked until Stripe recovers
+  // Cancel-on-failure (0 retries): treat unpaid / past_due as revoked immediately.
   if (
+    stripeStatus === "canceled" ||
+    stripeStatus === "incomplete_expired" ||
     stripeStatus === "past_due" ||
     stripeStatus === "unpaid" ||
     stripeStatus === "paused" ||
     stripeStatus === "incomplete"
   ) {
-    return "inactive";
+    return "canceled";
   }
-  return "inactive";
+  return "canceled";
 }
 
 async function stripeCustomerEmail(customerId: string | null): Promise<string | null> {
@@ -211,18 +212,20 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice): Promise<void
   const stripeSubscriptionId = invoiceSubscriptionId(invoice);
   const email = await stripeCustomerEmail(stripeCustomerId);
 
+  // Stripe is configured to cancel on failure with 0 retries — revoke access immediately.
   const record = await updateSubscriptionStatus({
     email,
     stripeCustomerId,
     stripeSubscriptionId,
-    status: "inactive",
+    status: "canceled",
   });
 
   if (record) {
-    logger.info("Stripe invoice payment failed — subscription marked inactive", {
+    logger.info("Stripe invoice payment failed — access revoked (canceled)", {
       email: record.email,
       invoiceId: invoice.id,
       stripeSubscriptionId: record.stripeSubscriptionId,
+      localStatus: record.status,
     });
   } else {
     logger.warn("invoice.payment_failed with no matching local subscriber", {

@@ -58,7 +58,13 @@ export function useIncidents(): IncidentState {
 
         const response = await apiFetch("/api/incidents");
         if (response.status === 401 || response.status === 403) {
-          if (!cancelled) setConnected(false);
+          if (!cancelled) {
+            setConnected(false);
+            setIncidents([]);
+          }
+          if (response.status === 403 && !cancelled) {
+            window.location.replace("/get-started");
+          }
           return;
         }
         if (!response.ok) throw new Error("Failed to load incidents");

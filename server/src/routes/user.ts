@@ -4,6 +4,7 @@ import { countUsersSelectingCity } from "../engine/activeMonitoredCities";
 import { coldStartCityScrape } from "../engine/cityColdStart";
 import { isKnownCityId } from "../engine/coverageZones";
 import { logger } from "../logger";
+import { requireActiveSubscription } from "../middleware/requireActiveSubscription";
 import { readSessionTokenFromRequest, SESSION_REPLACED_MESSAGE } from "../lib/sessionToken";
 import {
   claimUserSessionToken,
@@ -57,7 +58,8 @@ export function createUserRouter(): Router {
     }
   });
 
-  router.get("/city", async (req, res, next) => {
+  // City selection requires an entitled subscription (active / trialing only).
+  router.get("/city", requireActiveSubscription, async (req, res, next) => {
     try {
       const auth = getAuth(req);
       if (!auth.isAuthenticated || !auth.userId) {
@@ -72,7 +74,7 @@ export function createUserRouter(): Router {
     }
   });
 
-  router.put("/city", async (req, res, next) => {
+  router.put("/city", requireActiveSubscription, async (req, res, next) => {
     try {
       const auth = getAuth(req);
       if (!auth.isAuthenticated || !auth.userId) {
