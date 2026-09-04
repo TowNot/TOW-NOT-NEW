@@ -35,8 +35,7 @@ export function SelectZonePage({ user }: { user?: ZoneUser | null }) {
           Choose your city
         </h1>
         <p className="mt-4 max-w-xl text-base text-muted sm:text-lg">
-          Pick one city. Scraping, push alerts, and the live feed follow that city — switch anytime
-          from the dashboard.
+          Pick one city. Alerts stay on that city — switch anytime from the dashboard.
         </p>
 
         <ul className="mt-8 grid gap-3 sm:mt-12 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
