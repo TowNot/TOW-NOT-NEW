@@ -19,6 +19,7 @@ import { createPushRouter } from "./routes/push";
 import { createSmsRouter } from "./routes/sms";
 import { createSourcesRouter, createSourcesStatusRouter } from "./routes/sources";
 import { createSubscriptionsRouter } from "./routes/subscriptions";
+import { createCheckoutSessionRouter } from "./routes/createCheckoutSession";
 import { createMeRouter } from "./routes/me";
 import { createUserRouter } from "./routes/user";
 import { stripeWebhookHandler } from "./routes/stripeWebhook";
@@ -133,6 +134,14 @@ export function createApp(store: IncidentStore, dispatcher: PushDispatcher): exp
 
   // Subscription lookup for the signed-in account (onboarding UI).
   app.use("/api/subscriptions", requireClerkAuth, requireMatchingSession, createSubscriptionsRouter());
+
+  // Dynamic Stripe Checkout Sessions — trial bouncer lives on the server (not Payment Links).
+  app.use(
+    "/api/create-checkout-session",
+    requireClerkAuth,
+    requireMatchingSession,
+    createCheckoutSessionRouter(),
+  );
 
   return app;
 }

@@ -1,5 +1,5 @@
 import { useUser } from "@clerk/clerk-react";
-import { useEffect, useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AuthControls } from "../components/AuthControls";
 import { GetStartedButton } from "../components/GetStartedButton";
 import { SiteFooter } from "../components/SiteFooter";
@@ -7,7 +7,7 @@ import { type ZoneUser } from "../hooks/useSelectedZone";
 import { useSubscriptionStatus } from "../hooks/useSubscriptionStatus";
 import { isClerkConfigured } from "../lib/clerkKey";
 import { destinationCta, resolveAppDestination } from "../lib/onboarding";
-import { buildStripeCheckoutUrl } from "../lib/stripeCheckout";
+import { startStripeCheckout, type BillingInterval } from "../lib/stripeCheckout";
 
 const ONBOARDING_STEPS = [
   {
@@ -66,19 +66,6 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
     clerkUser?.emailAddresses?.[0]?.emailAddress ??
     null;
   const { active: subscribed, trialUsed, loading: subscriptionLoading, refresh } = useSubscriptionStatus();
-
-  const monthlyCheckoutUrl = buildStripeCheckoutUrl({
-    email: accountEmail,
-    clientReferenceId: clerkUser?.id ?? user?.id ?? null,
-    billing: "monthly",
-    hasUsedTrial: trialUsed,
-  });
-
-  const yearlyCheckoutUrl = buildStripeCheckoutUrl({
-    email: accountEmail,
-    clientReferenceId: clerkUser?.id ?? user?.id ?? null,
-    billing: "yearly",
-  });
 
   const checkoutSuccess = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
@@ -194,11 +181,7 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
             ) : subscriptionLoading ? (
               <p className="text-sm text-muted">Checking subscription…</p>
             ) : (
-              <PricingPlansGrid
-                monthlyCheckoutUrl={monthlyCheckoutUrl}
-                yearlyCheckoutUrl={yearlyCheckoutUrl}
-                monthlyHasUsedTrial={trialUsed}
-              />
+              <PricingPlansGrid monthlyHasUsedTrial={trialUsed} />
             )}
           </OnboardingStep>
 
@@ -238,52 +221,73 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
 
 const PLAN_FEATURES = ["Cancel anytime via Stripe"] as const;
 
-function PricingPlansGrid({
-  monthlyCheckoutUrl,
-  yearlyCheckoutUrl,
-  monthlyHasUsedTrial,
-}: {
-  monthlyCheckoutUrl: string;
-  yearlyCheckoutUrl: string;
-  monthlyHasUsedTrial: boolean;
-}) {
-  return (
-    <div className="pricing-plans-grid">
-      <article className="pricing-plan-card">
-        <h3 className="pricing-plan-title">Monthly</h3>
-        <p className="pricing-plan-price">$59.99 CAD / month</p>
-        <ul className="pricing-plan-features">
-          {PLAN_FEATURES.map((feature) => (
-            <li key={feature}>{feature}</li>
-          ))}
-        </ul>
-        <a
-          href={monthlyCheckoutUrl}
-          className="pricing-plan-cta btn-outline-light mt-auto w-full px-5 py-2.5 text-sm no-underline"
-        >
-          {monthlyHasUsedTrial ? "Subscribe" : "Start 7-Day Free Trial"}
-        </a>
-      </article>
+function PricingPlansGrid({ monthlyHasUsedTrial }: { monthlyHasUsedTrial: boolean }) {
+  const [busy, setBusy] = useState<BillingInterval | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-      <article className="pricing-plan-card pricing-plan-card-featured">
-        <div className="pricing-plan-badges">
-          <span className="pricing-plan-badge-free">2 Months Free</span>
-          <span className="pricing-plan-badge-popular">Popular</span>
-        </div>
-        <h3 className="pricing-plan-title">Yearly</h3>
-        <p className="pricing-plan-price">$599.00 CAD / year</p>
-        <ul className="pricing-plan-features">
-          {PLAN_FEATURES.map((feature) => (
-            <li key={feature}>{feature}</li>
-          ))}
-        </ul>
-        <a
-          href={yearlyCheckoutUrl}
-          className="pricing-plan-cta btn-primary mt-auto w-full px-5 py-2.5 text-sm no-underline"
-        >
-          Start 7-Day Free Trial
-        </a>
-      </article>
+  const onCheckout = async (billing: BillingInterval) => {
+    setError(null);
+    setBusy(billing);
+    try {
+      await startStripeCheckout(billing);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to start checkout");
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="pricing-plans-grid">
+        <article className="pricing-plan-card">
+          <h3 className="pricing-plan-title">Monthly</h3>
+          <p className="pricing-plan-price">$59.99 CAD / month</p>
+          <ul className="pricing-plan-features">
+            {PLAN_FEATURES.map((feature) => (
+              <li key={feature}>{feature}</li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            disabled={busy !== null}
+            onClick={() => void onCheckout("monthly")}
+            className="pricing-plan-cta btn-outline-light mt-auto w-full px-5 py-2.5 text-sm disabled:opacity-60"
+          >
+            {busy === "monthly"
+              ? "Redirecting…"
+              : monthlyHasUsedTrial
+                ? "Subscribe"
+                : "Start 7-Day Free Trial"}
+          </button>
+        </article>
+
+        <article className="pricing-plan-card pricing-plan-card-featured">
+          <div className="pricing-plan-badges">
+            <span className="pricing-plan-badge-free">2 Months Free</span>
+            <span className="pricing-plan-badge-popular">Popular</span>
+          </div>
+          <h3 className="pricing-plan-title">Yearly</h3>
+          <p className="pricing-plan-price">$599.00 CAD / year</p>
+          <ul className="pricing-plan-features">
+            {PLAN_FEATURES.map((feature) => (
+              <li key={feature}>{feature}</li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            disabled={busy !== null}
+            onClick={() => void onCheckout("yearly")}
+            className="pricing-plan-cta btn-primary mt-auto w-full px-5 py-2.5 text-sm disabled:opacity-60"
+          >
+            {busy === "yearly"
+              ? "Redirecting…"
+              : monthlyHasUsedTrial
+                ? "Subscribe"
+                : "Start 7-Day Free Trial"}
+          </button>
+        </article>
+      </div>
+      {error ? <p className="text-sm text-red-600">{error}</p> : null}
     </div>
   );
 }

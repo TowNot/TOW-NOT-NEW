@@ -145,9 +145,11 @@ export const config = {
   twilioVerifyServiceSid: process.env.TWILIO_VERIFY_SERVICE_SID?.trim() || "",
   stripeSecretKey: process.env.STRIPE_SECRET_KEY?.trim() || "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET?.trim() || "",
-  stripeCheckoutUrl:
-    process.env.STRIPE_CHECKOUT_URL?.trim() ||
-    "https://buy.stripe.com/bJedR832lcpJ42p5988Vi03",
+  /** Stripe Price IDs for Checkout Sessions (Dashboard → Products → Price). */
+  stripePriceMonthly: process.env.STRIPE_PRICE_MONTHLY?.trim() || "",
+  stripePriceYearly: process.env.STRIPE_PRICE_YEARLY?.trim() || "",
+  /** Trial length when the subscriber has never used a trial (Checkout Sessions only). */
+  stripeTrialDays: Math.max(0, Number(process.env.STRIPE_TRIAL_DAYS ?? 7) || 7),
   clerkPublishableKey:
     process.env.CLERK_PUBLISHABLE_KEY?.trim() ||
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim() ||
