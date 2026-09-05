@@ -10,6 +10,8 @@ export interface DeskFilterPreferences {
   waze: boolean;
   google_maps: boolean;
   fire_dispatch: boolean;
+  /** Decorative weather chip only — does not filter the live feed. */
+  weather: boolean;
 }
 
 export const DEFAULT_DESK_FILTER_PREFERENCES: DeskFilterPreferences = {
@@ -18,6 +20,7 @@ export const DEFAULT_DESK_FILTER_PREFERENCES: DeskFilterPreferences = {
   waze: true,
   google_maps: true,
   fire_dispatch: true,
+  weather: true,
 };
 
 const SOURCE_KEYS = ["waze", "google_maps", "fire_dispatch"] as const;
@@ -41,6 +44,7 @@ export function readDeskFilterPreferences(): DeskFilterPreferences {
       waze: parseBool(parsed.waze, DEFAULT_DESK_FILTER_PREFERENCES.waze),
       google_maps: parseBool(parsed.google_maps, DEFAULT_DESK_FILTER_PREFERENCES.google_maps),
       fire_dispatch: parseBool(parsed.fire_dispatch, DEFAULT_DESK_FILTER_PREFERENCES.fire_dispatch),
+      weather: parseBool(parsed.weather, DEFAULT_DESK_FILTER_PREFERENCES.weather),
     };
   } catch {
     return { ...DEFAULT_DESK_FILTER_PREFERENCES };

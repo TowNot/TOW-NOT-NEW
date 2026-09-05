@@ -1,4 +1,3 @@
-import { useState } from "react";
 import type { IncidentSource } from "../types";
 import type { DeskFilterPreferences } from "../lib/deskFilterPreferences";
 import { PoliceAlertsSettings } from "./PoliceAlertsSettings";
@@ -16,6 +15,7 @@ interface DeskFiltersPanelProps {
   preferences: DeskFilterPreferences;
   onToggleAccidents: () => void;
   onToggleIncidents: () => void;
+  onToggleWeather: () => void;
   onToggleSource: (source: IncidentSource) => void;
   policeAlertsEnabled: boolean;
   onTogglePoliceAlerts: () => void;
@@ -29,6 +29,7 @@ export function DeskFiltersPanel({
   preferences,
   onToggleAccidents,
   onToggleIncidents,
+  onToggleWeather,
   onToggleSource,
   policeAlertsEnabled,
   onTogglePoliceAlerts,
@@ -36,9 +37,7 @@ export function DeskFiltersPanel({
   hasFireFeed,
   hasEmsFeed,
 }: DeskFiltersPanelProps) {
-  const { showAccidents, showIncidents, waze, google_maps, fire_dispatch } = preferences;
-  /** Decorative only — does not filter the live feed. */
-  const [weatherEnabled, setWeatherEnabled] = useState(true);
+  const { showAccidents, showIncidents, waze, google_maps, fire_dispatch, weather } = preferences;
 
   const activeSources = new Set<IncidentSource>(
     SOURCE_ORDER.filter((source) => {
@@ -104,10 +103,7 @@ export function DeskFiltersPanel({
               </button>
             );
           })}
-          <StaticWeatherChip
-            enabled={weatherEnabled}
-            onToggle={() => setWeatherEnabled((current) => !current)}
-          />
+          <StaticWeatherChip enabled={weather} onToggle={onToggleWeather} />
         </div>
       </div>
 

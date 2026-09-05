@@ -9,7 +9,7 @@ import {
 import { syncProgressierTagsFromStorage } from "../lib/zones";
 import type { IncidentSource } from "../types";
 
-/** Persisted Accidents / Incidents / Waze / Google Maps / Fire desk filters. */
+/** Persisted Accidents / Incidents / Weather / Waze / Google Maps / Fire desk filters. */
 export function useDeskFilterPreferences() {
   const [preferences, setPreferences] = useState<DeskFilterPreferences>(() =>
     typeof window === "undefined" ? DEFAULT_DESK_FILTER_PREFERENCES : readDeskFilterPreferences(),
@@ -33,6 +33,10 @@ export function useDeskFilterPreferences() {
     persist({ ...preferences, showIncidents: !preferences.showIncidents });
   }, [persist, preferences]);
 
+  const toggleWeather = useCallback(() => {
+    persist({ ...preferences, weather: !preferences.weather });
+  }, [persist, preferences]);
+
   const toggleSource = useCallback(
     (source: IncidentSource) => {
       if (!isSourceToggleKey(source)) return;
@@ -53,6 +57,7 @@ export function useDeskFilterPreferences() {
     preferences,
     toggleAccidents,
     toggleIncidents,
+    toggleWeather,
     toggleSource,
     setSourceEnabled,
   };

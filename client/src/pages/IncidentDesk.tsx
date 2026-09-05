@@ -36,6 +36,7 @@ export function IncidentDesk({ user }: { user?: ZoneUser | null }) {
     preferences: deskFilters,
     toggleAccidents,
     toggleIncidents,
+    toggleWeather,
     toggleSource,
   } = useDeskFilterPreferences();
   const activeZone = getZone(selectedZoneId) ?? fallbackZone;
@@ -87,6 +88,7 @@ export function IncidentDesk({ user }: { user?: ZoneUser | null }) {
             preferences={deskFilters}
             onToggleAccidents={toggleAccidents}
             onToggleIncidents={toggleIncidents}
+            onToggleWeather={toggleWeather}
             onToggleSource={toggleSource}
             policeAlertsEnabled={policeAlertsEnabled}
             onTogglePoliceAlerts={togglePoliceAlerts}
