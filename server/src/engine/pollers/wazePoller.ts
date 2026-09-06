@@ -106,7 +106,7 @@ export class WazeTrafficPoller {
       wazeApiConfigured: Boolean(config.wazeApiKey),
       filter: '["ACCIDENT","POLICE"]',
       country: config.wazeApiCountry,
-      tiles: 4,
+      tiles: 8,
     });
     if (!config.wazeApiKey) {
       logger.warn("Skipping live traffic poll; WAZEAPI_KEY is unset");

@@ -24,11 +24,22 @@ export function boundingBox(
 /** Split a bounding box into an `n`×`n` grid of smaller boxes (4 tiles when n=2). */
 export function splitBoundingBox(box: BoundingBox, divisions: number): BoundingBox[] {
   const n = Math.max(1, Math.floor(divisions));
-  const latStep = (box.topRight.lat - box.bottomLeft.lat) / n;
-  const lngStep = (box.topRight.lng - box.bottomLeft.lng) / n;
+  return splitBoundingBoxGrid(box, n, n);
+}
+
+/** Split a bounding box into a `rows`×`cols` grid (e.g. 2×4 → 8 tiles). */
+export function splitBoundingBoxGrid(
+  box: BoundingBox,
+  rows: number,
+  cols: number,
+): BoundingBox[] {
+  const rowCount = Math.max(1, Math.floor(rows));
+  const colCount = Math.max(1, Math.floor(cols));
+  const latStep = (box.topRight.lat - box.bottomLeft.lat) / rowCount;
+  const lngStep = (box.topRight.lng - box.bottomLeft.lng) / colCount;
   const tiles: BoundingBox[] = [];
-  for (let row = 0; row < n; row++) {
-    for (let col = 0; col < n; col++) {
+  for (let row = 0; row < rowCount; row++) {
+    for (let col = 0; col < colCount; col++) {
       tiles.push({
         bottomLeft: {
           lat: box.bottomLeft.lat + row * latStep,

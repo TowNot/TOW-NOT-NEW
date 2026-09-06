@@ -1,6 +1,6 @@
 import { fetch as undiciFetch } from "undici";
 import { config } from "../config";
-import { boundingBox, distanceKm, splitBoundingBox, type BoundingBox } from "./geo";
+import { boundingBox, distanceKm, splitBoundingBoxGrid, type BoundingBox } from "./geo";
 import { enabledCoverageZones, getCoverageZone, zoneToBoundingBox } from "./coverageZones";
 import { getProxyAgent, keepAliveFetch } from "./httpFetch";
 import { logger } from "./pinoCompat";
@@ -1123,8 +1123,14 @@ async function fetchOpenWebNinja(
   );
 }
 
-/** Owner EU grid test: 2×2 quadrants over the London accident box. */
-const BLOCKSINSIDE_TILE_DIVISIONS = 2;
+/**
+ * BlocksInside tile grid — Waze only.
+ * Temporary experiment per WazeAPI owner ("smaller area", ~8 tiles).
+ * Prior proven setting: 2×2 = 4 tiles via splitBoundingBox(box, 2).
+ */
+const BLOCKSINSIDE_TILE_ROWS = 2;
+const BLOCKSINSIDE_TILE_COLS = 4;
+const BLOCKSINSIDE_TILES_PER_ZONE = BLOCKSINSIDE_TILE_ROWS * BLOCKSINSIDE_TILE_COLS;
 
 /** BlocksInside coordinate pair — owner format: "lat, lng" (comma + space). */
 function blocksInsideCoordPair(lat: number, lng: number): string {
@@ -1185,7 +1191,7 @@ function londonBlocksInsideBox(): BoundingBox {
 }
 
 async function fetchBlocksInsideBox(box: BoundingBox): Promise<WazeAlert[]> {
-  const tiles = splitBoundingBox(box, BLOCKSINSIDE_TILE_DIVISIONS);
+  const tiles = splitBoundingBoxGrid(box, BLOCKSINSIDE_TILE_ROWS, BLOCKSINSIDE_TILE_COLS);
   const settled = await Promise.allSettled(tiles.map((tile) => fetchBlocksInsideTile(tile)));
   const merged: WazeAlert[] = [];
   const seenIds = new Set<string>();
@@ -1215,8 +1221,6 @@ async function fetchBlocksInsideBox(box: BoundingBox): Promise<WazeAlert[]> {
 
   return merged;
 }
-
-const BLOCKSINSIDE_TILES_PER_ZONE = BLOCKSINSIDE_TILE_DIVISIONS ** 2;
 
 /**
  * Fetch BlocksInside accidents for a single coverage zone.
@@ -1259,16 +1263,17 @@ async function fetchBlocksInside(
     zones.length > 0
       ? zones.map((zone) => ({ zone, box: zoneToBoundingBox(zone) }))
       : [{ zone: { id: "london", name: "London" }, box: londonBlocksInsideBox() }];
-  const tilesPerZone = BLOCKSINSIDE_TILE_DIVISIONS ** 2;
+  const tilesPerZone = BLOCKSINSIDE_TILES_PER_ZONE;
 
   logger.debug(
     {
       cities: jobs.map((j) => j.zone.id),
       tilesPerCity: tilesPerZone,
+      tileGrid: `${BLOCKSINSIDE_TILE_ROWS}x${BLOCKSINSIDE_TILE_COLS}`,
       country: config.wazeApiCountry,
       filter: '["ACCIDENT","POLICE"]',
     },
-    "BlocksInside 4-tile poll",
+    "BlocksInside 8-tile poll",
   );
 
   const merged: WazeAlert[] = [];
