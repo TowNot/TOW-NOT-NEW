@@ -493,6 +493,14 @@ const ZONE_SEEDS: ZoneSeed[] = [
     audio: hlsPending("Guelph Fire (feed TBD)"),
     scannedAgencies: [],
   },
+  {
+    id: "ottawa",
+    name: "Ottawa",
+    center: { lat: 45.4215, lng: -75.6972 },
+    enabled: false,
+    audio: hlsPending("Ottawa Fire (feed TBD)"),
+    scannedAgencies: [],
+  },
 ];
 
 export const COVERAGE_ZONES: CoverageZoneDef[] = ZONE_SEEDS.map(buildZone);
