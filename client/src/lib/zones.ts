@@ -241,6 +241,24 @@ const ZONE_SEEDS = [
     center: { lat: 45.4215, lng: -75.6972 },
     scannedAgencies: [],
   },
+  {
+    id: "kanata",
+    name: "Kanata",
+    center: { lat: 45.3155, lng: -75.9095 },
+    scannedAgencies: [],
+  },
+  {
+    id: "orleans",
+    name: "Orléans",
+    center: { lat: 45.4757, lng: -75.5288 },
+    scannedAgencies: [],
+  },
+  {
+    id: "barrhaven",
+    name: "Barrhaven",
+    center: { lat: 45.2755, lng: -75.7455 },
+    scannedAgencies: [],
+  },
 ] as const;
 
 export type ZoneId = (typeof ZONE_SEEDS)[number]["id"];
