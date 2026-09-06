@@ -1,8 +1,7 @@
 import { clerkClient, getAuth } from "@clerk/express";
 import { Router } from "express";
-import { countUsersSelectingCity } from "../engine/activeMonitoredCities";
+import { countUsersSelectingCity, normalizeCityId } from "../engine/activeMonitoredCities";
 import { coldStartCityScrape } from "../engine/cityColdStart";
-import { isKnownCityId } from "../engine/coverageZones";
 import { logger } from "../logger";
 import { upsertUserSelectedCity } from "../store/userPreferenceStore";
 
@@ -18,12 +17,13 @@ export function createMeRouter(): Router {
         return;
       }
 
-      const selectedZoneId =
+      const raw =
         typeof req.body?.selectedZoneId === "string" ? req.body.selectedZoneId.trim() : "";
-      if (!isKnownCityId(selectedZoneId)) {
+      const selectedZoneId = normalizeCityId(raw);
+      if (!selectedZoneId) {
         res.status(400).json({
           error: "Unknown zone id",
-          selectedZoneId,
+          selectedZoneId: raw,
         });
         return;
       }

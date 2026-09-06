@@ -1,8 +1,7 @@
 import { clerkClient, getAuth } from "@clerk/express";
 import { Router } from "express";
-import { countUsersSelectingCity } from "../engine/activeMonitoredCities";
+import { countUsersSelectingCity, normalizeCityId } from "../engine/activeMonitoredCities";
 import { coldStartCityScrape } from "../engine/cityColdStart";
-import { isKnownCityId } from "../engine/coverageZones";
 import { logger } from "../logger";
 import { requireActiveSubscription } from "../middleware/requireActiveSubscription";
 import { readSessionTokenFromRequest, SESSION_REPLACED_MESSAGE } from "../lib/sessionToken";
@@ -88,8 +87,8 @@ export function createUserRouter(): Router {
           : typeof req.body?.selectedZoneId === "string"
             ? req.body.selectedZoneId
             : "";
-      const selectedCity = raw.trim().toLowerCase();
-      if (!isKnownCityId(selectedCity)) {
+      const selectedCity = normalizeCityId(raw);
+      if (!selectedCity) {
         res.status(400).json({ error: "Unknown city id", selectedCity: raw });
         return;
       }

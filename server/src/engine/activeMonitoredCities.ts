@@ -4,12 +4,15 @@ import { COVERAGE_ZONE_IDS } from "./zones.config";
 
 const DEFAULT_CITY = "london";
 
-const VALID_CITY_IDS = new Set<string>(COVERAGE_ZONE_IDS);
+/** Catalog ids keyed by lowercase — preserves camelCase (e.g. torontoCore). */
+const CANONICAL_CITY_BY_LOWER = new Map<string, string>(
+  COVERAGE_ZONE_IDS.map((id) => [id.toLowerCase(), id]),
+);
 
 export function normalizeCityId(raw: string): string | null {
-  const id = raw.trim().toLowerCase();
-  if (!id || !VALID_CITY_IDS.has(id)) return null;
-  return id;
+  const key = raw.trim().toLowerCase();
+  if (!key) return null;
+  return CANONICAL_CITY_BY_LOWER.get(key) ?? null;
 }
 
 /** @deprecated No in-memory city cache — kept as a no-op for existing call sites. */
