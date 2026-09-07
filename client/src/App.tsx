@@ -7,6 +7,7 @@ import { LandingPage } from "./pages/LandingPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
 import { RefundPolicyPage } from "./pages/RefundPolicyPage";
 import { ProductSuggestionsPage } from "./pages/ProductSuggestionsPage";
+import { RequestCoveragePage } from "./pages/RequestCoveragePage";
 import { TermsPage } from "./pages/TermsPage";
 import { ProtectedDeskRoute, ProtectedWelcomeRoute } from "./components/SubscriptionGate";
 import { useDeviceSessionTakeover } from "./hooks/useDeviceSessionTakeover";
@@ -77,7 +78,10 @@ function ClerkAwareApp() {
 function usePageTheme(path: string) {
   useEffect(() => {
     const isAurora =
-      path === "/" || path === "/get-started" || path === "/product-suggestions";
+      path === "/" ||
+      path === "/get-started" ||
+      path === "/product-suggestions" ||
+      path === "/request-coverage";
     document.documentElement.classList.toggle("theme-aurora", isAurora);
   }, [path]);
 }
@@ -119,6 +123,10 @@ function AppShell({
 
   if (path === "/product-suggestions") {
     return <ProductSuggestionsPage isSignedIn={isSignedIn} />;
+  }
+
+  if (path === "/request-coverage") {
+    return <RequestCoveragePage isSignedIn={isSignedIn} />;
   }
 
   if (path === "/") {

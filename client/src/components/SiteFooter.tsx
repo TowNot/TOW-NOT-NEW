@@ -1,6 +1,7 @@
 import { FOOTER_TAGLINE } from "../design/copy";
 
 const FOOTER_LINKS = [
+  { href: "/request-coverage", label: "Request coverage" },
   { href: "/product-suggestions", label: "Suggestions & questions" },
   { href: "/terms", label: "Terms & Conditions" },
   { href: "/privacy", label: "Privacy Policy" },
