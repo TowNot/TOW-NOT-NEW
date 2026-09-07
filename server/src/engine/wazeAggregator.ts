@@ -1241,10 +1241,13 @@ export async function fetchBlocksInsideForZone(zone: {
     );
     return alerts;
   } catch (err) {
-    logger.warn("BlocksInside city fetch failed", {
-      zone: zone.name,
-      error: err instanceof Error ? err.message : String(err),
-    });
+    logger.warn(
+      {
+        zone: zone.name,
+        error: err instanceof Error ? err.message : String(err),
+      },
+      "BlocksInside city fetch failed",
+    );
     logger.info(
       `[waze-poller] Polled zone: ${zone.name} | Tiles: ${BLOCKSINSIDE_TILES_PER_ZONE} | Alerts found: 0`,
     );
