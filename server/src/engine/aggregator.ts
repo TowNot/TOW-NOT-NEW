@@ -17,7 +17,7 @@ export class DataAggregatorEngine {
 
   start(): void {
     const enabled = enabledCoverageZones();
-    logger.info("[WAZE API] starting BlocksInside 8-tile Waze scraper", {
+    logger.info("[WAZE API] starting BlocksInside 9-tile Waze scraper", {
       londonOnly: LONDON_ONLY_INGEST,
       prismaDemandedCities: true,
       wazeApi: Boolean(config.wazeApiKey),

@@ -41,7 +41,7 @@ async function buildSourcesStatusPayload(store: IncidentStore) {
       endpoint: "https://api.wazeapi.com/v1/alerts",
       filter: '["ACCIDENT","POLICE"]',
       limit: "",
-      tiles: 8,
+      tiles: 9,
       tileDivisions: 2,
       cities: enabledCoverageZones().map((zone) => zone.id),
       "bottom-left": config.wazeBottomLeft,
