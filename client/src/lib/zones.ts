@@ -367,7 +367,6 @@ export interface ProgressierTagOptions {
 
 /**
  * Progressier tags for the active city only.
- * Passed as an array so Progressier overwrites prior tags (drops the previous city).
  * Category tags are added only while the matching desk toggle is ON.
  */
 export function progressierTagsForPush(
@@ -397,23 +396,81 @@ export function progressierTagsForPush(
   return tags;
 }
 
-/** Instantly re-tag this device for `zoneId` only — previous city tags are cleared. */
+const PROGRESSIER_WAIT_MS = 8_000;
+const PROGRESSIER_RETRY_MS = 400;
+const PROGRESSIER_MAX_ATTEMPTS = 4;
+
+/**
+ * Progressier overwrite format: one array element with a comma-separated list
+ * replaces all existing device tags (drops the previous city).
+ * @see https://intercom.help/progressier/en/articles/13680309-progressier-api-integration-documentation-for-ai-agents
+ */
+function progressierOverwriteTagsPayload(tags: string[]): { tags: string[] } {
+  return { tags: [tags.join(", ")] };
+}
+
+async function waitForProgressierClient(timeoutMs = PROGRESSIER_WAIT_MS): Promise<ProgressierClient | null> {
+  if (typeof window === "undefined") return null;
+  if (window.progressier?.add) return window.progressier;
+
+  return new Promise((resolve) => {
+    const started = Date.now();
+    const timer = window.setInterval(() => {
+      if (window.progressier?.add) {
+        window.clearInterval(timer);
+        resolve(window.progressier);
+        return;
+      }
+      if (Date.now() - started > timeoutMs) {
+        window.clearInterval(timer);
+        resolve(null);
+      }
+    }, 50);
+  });
+}
+
+/**
+ * Replace this device's Progressier tags with the active city only.
+ * Waits for Progressier, retries briefly — previous city tags are cleared on success.
+ */
+export async function replaceProgressierPushTags(
+  zoneId: ZoneId,
+  options?: ProgressierTagOptions,
+): Promise<boolean> {
+  const tags = progressierTagsForPush(zoneId, options);
+  const payload = progressierOverwriteTagsPayload(tags);
+
+  for (let attempt = 1; attempt <= PROGRESSIER_MAX_ATTEMPTS; attempt++) {
+    const client = await waitForProgressierClient(attempt === 1 ? PROGRESSIER_WAIT_MS : 1_500);
+    if (!client?.add) {
+      if (attempt < PROGRESSIER_MAX_ATTEMPTS) {
+        await new Promise((r) => setTimeout(r, PROGRESSIER_RETRY_MS * attempt));
+      }
+      continue;
+    }
+    try {
+      client.add(payload);
+      return true;
+    } catch {
+      if (attempt < PROGRESSIER_MAX_ATTEMPTS) {
+        await new Promise((r) => setTimeout(r, PROGRESSIER_RETRY_MS * attempt));
+      }
+    }
+  }
+  return false;
+}
+
+/** Fire-and-forget re-tag (keeps existing call sites). Prefer replaceProgressierPushTags when awaiting. */
 export function syncProgressierPushTags(
   zoneId: ZoneId,
   options?: ProgressierTagOptions,
 ): void {
-  try {
-    window.progressier?.add?.({
-      tags: progressierTagsForPush(zoneId, options),
-    });
-  } catch {
-    // Progressier may not be loaded yet.
-  }
+  void replaceProgressierPushTags(zoneId, options);
 }
 
 /** Re-read localStorage prefs and sync Progressier tags for the active city. */
 export function syncProgressierTagsFromStorage(zoneId?: ZoneId): void {
-  syncProgressierPushTags(zoneId ?? readLocalZoneId() ?? DEFAULT_ZONE_ID);
+  void replaceProgressierPushTags(zoneId ?? readLocalZoneId() ?? DEFAULT_ZONE_ID);
 }
 
 export function isZoneId(value: unknown): value is ZoneId {

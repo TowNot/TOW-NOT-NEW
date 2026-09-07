@@ -6,7 +6,7 @@ import {
   isZoneEnabledForDesk,
   isZoneId,
   readLocalZoneId,
-  syncProgressierTagsFromStorage,
+  replaceProgressierPushTags,
   writeLocalZoneId,
   type CoverageZone,
   type ZoneId,
@@ -80,6 +80,7 @@ export function useSelectedZone(user?: ZoneUser | null) {
           setSavedCityId(city);
           writeLocalZoneId(city);
           setLocalZoneId(city);
+          void replaceProgressierPushTags(city);
         }
       })
       .catch(() => undefined)
@@ -101,7 +102,7 @@ export function useSelectedZone(user?: ZoneUser | null) {
   }, [localZoneId]);
 
   useEffect(() => {
-    syncProgressierTagsFromStorage(selectedZoneId);
+    void replaceProgressierPushTags(selectedZoneId);
   }, [selectedZoneId]);
 
   const saveZone = useCallback(
@@ -110,8 +111,8 @@ export function useSelectedZone(user?: ZoneUser | null) {
       writeLocalZoneId(zoneId);
       setLocalZoneId(zoneId);
       setSavedCityId(zoneId);
-      // Overwrite Progressier tags immediately so the previous city stops receiving.
-      syncProgressierTagsFromStorage(zoneId);
+      // Await tag replace so the previous city is dropped before leaving the switcher.
+      await replaceProgressierPushTags(zoneId);
       if (user) {
         try {
           if (user.update) {
@@ -123,8 +124,10 @@ export function useSelectedZone(user?: ZoneUser | null) {
             });
           }
           await persistZoneToServer(zoneId);
+          // Re-apply after network work — Progressier may have loaded late.
+          await replaceProgressierPushTags(zoneId);
         } catch {
-          // localStorage + local state already updated.
+          // localStorage + local state already updated; tags already attempted.
         }
       }
     },

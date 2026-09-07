@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  syncProgressierTagsFromStorage,
+  readLocalZoneId,
+  replaceProgressierPushTags,
+  DEFAULT_ZONE_ID,
 } from "../lib/zones";
 
 const LOAD_TIMEOUT_MS = 8_000;
@@ -41,8 +43,8 @@ async function getSubscription(): Promise<PushSubscription | null> {
   return registration.pushManager.getSubscription();
 }
 
-function syncZoneTags(): void {
-  syncProgressierTagsFromStorage();
+async function syncZoneTags(): Promise<void> {
+  await replaceProgressierPushTags(readLocalZoneId() ?? DEFAULT_ZONE_ID);
 }
 
 export function useProgressier() {
@@ -63,8 +65,9 @@ export function useProgressier() {
     try {
       const subscription = await getSubscription();
       setEnabled(Boolean(subscription));
-      if (subscription && window.progressier) {
-        syncZoneTags();
+      if (subscription) {
+        // Always re-apply the account's selected city when the app is active.
+        await syncZoneTags();
       }
     } catch {
       setEnabled(false);
@@ -80,7 +83,11 @@ export function useProgressier() {
       if (document.visibilityState === "visible") void refresh();
     };
     document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
   }, [refresh]);
 
   const enablePush = useCallback(async () => {
@@ -100,7 +107,7 @@ export function useProgressier() {
       // subscribe() resolves before the subscription is registered, so settle
       // briefly and then confirm against the PushManager rather than assuming.
       await new Promise((resolve) => setTimeout(resolve, SUBSCRIBE_SETTLE_MS));
-      syncZoneTags();
+      await syncZoneTags();
       const subscription = await getSubscription();
       if (!subscription) {
         throw new Error("Push subscription was not created — check notification permissions");
