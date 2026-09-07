@@ -74,8 +74,8 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
 
   useEffect(() => {
     if (!checkoutSuccess) return;
-    void refresh();
-    const timer = window.setInterval(() => void refresh(), 3000);
+    void refresh({ background: true });
+    const timer = window.setInterval(() => void refresh({ background: true }), 3000);
     return () => window.clearInterval(timer);
   }, [checkoutSuccess, refresh]);
 

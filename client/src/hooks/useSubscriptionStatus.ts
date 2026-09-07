@@ -7,7 +7,7 @@ interface SubscriptionStatus {
   trialUsed: boolean;
   loading: boolean;
   error: string | null;
-  refresh: () => Promise<void>;
+  refresh: (opts?: { background?: boolean }) => Promise<void>;
 }
 
 export function useSubscriptionStatus(): SubscriptionStatus {
@@ -17,9 +17,11 @@ export function useSubscriptionStatus(): SubscriptionStatus {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (opts?: { background?: boolean }) => {
+    const background = Boolean(opts?.background);
+
     if (!isLoaded) {
-      setLoading(true);
+      if (!background) setLoading(true);
       return;
     }
 
@@ -31,7 +33,9 @@ export function useSubscriptionStatus(): SubscriptionStatus {
       return;
     }
 
-    setLoading(true);
+    // Background rechecks must not flip loading — that unmounts the desk
+    // ("Checking your access…"), drops SSE, and restarts Progressier tags.
+    if (!background) setLoading(true);
     setError(null);
     try {
       await ensureDeviceSession();
@@ -57,7 +61,7 @@ export function useSubscriptionStatus(): SubscriptionStatus {
       setTrialUsed(false);
       setError(caught instanceof Error ? caught.message : "Unable to check subscription status");
     } finally {
-      setLoading(false);
+      if (!background) setLoading(false);
     }
   }, [isLoaded, isSignedIn]);
 

@@ -187,9 +187,11 @@ export class WazeTrafficPoller {
       );
       ingested.push(created);
     }
-    logger.debug(
-      `Live traffic poll complete fetched=${alerts.length} ingested=${ingested.length}`,
-    );
+    if (alerts.length > 0 || ingested.length > 0) {
+      logger.info(
+        `Live traffic poll complete fetched=${alerts.length} ingested=${ingested.length}`,
+      );
+    }
     return ingested;
   }
 }

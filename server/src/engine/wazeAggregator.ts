@@ -1234,19 +1234,18 @@ export async function fetchBlocksInsideForZone(zone: {
   const box = match ? zoneToBoundingBox(match) : londonBlocksInsideBox();
   try {
     const alerts = await fetchBlocksInsideBox(box);
-    logger.debug(
-      `[waze-poller] Polled zone: ${zone.name} | Tiles: ${BLOCKSINSIDE_TILES_PER_ZONE} | Alerts found: ${alerts.length}`,
+    const accidents = alerts.filter((a) => a.type.toUpperCase().startsWith("ACCIDENT")).length;
+    const police = alerts.filter((a) => a.type.toUpperCase() === "POLICE" || (a.subtype ?? "").toUpperCase().includes("POLICE")).length;
+    logger.info(
+      `[waze-poller] Polled zone: ${zone.name} | Tiles: ${BLOCKSINSIDE_TILES_PER_ZONE} | Alerts found: ${alerts.length} (accidents=${accidents} police=${police})`,
     );
     return alerts;
   } catch (err) {
-    logger.warn(
-      {
-        zone: zone.name,
-        error: err instanceof Error ? err.message : String(err),
-      },
-      "BlocksInside city fetch failed",
-    );
-    logger.debug(
+    logger.warn("BlocksInside city fetch failed", {
+      zone: zone.name,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    logger.info(
       `[waze-poller] Polled zone: ${zone.name} | Tiles: ${BLOCKSINSIDE_TILES_PER_ZONE} | Alerts found: 0`,
     );
     throw err;

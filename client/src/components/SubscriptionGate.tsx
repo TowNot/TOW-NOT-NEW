@@ -27,7 +27,8 @@ export function ProtectedDeskRoute({ user }: { user: Parameters<typeof IncidentD
 
   useEffect(() => {
     if (!isSignedIn) return;
-    const timer = window.setInterval(() => void refresh(), 60_000);
+    // Quiet recheck — never set loading, or the desk unmounts every minute.
+    const timer = window.setInterval(() => void refresh({ background: true }), 60_000);
     return () => window.clearInterval(timer);
   }, [isSignedIn, refresh]);
 
