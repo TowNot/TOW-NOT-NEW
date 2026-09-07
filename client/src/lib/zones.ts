@@ -401,12 +401,12 @@ const PROGRESSIER_RETRY_MS = 400;
 const PROGRESSIER_MAX_ATTEMPTS = 4;
 
 /**
- * Progressier overwrite format: one array element with a comma-separated list
- * replaces all existing device tags (drops the previous city).
- * @see https://intercom.help/progressier/en/articles/13680309-progressier-api-integration-documentation-for-ai-agents
+ * Progressier array form overwrites all device tags (drops the previous city).
+ * Pass each tag as its own array entry so targeting matches server sends
+ * (e.g. zone-london-google-maps-accidents) — do not join into one string.
  */
 function progressierOverwriteTagsPayload(tags: string[]): { tags: string[] } {
-  return { tags: [tags.join(", ")] };
+  return { tags: [...tags] };
 }
 
 async function waitForProgressierClient(timeoutMs = PROGRESSIER_WAIT_MS): Promise<ProgressierClient | null> {
