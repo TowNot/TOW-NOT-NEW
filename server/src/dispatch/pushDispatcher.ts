@@ -1,4 +1,3 @@
-import { isPoliceType } from "../engine/wazeAggregator";
 import {
   claimIncidentPush,
   logSkippedPush,
@@ -89,11 +88,9 @@ export class PushDispatcher extends EventEmitter {
     }
 
     const push = incidentToPushPayload(incident);
-    // Police is push opt-in only — do not SMS every Twilio subscriber.
-    const sendSms = !isPoliceType(incident.type, incident.subtype ?? null);
     return this.send(push, "dispatch", {
-      sendSms,
-      ...(sendSms ? { smsBody: buildSmsBody(incident) } : {}),
+      sendSms: true,
+      smsBody: buildSmsBody(incident),
     });
   }
 
