@@ -380,7 +380,8 @@ export function progressierTagsForPush(
   if (policeAlertsEnabled) {
     tags.push(zonePolicePushTag(zoneId));
   }
-  if (deskFilters.waze) {
+  // Waze non-police alerts are accidents — require Accidents + Waze source.
+  if (deskFilters.waze && deskFilters.showAccidents) {
     tags.push(zoneWazePushTag(zoneId));
   }
   if (deskFilters.google_maps && deskFilters.showAccidents) {

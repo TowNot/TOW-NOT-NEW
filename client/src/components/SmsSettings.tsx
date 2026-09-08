@@ -1,5 +1,7 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { apiFetch } from "../lib/apiFetch";
+import { smsAlertPreferencesFromDesk, syncSmsAlertPreferences } from "../lib/smsAlertPreferences";
+import { readLocalZoneId } from "../lib/zones";
 
 const STORAGE_KEY = "alertnav-sms-phone";
 /** Twilio from-number users save as a contact for a custom SMS tone. */
@@ -49,6 +51,7 @@ export function SmsSettings() {
       if (stored) {
         setPhone(stored);
         setSaved(stored);
+        void syncSmsAlertPreferences(stored);
       }
     } catch {
       // Private browsing.
@@ -96,6 +99,13 @@ export function SmsSettings() {
     setMessage(null);
   };
 
+  const optInBody = (phoneValue: string, code?: string) => ({
+    phone: phoneValue,
+    ...(code ? { code } : {}),
+    zoneId: readLocalZoneId() ?? undefined,
+    alertPreferences: smsAlertPreferencesFromDesk(),
+  });
+
   const onSaveDirect = async (event: FormEvent) => {
     event.preventDefault();
     setBusy(true);
@@ -105,7 +115,7 @@ export function SmsSettings() {
       const response = await apiFetch("/api/sms/opt-in", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone }),
+        body: JSON.stringify(optInBody(phone)),
       });
       const body = (await response.json()) as { phone?: string; error?: string; created?: boolean };
       if (response.status === 401) {
@@ -190,7 +200,7 @@ export function SmsSettings() {
       const response = await apiFetch("/api/sms/opt-in", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: pendingPhone || phone, code }),
+        body: JSON.stringify(optInBody(pendingPhone || phone, code)),
       });
       const body = (await response.json()) as {
         phone?: string;

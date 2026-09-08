@@ -46,11 +46,18 @@ model UserPreference {
 }
 
 model SmsSubscriber {
-  phone        String   @id
-  active       Boolean  @default(true)
-  selectedCity String   @default("london") @map("zone_id")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  phone            String   @id
+  active           Boolean  @default(true)
+  selectedCity     String   @default("london") @map("zone_id")
+  /** Mirror Live Desk / Progressier category toggles for SMS fan-out. */
+  alertAccidents   Boolean  @default(true) @map("alert_accidents")
+  alertIncidents   Boolean  @default(false) @map("alert_incidents")
+  alertPolice      Boolean  @default(false) @map("alert_police")
+  alertFire        Boolean  @default(true) @map("alert_fire")
+  alertWaze        Boolean  @default(true) @map("alert_waze")
+  alertGoogleMaps  Boolean  @default(true) @map("alert_google_maps")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
   @@index([active])
   @@index([selectedCity])

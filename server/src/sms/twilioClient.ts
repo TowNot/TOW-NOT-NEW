@@ -2,7 +2,8 @@ import { config } from "../config";
 import { logger } from "../logger";
 import { incidentToPushPayload } from "../push";
 import type { Incident } from "../types/incident";
-import { listSmsSubscribers } from "./subscribers";
+import { pushCategoryForIncident, type PushCategory } from "../engine/pushCategories";
+import { listSmsRecipientsForCategory, listSmsSubscribers } from "./subscribers";
 
 type TwilioMessages = {
   messages: {
@@ -59,19 +60,30 @@ export function buildSmsBody(incident: Incident): string {
 /**
  * Awaitable SMS fan-out for the notification worker.
  * Individual recipient failures are logged; does not throw (push already sent).
+ * When `category` is set, only subscribers who opted into that desk category get texts.
  */
 export async function dispatchSmsBody(
   body: string,
   incidentId?: string,
+  category?: PushCategory,
 ): Promise<void> {
   if (!isTwilioConfigured()) return;
-  const recipients = await listSmsSubscribers();
-  if (recipients.length === 0) return;
+  const recipients = category
+    ? await listSmsRecipientsForCategory(category)
+    : await listSmsSubscribers();
+  if (recipients.length === 0) {
+    logger.info("Twilio SMS dispatch skipped — no matching recipients", {
+      incidentId,
+      category: category ?? "all",
+    });
+    return;
+  }
 
   const results = await Promise.allSettled(recipients.map((to) => sendOne(to, body)));
   const failed = results.filter((r) => r.status === "rejected").length;
   logger.info("Twilio SMS dispatch finished", {
     incidentId,
+    category: category ?? "all",
     sent: results.length - failed,
     failed,
   });
@@ -85,9 +97,13 @@ export async function dispatchSmsBody(
   });
 }
 
-/** Fire-and-forget SMS to every opted-in number. Never throws to the caller. */
+/** Fire-and-forget SMS to category-matched numbers. Never throws to the caller. */
 export function notifySmsSubscribers(incident: Incident): void {
-  void dispatchSmsBody(buildSmsBody(incident), incident.id).catch((error: unknown) => {
+  void dispatchSmsBody(
+    buildSmsBody(incident),
+    incident.id,
+    pushCategoryForIncident(incident),
+  ).catch((error: unknown) => {
     logger.warn("Twilio SMS dispatch aborted", {
       error: error instanceof Error ? error.message : String(error),
     });

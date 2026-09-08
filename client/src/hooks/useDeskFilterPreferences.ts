@@ -6,6 +6,7 @@ import {
   readDeskFilterPreferences,
   writeDeskFilterPreferences,
 } from "../lib/deskFilterPreferences";
+import { syncSmsAlertPreferences } from "../lib/smsAlertPreferences";
 import { syncProgressierTagsFromStorage } from "../lib/zones";
 import type { IncidentSource } from "../types";
 
@@ -17,12 +18,14 @@ export function useDeskFilterPreferences() {
 
   useEffect(() => {
     setPreferences(readDeskFilterPreferences());
+    void syncSmsAlertPreferences();
   }, []);
 
   const persist = useCallback((next: DeskFilterPreferences) => {
     writeDeskFilterPreferences(next);
     setPreferences(next);
     syncProgressierTagsFromStorage();
+    void syncSmsAlertPreferences();
   }, []);
 
   const toggleAccidents = useCallback(() => {

@@ -1,5 +1,6 @@
 import { Queue } from "bullmq";
 import type { PushPayload } from "../types/incident";
+import type { PushCategory } from "../engine/pushCategories";
 import { createRedisConnection } from "./connection";
 
 export const DISPATCH_NOTIFICATIONS_QUEUE = "dispatchNotifications";
@@ -11,6 +12,8 @@ export interface DispatchNotificationJobData {
   sendSms: boolean;
   /** Pre-built SMS text (title + body). Required when `sendSms` is true. */
   smsBody?: string;
+  /** Desk/Progressier category — SMS only goes to subscribers who opted into it. */
+  smsCategory?: PushCategory;
 }
 
 const DEFAULT_JOB_OPTIONS = {

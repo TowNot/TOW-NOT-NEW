@@ -3,6 +3,7 @@ import {
   logSkippedPush,
   type PushClaimOptions,
 } from "../engine/pushDedup";
+import { pushCategoryForIncident, type PushCategory } from "../engine/pushCategories";
 import { logger } from "../logger";
 import { incidentToPushPayload } from "../push";
 import { enqueueDispatchNotification } from "../queue/notificationQueue";
@@ -12,24 +13,29 @@ import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 
 export interface PushChannel {
-  send(payload: PushPayload, options?: { sendSms?: boolean; smsBody?: string }): Promise<void>;
+  send(
+    payload: PushPayload,
+    options?: { sendSms?: boolean; smsBody?: string; smsCategory?: PushCategory },
+  ): Promise<void>;
 }
 
 /** Enqueues Progressier (+ optional SMS) onto BullMQ — does not block on delivery. */
 export class QueuedPushChannel implements PushChannel {
   async send(
     payload: PushPayload,
-    options?: { sendSms?: boolean; smsBody?: string },
+    options?: { sendSms?: boolean; smsBody?: string; smsCategory?: PushCategory },
   ): Promise<void> {
     const jobId = await enqueueDispatchNotification({
       push: payload,
       sendSms: Boolean(options?.sendSms && options.smsBody),
       ...(options?.smsBody ? { smsBody: options.smsBody } : {}),
+      ...(options?.smsCategory ? { smsCategory: options.smsCategory } : {}),
     });
     logger.debug("Notification enqueued", {
       jobId,
       incidentId: payload.incidentId,
       sendSms: Boolean(options?.sendSms),
+      smsCategory: options?.smsCategory,
     });
   }
 }
@@ -57,7 +63,7 @@ export class PushDispatcher extends EventEmitter {
   async send(
     payload: PushPayload,
     channel: PushReceipt["channel"] = "dispatch",
-    options?: { sendSms?: boolean; smsBody?: string },
+    options?: { sendSms?: boolean; smsBody?: string; smsCategory?: PushCategory },
   ): Promise<PushReceipt> {
     if (!payload.title?.trim() || !payload.body?.trim()) {
       throw new Error("Push payload requires title and body");
@@ -88,9 +94,11 @@ export class PushDispatcher extends EventEmitter {
     }
 
     const push = incidentToPushPayload(incident);
+    const smsCategory = pushCategoryForIncident(incident);
     return this.send(push, "dispatch", {
       sendSms: true,
       smsBody: buildSmsBody(incident),
+      smsCategory,
     });
   }
 
