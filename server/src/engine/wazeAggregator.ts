@@ -1126,10 +1126,10 @@ async function fetchOpenWebNinja(
 /**
  * BlocksInside tile grid — Waze only.
  * Experimental smaller tiles per WazeAPI owner ("boxes too big").
- * Prior: 2×2 = 4, then 2×4 = 8. Current: 3×3 = 9.
+ * Prior: 2×2 = 4, then 2×4 = 8, then 3×3 = 9. Current: 3×4 = 12.
  */
 const BLOCKSINSIDE_TILE_ROWS = 3;
-const BLOCKSINSIDE_TILE_COLS = 3;
+const BLOCKSINSIDE_TILE_COLS = 4;
 const BLOCKSINSIDE_TILES_PER_ZONE = BLOCKSINSIDE_TILE_ROWS * BLOCKSINSIDE_TILE_COLS;
 
 /** BlocksInside coordinate pair — owner format: "lat, lng" (comma + space). */
@@ -1275,7 +1275,7 @@ async function fetchBlocksInside(
       country: config.wazeApiCountry,
       filter: '["ACCIDENT","POLICE"]',
     },
-    "BlocksInside 9-tile poll",
+    "BlocksInside 12-tile poll",
   );
 
   const merged: WazeAlert[] = [];
