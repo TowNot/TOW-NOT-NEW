@@ -2,8 +2,18 @@ import { type FormEvent, useEffect, useState } from "react";
 import { apiFetch } from "../lib/apiFetch";
 
 const STORAGE_KEY = "alertnav-sms-phone";
+/** Twilio from-number users save as a contact for a custom SMS tone. */
+const ALERTNAV_SMS_FROM = "+1 (249) 402-5882";
 
 type SmsStep = "phone" | "verify";
+
+function smsOptInBlurb(verifyConfigured: boolean | null): string {
+  // Prefer OTP copy while status loads — avoids a flash of the legacy E.164 line.
+  if (verifyConfigured !== false) {
+    return "Opt in to text messages. We verify your number with a one-time code before saving it.";
+  }
+  return "Opt in to text messages. Numbers are stored as E.164 (e.g. +15195551212).";
+}
 
 function formatAsYouType(value: string): string {
   const trimmed = value.trim();
@@ -254,11 +264,24 @@ export function SmsSettings() {
       <h2 className="text-sm font-semibold tracking-[0.18em] uppercase text-gray-900">
         SMS alerts
       </h2>
-      <p className="mt-1 text-xs text-gray-500">
-        {otpRequired
-          ? "Opt in to text messages. We verify your number with a one-time code before saving it."
-          : "Opt in to text messages. Numbers are stored as E.164 (e.g. +15195551212)."}
-      </p>
+      <p className="mt-1 text-xs text-gray-500">{smsOptInBlurb(verifyConfigured)}</p>
+      <div className="mt-3 rounded-md border border-line bg-white px-3 py-2.5 text-xs leading-relaxed text-gray-600">
+        <p className="font-medium text-gray-800">Custom alert sound</p>
+        <ol className="mt-1.5 list-decimal space-y-1 pl-4">
+          <li>
+            Save <span className="font-mono text-gray-800">{ALERTNAV_SMS_FROM}</span> as a
+            contact named AlertNav (this is the number texts come from).
+          </li>
+          <li>
+            <span className="font-medium text-gray-700">iPhone:</span> open the contact → Edit →
+            Text Tone → pick any sound.
+          </li>
+          <li>
+            <span className="font-medium text-gray-700">Android:</span> open the contact → edit →
+            set ringtone / message tone (wording varies by phone).
+          </li>
+        </ol>
+      </div>
       {configured === false ? (
         <p className="mt-2 font-mono text-[11px] text-amber-700">
           Twilio is not configured on the server yet — your number will still be saved.
