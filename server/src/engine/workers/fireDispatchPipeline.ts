@@ -41,7 +41,6 @@ export interface FireDispatchContext {
 
 const SILENCE_RMS_DBFS = -50;
 const DEDUP_TTL_MS = 30 * 60 * 1000;
-const STT_PUSH_PREFIX = "[DG]";
 
 function zoneCenter(zoneId: string): { lat: number; lng: number } {
   const zone = getCoverageZone(zoneId);
@@ -326,11 +325,9 @@ export class FireDispatchProcessor {
       source,
       type: agency === "ems" ? "EMS" : "ACCIDENT",
       subtype: agency === "ems" ? "EMS_CALL" : "ACCIDENT_MAJOR",
-      title: keywords[0]
-        ? `${STT_PUSH_PREFIX} ${titlePrefix} · ${keywords[0]}`
-        : `${STT_PUSH_PREFIX} ${titlePrefix}`,
+      title: keywords[0] ? `${titlePrefix} · ${keywords[0]}` : titlePrefix,
       description:
-        `${typeLabel} (${keywords.join(", ")}) [DG]` +
+        `${typeLabel} (${keywords.join(", ")})` +
         (unverifiedAddress ? ` [UNVERIFIED ADDRESS — heard: "${location}"]` : "") +
         `: ${transcript.slice(0, 800)}`,
       coordinates: { latitude: coords.lat, longitude: coords.lng },

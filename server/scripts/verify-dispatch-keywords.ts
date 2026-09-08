@@ -74,6 +74,51 @@ const checks: Array<[string, () => void]> = [
     },
   ],
   [
+    "code 4 with only apparatus callsigns (car/truck units) does not post",
+    () => {
+      // No blacklist phrase — only Engine/Truck/Car unit IDs + code 4.
+      assert.deepEqual(
+        findCrashKeywords(
+          "Engine 8, engine 4, truck 1, car 6, and engine 1, code 4, 1033 Patricia Street, code 4 on tac 2",
+        ),
+        [],
+      );
+      assert.deepEqual(
+        findCrashKeywords(
+          "Engine 8, engine 4, truck 1, car 6, and engine 1, code 4, 1033 Patricia Street, burnout gas, code 4 on tac 2",
+        ),
+        [],
+      );
+      assert.deepEqual(
+        findCrashKeywords(
+          "Engine 6, truck 6, car 6, engine 8, code 4, 269 Astoria Place, reports of smoke in the home",
+        ),
+        [],
+      );
+      assert.deepEqual(
+        findCrashKeywords(
+          "Engine 1, engine 4, truck 1, car 2, rescue 2, code 4, backyard burn, 334 Queens Ave",
+        ),
+        [],
+      );
+    },
+  ],
+  [
+    "hallway smoke detector / nat gas blacklist drops even with accident language",
+    () => {
+      assert.deepEqual(
+        findCrashKeywords(
+          "Truck 7, code 4, hallway smoke detector, 57 Irving Place, accident reported",
+        ),
+        [],
+      );
+      assert.deepEqual(
+        findCrashKeywords("Engine 8, natural gas, code 4, Patricia Street, collision"),
+        [],
+      );
+    },
+  ],
+  [
     "elevator / escalator / medical assist / alarm drop even with extricated or accident",
     () => {
       assert.deepEqual(

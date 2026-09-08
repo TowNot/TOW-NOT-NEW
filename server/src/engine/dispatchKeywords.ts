@@ -31,11 +31,38 @@ export const negativeKeywords = [
   "smoke investigation",
   "odour of smoke",
   "odor of smoke",
+  "smoke detector",
+  "smoke alarm",
+  "smoke in the home",
+  "smoke in the house",
+  "smoke in the building",
+  "reports of smoke",
+  "backyard burn",
+  "open burn",
+  "burning complaint",
+  "natural gas",
+  "nat gas",
+  "gas leak",
+  "odour of gas",
+  "odor of gas",
+  "smell of gas",
+  "burnout gas",
   "lift",
   "medical call",
   "medical emergency",
 ];
 
+/** LFD apparatus callsigns — "car 6" / "truck 1" are units, not civilian vehicles. */
+const APPARATUS_CALLSIGN_RE =
+  /\b(?:engines?|trucks?|cars?|rescues?|pumpers?|aerials?|ladders?|squads?|tankers?|platforms?)\s*#?\s*\d+\b/gi;
+
+const CIVILIAN_VEHICLE_WORD_RE =
+  /\b(?:cars?|trucks?|vehicles?|trailers?|semis?|transports?)\b/i;
+
+/** Remove Engine/Truck/Car unit designations before civilian-vehicle checks. */
+export function stripApparatusCallsigns(transcript: string): string {
+  return transcript.replace(APPARATUS_CALLSIGN_RE, " ");
+}
 function keywordBoundaryRe(keyword: string): RegExp {
   const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
   return new RegExp(`\\b${escaped}s?\\b`, "i");
@@ -187,12 +214,14 @@ export function findCrashKeywords(transcript: string): string[] {
   for (const { label, re } of CRASH_PATTERNS) {
     if (re.test(transcript) && !hits.includes(label)) hits.push(label);
   }
-  // Code 4 + a vehicle word: London Fire often dispatches "Engine 7, …
-  // code 4" and only later says MVC. Treat that as a crash so the first
-  // transmission still posts.
+  // Code 4 + a civilian vehicle word: London Fire often dispatches "Engine 7,
+  // … code 4" and only later says MVC. Treat that as a crash so the first
+  // transmission still posts — but ignore apparatus callsigns ("car 6",
+  // "truck 1"), which previously false-triggered every Code 4 fire call.
+  const withoutApparatus = stripApparatusCallsigns(transcript);
   if (
     CODE4_RE.test(transcript) &&
-    /\b(?:cars?|trucks?|vehicles?|trailers?|semis?|transports?)\b/i.test(transcript) &&
+    CIVILIAN_VEHICLE_WORD_RE.test(withoutApparatus) &&
     !hits.includes("code 4 vehicle")
   ) {
     hits.push("code 4 vehicle");
