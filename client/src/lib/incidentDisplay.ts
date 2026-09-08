@@ -40,7 +40,6 @@ export function formatSourceDetectionLabel(
   if (detection.source === "fire_dispatch") {
     return fireDispatchDisplayLabel(detection.provider ?? incident?.provider);
   }
-  if (detection.provider === "blocksinside") return "BlocksInside · Waze";
   return SOURCE_LABELS[detection.source];
 }
 
