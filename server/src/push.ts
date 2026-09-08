@@ -53,8 +53,8 @@ function absoluteUrl(pathOrUrl: string): string {
 }
 
 const PROVIDER_LABELS: Record<string, string> = {
-  blocksinside: "BlocksInside",
-  waze_direct: "Waze Direct",
+  blocksinside: "Waze",
+  waze_direct: "Waze",
   openwebninja: "OpenWebNinja",
   openwebninja_google_maps: "Google Maps",
   google_maps: "Google Maps",
@@ -193,11 +193,11 @@ export function incidentToPushPayload(incident: Incident): PushPayload {
         )
       : truncate(
           [
-            `${incident.locationLabel} — caught by ${providerLabel}`,
+            incident.locationLabel,
             incident.reporterName ? `Reported by ${incident.reporterName}` : null,
           ]
             .filter(Boolean)
-            .join(" · "),
+            .join(" · ") || incident.locationLabel,
           BODY_MAX,
         ),
     ...base,
