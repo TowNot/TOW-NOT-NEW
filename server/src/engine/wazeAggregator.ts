@@ -881,6 +881,10 @@ export function getProviderRuntimeStats(): Record<
 const PROVIDER_TIMEOUT_MS = 25_000;
 /** BlocksInside 10s poll: abort before the next tick so calls cannot overlap. */
 const BLOCKSINSIDE_TIMEOUT_MS = 8_000;
+/** Plan cap is 10 req/s — never fire more than this many tile fetches at once. */
+const BLOCKSINSIDE_TILE_CONCURRENCY = 10;
+/** Pause between tile batches so the next wave starts in a new rate-limit window. */
+const BLOCKSINSIDE_TILE_BATCH_GAP_MS = 1_100;
 
 /** Launch offset between providers so they never fire on the same millisecond. */
 const PROVIDER_STAGGER_MS = 250;
@@ -1192,7 +1196,19 @@ function londonBlocksInsideBox(): BoundingBox {
 
 async function fetchBlocksInsideBox(box: BoundingBox): Promise<WazeAlert[]> {
   const tiles = splitBoundingBoxGrid(box, BLOCKSINSIDE_TILE_ROWS, BLOCKSINSIDE_TILE_COLS);
-  const settled = await Promise.allSettled(tiles.map((tile) => fetchBlocksInsideTile(tile)));
+  const settled: PromiseSettledResult<WazeAlert[]>[] = [];
+
+  // 12 (or more) tiles in one Promise.allSettled burst exceeds the 10 req/s
+  // plan cap → 429 on ~2 tiles every poll (holes that can miss downtown).
+  for (let i = 0; i < tiles.length; i += BLOCKSINSIDE_TILE_CONCURRENCY) {
+    if (i > 0) await sleep(BLOCKSINSIDE_TILE_BATCH_GAP_MS);
+    const batch = tiles.slice(i, i + BLOCKSINSIDE_TILE_CONCURRENCY);
+    const batchSettled = await Promise.allSettled(
+      batch.map((tile) => fetchBlocksInsideTile(tile)),
+    );
+    settled.push(...batchSettled);
+  }
+
   const merged: WazeAlert[] = [];
   const seenIds = new Set<string>();
   let failedTiles = 0;
