@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Incident, IncidentSeverity, IncidentSource } from "../types";
+import type { Incident, IncidentSource } from "../types";
 import { withDeviceSessionQuery } from "../lib/apiFetch";
 import {
   formatDetectionClock,
@@ -21,12 +21,6 @@ export function IncidentCard({ incident }: { incident: Incident }) {
     <article className="grid gap-3 rounded-lg border border-line bg-panel p-4 md:grid-cols-[9rem_1fr_auto]">
       <div className="flex items-start justify-between gap-3 md:block">
         <SourceBadges detections={detections} incident={incident} />
-        <div className="md:mt-2">
-          <SeverityMark severity={incident.severity} />
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-gray-400">
-            {incident.notified ? "alerted" : "silent"}
-          </p>
-        </div>
       </div>
       <div className="flex min-w-0 flex-col gap-3 sm:flex-row">
         {showMap ? <IncidentMapThumbnail lat={lat} lng={lng} /> : null}
@@ -195,22 +189,12 @@ function SourceBadge({
   );
 }
 
-function SeverityMark({ severity }: { severity: IncidentSeverity }) {
-  const color: Record<IncidentSeverity, string> = {
-    low: "text-gray-500",
-    medium: "text-amber-700",
-    high: "text-orange-700",
-    critical: "text-red-700",
-  };
-  return <p className={`font-mono text-[10px] uppercase tracking-[0.18em] ${color[severity]}`}>{severity}</p>;
-}
-
 function formatClock(iso: string): string {
   return new Intl.DateTimeFormat("en-CA", {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
-    hour12: false,
+    hour12: true,
     timeZone: "America/Toronto",
   }).format(new Date(iso));
 }

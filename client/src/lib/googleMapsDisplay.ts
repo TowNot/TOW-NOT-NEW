@@ -1,15 +1,11 @@
 import { fireDispatchDisplayLabel } from "./fireDispatchLabel";
 
-/** Provider attribution for OpenWebNinja-sourced Google Maps incidents. */
+/** Desk / push label for OpenWebNinja-sourced Google Maps incidents. */
 export function formatOpenWebNinjaGoogleMapsLabel(
-  zoom?: number | null,
-  rawType?: string | null,
+  _zoom?: number | null,
+  _rawType?: string | null,
 ): string {
-  const type = rawType?.trim();
-  if (zoom != null && type) return `OpenWebNinja (Zoom ${zoom} - ${type}) · Google Maps`;
-  if (zoom != null) return `OpenWebNinja (Zoom ${zoom}) · Google Maps`;
-  if (type) return `OpenWebNinja (${type}) · Google Maps`;
-  return "OpenWebNinja · Google Maps";
+  return "Google Maps";
 }
 
 export function formatGoogleMapsProviderAttribution(
