@@ -37,10 +37,12 @@ export function IncidentCard({ incident }: { incident: Incident }) {
         {incident.source === "fire_dispatch" || incident.source === "ems" ? (
           <DispatchAudioPlayer incidentId={incident.id} audioUrl={incident.audioUrl} />
         ) : null}
-        <div className="mt-3 flex flex-wrap gap-2">
-          <NavLink href={wazeUrl} label="Open in Waze" />
-          <NavLink href={googleMapsUrl} label="Open in Google Maps" />
-        </div>
+        {incident.source === "waze" || incident.source === "google_maps" ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <NavLink href={wazeUrl} label="Open in Waze" />
+            <NavLink href={googleMapsUrl} label="Open in Google Maps" />
+          </div>
+        ) : null}
         </div>
       </div>
       <div className="font-mono text-[11px] text-gray-500 md:text-right">
