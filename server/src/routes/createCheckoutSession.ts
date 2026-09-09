@@ -76,8 +76,14 @@ export function createCheckoutSessionRouter(): Router {
         success_url: successUrl,
         cancel_url: cancelUrl,
         client_reference_id: auth.userId,
+        // Stripe Tax — needs a billing address (postal code + region) to apply HST/GST/etc.
+        automatic_tax: { enabled: true },
+        billing_address_collection: "required",
         ...(existing?.stripeCustomerId
-          ? { customer: existing.stripeCustomerId }
+          ? {
+              customer: existing.stripeCustomerId,
+              customer_update: { address: "auto", name: "auto" },
+            }
           : email
             ? { customer_email: email }
             : {}),
