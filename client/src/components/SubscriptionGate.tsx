@@ -22,16 +22,17 @@ function currentReturnPath(): string {
 
 function useCityChosen(enabled: boolean): { cityChosen: boolean | null; loading: boolean } {
   const [cityChosen, setCityChosen] = useState<boolean | null>(null);
-  const [loading, setLoading] = useState(enabled);
+  /** idle/loading/done — must not treat "not yet fetched" as cityChosen=false. */
+  const [fetchState, setFetchState] = useState<"idle" | "loading" | "done">("idle");
 
   useEffect(() => {
     if (!enabled) {
       setCityChosen(null);
-      setLoading(false);
+      setFetchState("idle");
       return;
     }
     let cancelled = false;
-    setLoading(true);
+    setFetchState("loading");
     void apiFetch("/api/user/city")
       .then(async (res) => (res.ok ? res.json() : null))
       .then((data) => {
@@ -42,13 +43,16 @@ function useCityChosen(enabled: boolean): { cityChosen: boolean | null; loading:
         if (!cancelled) setCityChosen(false);
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setFetchState("done");
       });
     return () => {
       cancelled = true;
     };
   }, [enabled]);
 
+  // When enabled flips true, fetchState is still "idle" until this effect runs —
+  // keep loading so we never redirect on a null cityChosen from the prior disabled state.
+  const loading = enabled && fetchState !== "done";
   return { cityChosen, loading };
 }
 
@@ -82,6 +86,7 @@ export function ProtectedDeskRoute({ user }: { user: Parameters<typeof IncidentD
     return redirect("/get-started");
   }
 
+  // Only bounce after the city fetch finishes — null means still unknown.
   if (cityChosen !== true) {
     return redirect("/welcome");
   }

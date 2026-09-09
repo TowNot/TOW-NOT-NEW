@@ -112,12 +112,11 @@ export function useSelectedZone(user?: ZoneUser | null) {
 
   const saveZone = useCallback(
     async (zoneId: ZoneId) => {
-      if (!isZoneEnabledForDesk(zoneId)) return;
-      writeLocalZoneId(zoneId);
-      setLocalZoneId(zoneId);
-      setSavedCityId(zoneId);
+      if (!isZoneEnabledForDesk(zoneId)) {
+        throw new Error("That city is not available yet");
+      }
       // Persist to the server first — desk access depends on cityChosen in Postgres.
-      if (user) {
+      if (user?.id) {
         await persistZoneToServer(zoneId);
         try {
           if (user.update) {
@@ -132,6 +131,9 @@ export function useSelectedZone(user?: ZoneUser | null) {
           // Clerk metadata is best-effort; server city is what unlocks the desk.
         }
       }
+      writeLocalZoneId(zoneId);
+      setLocalZoneId(zoneId);
+      setSavedCityId(zoneId);
       await replaceProgressierPushTags(zoneId);
     },
     [user],

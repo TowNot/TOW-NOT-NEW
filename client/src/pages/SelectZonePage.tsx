@@ -10,6 +10,10 @@ export function SelectZonePage({ user }: { user?: ZoneUser | null }) {
   const zones = selectableCoverageZones();
 
   const onSelect = async (id: ZoneId) => {
+    if (!user?.id) {
+      setError("Sign in required to save city");
+      return;
+    }
     setBusy(id);
     setError(null);
     try {
