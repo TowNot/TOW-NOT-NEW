@@ -81,17 +81,33 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
 
   const accountDone = Boolean(isSignedIn);
   const subscribeDone = subscribed;
-  const installDone = subscribeDone;
+  /** Only mark install complete after they continue — never auto-skip the PWA step. */
+  const [installContinued, setInstallContinued] = useState(() => {
+    try {
+      return window.sessionStorage.getItem("alertnav-install-continued") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const installDone = installContinued;
   const nextDestination = resolveAppDestination({
     isSignedIn: Boolean(isSignedIn),
     subscribed: subscribeDone,
   });
   const nextCta = destinationCta(nextDestination);
 
-  useEffect(() => {
-    if (!checkoutSuccess || !subscribeDone || subscriptionLoading) return;
-    window.location.replace("/dashboard");
-  }, [checkoutSuccess, subscribeDone, subscriptionLoading]);
+  const continueAfterInstall = () => {
+    try {
+      window.sessionStorage.setItem("alertnav-install-continued", "1");
+    } catch {
+      // Private browsing.
+    }
+    setInstallContinued(true);
+    window.location.assign(nextCta.href);
+  };
+
+  // Stay on Get Started after checkout so Install AlertNav is visible.
+  // (Previously redirected straight to /dashboard and skipped step 3.)
 
   if (!isSignedIn) {
     return (
@@ -141,23 +157,27 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
           Create your account, subscribe, then install the app on your phone for nearby road alerts.
         </p>
 
+        {checkoutSuccess && subscribeDone ? (
+          <p className="mt-4 rounded-xl border border-accent/25 bg-accent-soft px-4 py-3 text-sm text-accent-deep">
+            Payment received — your plan is active. Install AlertNav below so alerts reach your home
+            screen, then open the desk.
+          </p>
+        ) : null}
+
         {checkoutSuccess && !subscribeDone && !subscriptionLoading ? (
           <p className="mt-4 rounded-xl border border-accent/25 bg-accent-soft px-4 py-3 text-sm text-accent-deep">
             Payment received — finishing activation. This usually takes a few seconds.
           </p>
         ) : null}
 
-        {subscribeDone ? (
+        {subscribeDone && !checkoutSuccess ? (
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <a href={nextCta.href} className="btn-primary px-5 py-2.5 text-sm no-underline">
               {nextCta.label}
             </a>
-            {nextDestination === "/dashboard" ? (
-              <p className="text-sm text-muted">
-                Your subscription is active. Install the app below for push alerts, or open the desk
-                now.
-              </p>
-            ) : null}
+            <p className="text-sm text-muted">
+              Subscription active. You can install the app below anytime.
+            </p>
           </div>
         ) : null}
 
@@ -201,15 +221,16 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
                   Install AlertNav
                 </button>
                 <p className="mt-3 max-w-md text-xs leading-relaxed text-muted">
-                  On iPhone: follow the Add to Home Screen steps. On Android: use the install
-                  prompt. You can install anytime — it does not block dashboard access.
+                  On iPhone: Safari → Share → Add to Home Screen. On Android: tap Install when
+                  prompted. Push alerts work best from the installed app.
                 </p>
-                <a
-                  href={nextCta.href}
-                  className="mt-4 inline-flex text-sm font-semibold text-accent-deep no-underline hover:underline"
+                <button
+                  type="button"
+                  onClick={continueAfterInstall}
+                  className="btn-primary mt-4 px-5 py-2.5 text-sm"
                 >
                   {nextCta.label} →
-                </a>
+                </button>
               </div>
             )}
           </OnboardingStep>
