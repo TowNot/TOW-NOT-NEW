@@ -37,13 +37,18 @@ export function createMeRouter(): Router {
         });
       });
 
-      const existing = await clerkClient.users.getUser(auth.userId);
-      const nextMeta = { ...(existing.publicMetadata ?? {}), selectedZoneId };
-      delete (nextMeta as Record<string, unknown>).pushZoneMode;
-
-      await clerkClient.users.updateUser(auth.userId, {
-        publicMetadata: nextMeta,
-      });
+      try {
+        const existing = await clerkClient.users.getUser(auth.userId);
+        const nextMeta = { ...(existing.publicMetadata ?? {}), selectedZoneId };
+        delete (nextMeta as Record<string, unknown>).pushZoneMode;
+        await clerkClient.users.updateUser(auth.userId, {
+          publicMetadata: nextMeta,
+        });
+      } catch (error) {
+        logger.warn("Clerk publicMetadata city update skipped", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
 
       if (usersAlreadyOnCity === 0) {
         void coldStartCityScrape(selectedZoneId).catch((error) => {
@@ -54,7 +59,7 @@ export function createMeRouter(): Router {
         });
       }
 
-      res.json({ ok: true, selectedZoneId, coldStart: usersAlreadyOnCity === 0 });
+      res.json({ ok: true, selectedZoneId, cityChosen: true, coldStart: usersAlreadyOnCity === 0 });
     } catch (error) {
       logger.warn("Failed to persist selectedZoneId on Clerk publicMetadata", {
         error: error instanceof Error ? error.message : String(error),
