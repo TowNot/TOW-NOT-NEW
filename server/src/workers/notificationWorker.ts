@@ -28,7 +28,7 @@ async function processDispatchNotification(
   await sendProgressierPush(push);
 
   if (sendSms && smsBody?.trim()) {
-    await dispatchSmsBody(smsBody, incidentId, job.data.smsCategory);
+    await dispatchSmsBody(smsBody, incidentId, job.data.smsCategory, push.zoneId);
   }
 
   logger.info("Notification worker completed job", {

@@ -27,6 +27,7 @@ export const DEFAULT_SMS_ALERT_PREFERENCES: SmsAlertPreferences = {
 
 export interface SmsSubscriberRow extends SmsAlertPreferences {
   phone: string;
+  selectedCity: string;
 }
 
 /** Active subscribers — refreshed from Postgres on miss / after writes. */
@@ -34,6 +35,7 @@ let activeSubscribersCache: SmsSubscriberRow[] | null = null;
 
 function rowFromDb(row: {
   phone: string;
+  selectedCity: string;
   alertAccidents: boolean;
   alertIncidents: boolean;
   alertPolice: boolean;
@@ -43,6 +45,7 @@ function rowFromDb(row: {
 }): SmsSubscriberRow {
   return {
     phone: row.phone,
+    selectedCity: row.selectedCity,
     alertAccidents: row.alertAccidents,
     alertIncidents: row.alertIncidents,
     alertPolice: row.alertPolice,
@@ -57,6 +60,7 @@ async function refreshActiveSubscribersCache(): Promise<SmsSubscriberRow[]> {
     where: { active: true },
     select: {
       phone: true,
+      selectedCity: true,
       alertAccidents: true,
       alertIncidents: true,
       alertPolice: true,
@@ -137,11 +141,40 @@ export function subscriberWantsSmsCategory(
   }
 }
 
-export async function listSmsRecipientsForCategory(category: PushCategory): Promise<string[]> {
+export async function listSmsRecipientsForCategory(
+  category: PushCategory,
+  zoneId?: string | null,
+): Promise<string[]> {
+  const city = zoneId?.trim().toLowerCase();
+  if (!city) return [];
+
   const rows = await listSmsSubscriberRows();
   return rows
-    .filter((row) => subscriberWantsSmsCategory(row, category))
+    .filter(
+      (row) =>
+        row.selectedCity.trim().toLowerCase() === city &&
+        subscriberWantsSmsCategory(row, category),
+    )
     .map((row) => row.phone);
+}
+
+/** Keep SMS city in sync when the signed-in user switches desk city. */
+export async function updateSmsSubscriberCityForClerkUser(
+  clerkUserIdRaw: string,
+  selectedCity: string,
+): Promise<void> {
+  const clerkUserId = clerkUserIdRaw.trim();
+  const city = selectedCity.trim().toLowerCase();
+  if (!clerkUserId || !city) return;
+
+  const result = await prisma.smsSubscriber.updateMany({
+    where: { clerkUserId, active: true },
+    data: { selectedCity: city },
+  });
+  if (result.count > 0) {
+    invalidateSmsCache();
+    invalidateActiveMonitoredCitiesCache();
+  }
 }
 
 export async function smsSubscriberCount(): Promise<number> {

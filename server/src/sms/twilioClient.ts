@@ -3,7 +3,7 @@ import { logger } from "../logger";
 import { incidentToPushPayload } from "../push";
 import type { Incident } from "../types/incident";
 import { pushCategoryForIncident, type PushCategory } from "../engine/pushCategories";
-import { listSmsRecipientsForCategory, listSmsSubscribers } from "./subscribers";
+import { listSmsRecipientsForCategory } from "./subscribers";
 
 type TwilioMessages = {
   messages: {
@@ -60,21 +60,23 @@ export function buildSmsBody(incident: Incident): string {
 /**
  * Awaitable SMS fan-out for the notification worker.
  * Individual recipient failures are logged; does not throw (push already sent).
- * When `category` is set, only subscribers who opted into that desk category get texts.
+ * Recipients must match both desk category prefs and the incident city.
  */
 export async function dispatchSmsBody(
   body: string,
   incidentId?: string,
   category?: PushCategory,
+  zoneId?: string | null,
 ): Promise<void> {
   if (!isTwilioConfigured()) return;
   const recipients = category
-    ? await listSmsRecipientsForCategory(category)
-    : await listSmsSubscribers();
+    ? await listSmsRecipientsForCategory(category, zoneId)
+    : [];
   if (recipients.length === 0) {
     logger.info("Twilio SMS dispatch skipped — no matching recipients", {
       incidentId,
       category: category ?? "all",
+      zoneId: zoneId ?? null,
     });
     return;
   }
@@ -84,6 +86,7 @@ export async function dispatchSmsBody(
   logger.info("Twilio SMS dispatch finished", {
     incidentId,
     category: category ?? "all",
+    zoneId: zoneId ?? null,
     sent: results.length - failed,
     failed,
   });
@@ -97,15 +100,15 @@ export async function dispatchSmsBody(
   });
 }
 
-/** Fire-and-forget SMS to category-matched numbers. Never throws to the caller. */
+/** Fire-and-forget SMS to category + city matched numbers. Never throws to the caller. */
 export function notifySmsSubscribers(incident: Incident): void {
-  void dispatchSmsBody(
-    buildSmsBody(incident),
-    incident.id,
-    pushCategoryForIncident(incident),
-  ).catch((error: unknown) => {
-    logger.warn("Twilio SMS dispatch aborted", {
-      error: error instanceof Error ? error.message : String(error),
-    });
-  });
+  const category = pushCategoryForIncident(incident);
+  const zoneId = incidentToPushPayload(incident).zoneId;
+  void dispatchSmsBody(buildSmsBody(incident), incident.id, category, zoneId).catch(
+    (error: unknown) => {
+      logger.warn("Twilio SMS dispatch aborted", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    },
+  );
 }

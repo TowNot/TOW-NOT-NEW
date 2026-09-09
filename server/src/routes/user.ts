@@ -8,12 +8,11 @@ import { readSessionTokenFromRequest, SESSION_REPLACED_MESSAGE } from "../lib/se
 import {
   claimUserSessionToken,
   getUserSelectedCity,
-  updateSmsSubscriberSelectedCity,
   updateSubscriptionSelectedCity,
   upsertUserSelectedCity,
   userSessionTokenMatches,
 } from "../store/userPreferenceStore";
-import { toE164 } from "../sms/e164";
+import { updateSmsSubscriberCityForClerkUser } from "../sms/subscribers";
 
 export function createUserRouter(): Router {
   const router = Router();
@@ -109,17 +108,11 @@ export function createUserRouter(): Router {
         });
       }
 
-      const phoneRaw =
-        user.primaryPhoneNumber?.phoneNumber ??
-        user.phoneNumbers.find((entry) => entry.id === user.primaryPhoneNumberId)?.phoneNumber;
-      const phone = phoneRaw ? toE164(phoneRaw) : null;
-      if (phone) {
-        await updateSmsSubscriberSelectedCity(phone, selectedCity).catch((error) => {
-          logger.debug("SMS subscriber city update skipped", {
-            error: error instanceof Error ? error.message : String(error),
-          });
+      await updateSmsSubscriberCityForClerkUser(auth.userId, selectedCity).catch((error) => {
+        logger.debug("SMS subscriber city update skipped", {
+          error: error instanceof Error ? error.message : String(error),
         });
-      }
+      });
 
       const nextMeta = { ...(user.publicMetadata ?? {}), selectedZoneId: selectedCity };
       delete (nextMeta as Record<string, unknown>).pushZoneMode;

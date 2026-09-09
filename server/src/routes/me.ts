@@ -4,6 +4,7 @@ import { countUsersSelectingCity, normalizeCityId } from "../engine/activeMonito
 import { coldStartCityScrape } from "../engine/cityColdStart";
 import { logger } from "../logger";
 import { upsertUserSelectedCity } from "../store/userPreferenceStore";
+import { updateSmsSubscriberCityForClerkUser } from "../sms/subscribers";
 
 /** Any catalog city may be selected — scrapers follow Prisma demand. */
 export function createMeRouter(): Router {
@@ -30,6 +31,11 @@ export function createMeRouter(): Router {
 
       const usersAlreadyOnCity = await countUsersSelectingCity(selectedZoneId);
       await upsertUserSelectedCity(auth.userId, selectedZoneId);
+      await updateSmsSubscriberCityForClerkUser(auth.userId, selectedZoneId).catch((error) => {
+        logger.debug("SMS subscriber city update skipped", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
 
       const existing = await clerkClient.users.getUser(auth.userId);
       const nextMeta = { ...(existing.publicMetadata ?? {}), selectedZoneId };
