@@ -6,13 +6,17 @@ import { selectableCoverageZones, type ZoneId } from "../lib/zones";
 export function SelectZonePage({ user }: { user?: ZoneUser | null }) {
   const { saveZone } = useSelectedZone(user);
   const [busy, setBusy] = useState<ZoneId | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const zones = selectableCoverageZones();
 
   const onSelect = async (id: ZoneId) => {
     setBusy(id);
+    setError(null);
     try {
       await saveZone(id);
       window.location.assign("/dashboard");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to save city — try again");
     } finally {
       setBusy(null);
     }
@@ -37,6 +41,11 @@ export function SelectZonePage({ user }: { user?: ZoneUser | null }) {
         <p className="mt-4 max-w-xl text-base text-muted sm:text-lg">
           Pick one city. Alerts stay on that city — switch anytime from the dashboard.
         </p>
+        {error ? (
+          <p className="mt-4 rounded-xl border border-rose-300/40 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+            {error}
+          </p>
+        ) : null}
 
         <ul className="mt-8 grid gap-3 sm:mt-12 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
           {zones.map((zone) => (

@@ -116,11 +116,18 @@ export function createUserRouter(): Router {
         });
       });
 
-      const nextMeta = { ...(user.publicMetadata ?? {}), selectedZoneId: selectedCity };
-      delete (nextMeta as Record<string, unknown>).pushZoneMode;
-      await clerkClient.users.updateUser(auth.userId, {
-        publicMetadata: nextMeta,
-      });
+      try {
+        const nextMeta = { ...(user.publicMetadata ?? {}), selectedZoneId: selectedCity };
+        delete (nextMeta as Record<string, unknown>).pushZoneMode;
+        await clerkClient.users.updateUser(auth.userId, {
+          publicMetadata: nextMeta,
+        });
+      } catch (error) {
+        // City is already saved in Postgres — don't fail the request on Clerk metadata.
+        logger.warn("Clerk publicMetadata city update skipped", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
 
       if (usersAlreadyOnCity === 0) {
         void coldStartCityScrape(selectedCity).catch((error) => {
@@ -131,7 +138,7 @@ export function createUserRouter(): Router {
         });
       }
 
-      res.json({ ok: true, selectedCity, coldStart: usersAlreadyOnCity === 0 });
+      res.json({ ok: true, selectedCity, cityChosen: true, coldStart: usersAlreadyOnCity === 0 });
     } catch (error) {
       logger.warn("Failed to persist selected city", {
         error: error instanceof Error ? error.message : String(error),

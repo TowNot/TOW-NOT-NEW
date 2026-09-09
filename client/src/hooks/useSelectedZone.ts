@@ -42,11 +42,15 @@ export function resolveHasZonePreference(user?: ZoneUser | null): boolean {
 }
 
 async function persistZoneToServer(zoneId: ZoneId): Promise<void> {
-  await apiFetch("/api/user/city", {
+  const response = await apiFetch("/api/user/city", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ selectedCity: zoneId }),
   });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error ?? "Unable to save city");
+  }
 }
 
 export function useSelectedZone(user?: ZoneUser | null) {
@@ -112,9 +116,9 @@ export function useSelectedZone(user?: ZoneUser | null) {
       writeLocalZoneId(zoneId);
       setLocalZoneId(zoneId);
       setSavedCityId(zoneId);
-      // Await tag replace so the previous city is dropped before leaving the switcher.
-      await replaceProgressierPushTags(zoneId);
+      // Persist to the server first — desk access depends on cityChosen in Postgres.
       if (user) {
+        await persistZoneToServer(zoneId);
         try {
           if (user.update) {
             await user.update({
@@ -124,13 +128,11 @@ export function useSelectedZone(user?: ZoneUser | null) {
               },
             });
           }
-          await persistZoneToServer(zoneId);
-          // Re-apply after network work — Progressier may have loaded late.
-          await replaceProgressierPushTags(zoneId);
         } catch {
-          // localStorage + local state already updated; tags already attempted.
+          // Clerk metadata is best-effort; server city is what unlocks the desk.
         }
       }
+      await replaceProgressierPushTags(zoneId);
     },
     [user],
   );
