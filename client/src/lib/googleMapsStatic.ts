@@ -11,7 +11,7 @@ export const MAP_THUMB_WIDTH = 600;
 export const MAP_THUMB_HEIGHT = 300;
 
 /** Fixed zoom for card thumbnails — independent of poller tile zoom (often 12). */
-const CARD_PREVIEW_ZOOM = 16;
+const CARD_PREVIEW_ZOOM = 15;
 
 export function resolveGoogleMapsApiKey(): string {
   const fromVite =
@@ -34,7 +34,7 @@ export function showTrafficMapThumbnail(source: IncidentSource): boolean {
 
 /**
  * Single Static Maps request — always the preview source of truth for cards.
- * Poller metadata (googleMapsZoom) is not used; card zoom stays fixed at 16.
+ * Poller metadata (googleMapsZoom) is not used; card zoom stays fixed at 15.
  */
 export function buildGoogleStaticMapUrl(
   lat: number,
