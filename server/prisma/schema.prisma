@@ -49,6 +49,8 @@ model SmsSubscriber {
   phone            String   @id
   active           Boolean  @default(true)
   selectedCity     String   @default("london") @map("zone_id")
+  /** Owning Clerk account — required for prefs / opt-out after opt-in. */
+  clerkUserId      String?  @map("clerk_user_id")
   /** Mirror Live Desk / Progressier category toggles for SMS fan-out. */
   alertAccidents   Boolean  @default(true) @map("alert_accidents")
   alertIncidents   Boolean  @default(false) @map("alert_incidents")
@@ -61,5 +63,6 @@ model SmsSubscriber {
 
   @@index([active])
   @@index([selectedCity])
+  @@index([clerkUserId])
   @@map("sms_subscribers")
 }

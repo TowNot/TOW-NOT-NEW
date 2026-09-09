@@ -1,3 +1,4 @@
+import { getAuth } from "@clerk/express";
 import { Router } from "express";
 import { isTwilioConfigured } from "../sms/twilioClient";
 import {
@@ -12,6 +13,21 @@ import {
   updateSmsAlertPreferences,
   type SmsAlertPreferences,
 } from "../sms/subscribers";
+
+/** Per Clerk user: limit Twilio Verify sends (cost / abuse). */
+const VERIFY_WINDOW_MS = 60 * 60 * 1000;
+const VERIFY_MAX_PER_WINDOW = 5;
+const verifySendLog = new Map<string, number[]>();
+
+function assertSmsVerifyRateLimit(clerkUserId: string): void {
+  const now = Date.now();
+  const recent = (verifySendLog.get(clerkUserId) ?? []).filter((t) => now - t < VERIFY_WINDOW_MS);
+  if (recent.length >= VERIFY_MAX_PER_WINDOW) {
+    throw new Error("Too many verification texts — try again in an hour");
+  }
+  recent.push(now);
+  verifySendLog.set(clerkUserId, recent);
+}
 
 export function createSmsRouter(): Router {
   const router = Router();
@@ -29,18 +45,37 @@ export function createSmsRouter(): Router {
   });
 
   router.post("/verify/start", async (req, res) => {
+    const auth = getAuth(req);
+    const userId = auth.userId?.trim() ?? "";
+    if (!userId) {
+      res.status(401).json({ error: "Unauthorized — sign in required" });
+      return;
+    }
+
     const phone = typeof req.body?.phone === "string" ? req.body.phone : "";
     try {
+      assertSmsVerifyRateLimit(userId);
       const result = await sendSmsVerificationCode(phone);
       res.status(200).json({ ok: true, phone: result.phone });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to send verification code";
-      const status = message.includes("not configured") ? 503 : 400;
+      const status = message.includes("not configured")
+        ? 503
+        : message.includes("Too many")
+          ? 429
+          : 400;
       res.status(status).json({ error: message });
     }
   });
 
   router.post("/opt-in", async (req, res) => {
+    const auth = getAuth(req);
+    const userId = auth.userId?.trim() ?? "";
+    if (!userId) {
+      res.status(401).json({ error: "Unauthorized — sign in required" });
+      return;
+    }
+
     const phone = typeof req.body?.phone === "string" ? req.body.phone : "";
     const code = typeof req.body?.code === "string" ? req.body.code : "";
     const zoneId = typeof req.body?.zoneId === "string" ? req.body.zoneId : undefined;
@@ -51,7 +86,7 @@ export function createSmsRouter(): Router {
         const verified = await verifySmsVerificationCode(phone, code);
         verifiedPhone = verified.phone;
       }
-      const result = await addSmsSubscriber(verifiedPhone, zoneId, alertPrefs);
+      const result = await addSmsSubscriber(verifiedPhone, zoneId, alertPrefs, userId);
       res.status(result.created ? 201 : 200).json({
         ok: true,
         phone: result.phone,
@@ -66,6 +101,13 @@ export function createSmsRouter(): Router {
 
   /** Keep SMS category toggles in sync with Live Desk / Progressier preferences. */
   router.put("/preferences", async (req, res) => {
+    const auth = getAuth(req);
+    const userId = auth.userId?.trim() ?? "";
+    if (!userId) {
+      res.status(401).json({ error: "Unauthorized — sign in required" });
+      return;
+    }
+
     const phone = typeof req.body?.phone === "string" ? req.body.phone : "";
     const alertPrefs = req.body?.alertPreferences as Partial<SmsAlertPreferences> | undefined;
     if (!alertPrefs || typeof alertPrefs !== "object") {
@@ -73,7 +115,7 @@ export function createSmsRouter(): Router {
       return;
     }
     try {
-      const result = await updateSmsAlertPreferences(phone, alertPrefs);
+      const result = await updateSmsAlertPreferences(phone, alertPrefs, userId);
       res.json({ ok: true, phone: result.phone, alertPreferences: result.prefs });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to update SMS preferences";
@@ -82,9 +124,16 @@ export function createSmsRouter(): Router {
   });
 
   router.delete("/opt-in", async (req, res) => {
+    const auth = getAuth(req);
+    const userId = auth.userId?.trim() ?? "";
+    if (!userId) {
+      res.status(401).json({ error: "Unauthorized — sign in required" });
+      return;
+    }
+
     const phone = typeof req.body?.phone === "string" ? req.body.phone : "";
     try {
-      const result = await removeSmsSubscriber(phone);
+      const result = await removeSmsSubscriber(phone, userId);
       res.json({ ok: true, phone: result.phone, removed: result.removed });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to remove phone number";

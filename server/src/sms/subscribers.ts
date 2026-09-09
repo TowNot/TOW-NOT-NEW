@@ -74,6 +74,27 @@ function invalidateSmsCache(): void {
   activeSubscribersCache = null;
 }
 
+function assertClerkUserId(clerkUserId: string): string {
+  const id = clerkUserId.trim();
+  if (!id) throw new Error("Sign in required to manage SMS alerts");
+  return id;
+}
+
+function assertOwnedBy(
+  existing: { clerkUserId: string | null; active: boolean },
+  clerkUserId: string,
+): void {
+  if (!existing.active) {
+    throw new Error("That number is not opted in for SMS");
+  }
+  if (!existing.clerkUserId) {
+    throw new Error("Re-verify this number in SMS settings to link it to your account");
+  }
+  if (existing.clerkUserId !== clerkUserId) {
+    throw new Error("That number is linked to another AlertNav account");
+  }
+}
+
 export async function warmSmsSubscriberCache(): Promise<void> {
   try {
     const count = (await refreshActiveSubscribersCache()).length;
@@ -146,20 +167,38 @@ export function normalizeSmsAlertPreferences(
   };
 }
 
+/** One active SMS number per Clerk account. */
+async function deactivateOtherPhonesForUser(clerkUserId: string, keepPhone: string): Promise<void> {
+  await prisma.smsSubscriber.updateMany({
+    where: {
+      clerkUserId,
+      active: true,
+      NOT: { phone: keepPhone },
+    },
+    data: { active: false },
+  });
+}
+
 export async function addSmsSubscriber(
   raw: string,
-  selectedCity?: string | null,
-  alertPrefs?: Partial<SmsAlertPreferences> | null,
+  selectedCity: string | null | undefined,
+  alertPrefs: Partial<SmsAlertPreferences> | null | undefined,
+  clerkUserIdRaw: string,
 ): Promise<{ phone: string; created: boolean }> {
+  const clerkUserId = assertClerkUserId(clerkUserIdRaw);
   const phone = toE164(raw);
   if (!phone) {
     throw new Error("Enter a valid phone number, e.g. 519-555-1212 or +15195551212");
   }
 
   const existing = await prisma.smsSubscriber.findUnique({ where: { phone } });
-  if (existing?.active) {
+  if (existing?.active && existing.clerkUserId && existing.clerkUserId !== clerkUserId) {
+    throw new Error("This number is already linked to another AlertNav account");
+  }
+
+  if (existing?.active && existing.clerkUserId === clerkUserId) {
     if (alertPrefs) {
-      await updateSmsAlertPreferences(phone, alertPrefs);
+      await updateSmsAlertPreferences(phone, alertPrefs, clerkUserId);
     }
     return { phone, created: false };
   }
@@ -178,14 +217,18 @@ export async function addSmsSubscriber(
       phone,
       active: true,
       selectedCity: city,
+      clerkUserId,
       ...prefs,
     },
     update: {
       active: true,
+      clerkUserId,
       ...(selectedCity?.trim() ? { selectedCity: city } : {}),
       ...prefs,
     },
   });
+
+  await deactivateOtherPhonesForUser(clerkUserId, phone);
 
   invalidateSmsCache();
   invalidateActiveMonitoredCitiesCache();
@@ -195,16 +238,19 @@ export async function addSmsSubscriber(
 export async function updateSmsAlertPreferences(
   rawPhone: string,
   alertPrefs: Partial<SmsAlertPreferences>,
+  clerkUserIdRaw: string,
 ): Promise<{ phone: string; prefs: SmsAlertPreferences }> {
+  const clerkUserId = assertClerkUserId(clerkUserIdRaw);
   const phone = toE164(rawPhone);
   if (!phone) {
     throw new Error("Enter a valid phone number, e.g. 519-555-1212 or +15195551212");
   }
 
   const existing = await prisma.smsSubscriber.findUnique({ where: { phone } });
-  if (!existing?.active) {
+  if (!existing) {
     throw new Error("That number is not opted in for SMS");
   }
+  assertOwnedBy(existing, clerkUserId);
 
   const prefs = normalizeSmsAlertPreferences({
     alertAccidents: alertPrefs.alertAccidents ?? existing.alertAccidents,
@@ -226,7 +272,9 @@ export async function updateSmsAlertPreferences(
 
 export async function removeSmsSubscriber(
   raw: string,
+  clerkUserIdRaw: string,
 ): Promise<{ phone: string; removed: boolean }> {
+  const clerkUserId = assertClerkUserId(clerkUserIdRaw);
   const phone = toE164(raw);
   if (!phone) {
     throw new Error("Enter a valid phone number, e.g. 519-555-1212 or +15195551212");
@@ -236,6 +284,7 @@ export async function removeSmsSubscriber(
   if (!existing?.active) {
     return { phone, removed: false };
   }
+  assertOwnedBy(existing, clerkUserId);
 
   await prisma.smsSubscriber.update({
     where: { phone },

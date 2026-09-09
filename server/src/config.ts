@@ -108,9 +108,7 @@ export const config = {
     process.env.PUSH_ICON_URL?.trim() ||
     "https://oouxkyuexvzylckxeeks.supabase.co/storage/v1/object/public/pgsstoragebucket/Box8ybh6oF1k8MfNQjxX/YUEjbFcDfJDaWOI.png",
   rapidApiKey: process.env.RAPIDAPI_KEY ?? "",
-  wazeApiKey:
-    process.env.WAZEAPI_KEY?.trim() ||
-    "wz_live_XZDbg-TNpEJGfpAVcOfkeeV6ed0AtCp-",
+  wazeApiKey: process.env.WAZEAPI_KEY?.trim() || "",
   wazeApiCountry: process.env.WAZEAPI_COUNTRY?.trim() || "eur",
   wazeBottomLeft: process.env.WAZE_BOTTOM_LEFT?.trim() || "42.8949, -81.3683",
   wazeTopRight: process.env.WAZE_TOP_RIGHT?.trim() || "43.0749, -81.1223",
