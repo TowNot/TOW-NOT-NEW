@@ -319,9 +319,67 @@ function buildClientZone(seed: ZoneSeed): CoverageZone {
 
 export const COVERAGE_ZONES: CoverageZone[] = ZONE_SEEDS.map(buildClientZone);
 
+/**
+ * UI order for desk dropdown + onboarding city picker.
+ * Toronto (Core) first; London near the middle. Does not change scrape/config seeds.
+ */
+const ZONE_PICKER_ORDER: ZoneId[] = [
+  "torontoCore",
+  "milton",
+  "haltonHills",
+  "kitchener",
+  "waterloo",
+  "cambridge",
+  "etobicoke",
+  "northYork",
+  "scarborough",
+  "hamilton",
+  "burlington",
+  "brantford",
+  "barrie",
+  "windsor",
+  "chatham",
+  "mississauga",
+  "brampton",
+  "caledon",
+  "vaughan",
+  "richmondHill",
+  "london",
+  "newmarket",
+  "markham",
+  "pickering",
+  "ajax",
+  "whitby",
+  "oshawa",
+  "bowmanville",
+  "stCatharines",
+  "niagaraFalls",
+  "fortErie",
+  "grimsby",
+  "lincoln",
+  "niagaraOnTheLake",
+  "oakville",
+  "woodstock",
+  "guelph",
+  "ottawa",
+  "kanata",
+  "orleans",
+  "barrhaven",
+];
+
 /** Desk / onboarding city picker — full coverage catalog (one city at a time). */
 export function selectableCoverageZones(): CoverageZone[] {
-  return COVERAGE_ZONES;
+  const byId = new Map(COVERAGE_ZONES.map((zone) => [zone.id, zone]));
+  const ordered: CoverageZone[] = [];
+  for (const id of ZONE_PICKER_ORDER) {
+    const zone = byId.get(id);
+    if (zone) ordered.push(zone);
+  }
+  // Any new seed not yet listed in ZONE_PICKER_ORDER still appears at the end.
+  for (const zone of COVERAGE_ZONES) {
+    if (!ZONE_PICKER_ORDER.includes(zone.id)) ordered.push(zone);
+  }
+  return ordered;
 }
 
 export function isZoneEnabledForDesk(id: string): boolean {
