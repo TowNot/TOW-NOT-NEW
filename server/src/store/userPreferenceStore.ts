@@ -8,6 +8,7 @@ const DEFAULT_CITY = "london";
 export interface UserCityRecord {
   clerkUserId: string;
   selectedCity: string;
+  cityChosen: boolean;
   notificationsEnabled: boolean;
   updatedAt: string;
 }
@@ -15,12 +16,14 @@ export interface UserCityRecord {
 function toRecord(row: {
   clerkUserId: string;
   selectedCity: string;
+  cityChosen: boolean;
   notificationsEnabled: boolean;
   updatedAt: Date;
 }): UserCityRecord {
   return {
     clerkUserId: row.clerkUserId,
     selectedCity: row.selectedCity,
+    cityChosen: row.cityChosen,
     notificationsEnabled: row.notificationsEnabled,
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -42,6 +45,25 @@ export async function getUserSelectedCity(clerkUserId: string): Promise<string> 
   }
 }
 
+/** True only after an explicit city save (not session-claim placeholder). */
+export async function userHasChosenCity(clerkUserId: string): Promise<boolean> {
+  const id = clerkUserId.trim();
+  if (!id) return false;
+  try {
+    const row = await prisma.userPreference.findUnique({
+      where: { clerkUserId: id },
+      select: { cityChosen: true },
+    });
+    return Boolean(row?.cityChosen);
+  } catch (error) {
+    logger.warn("Failed to read cityChosen flag", {
+      clerkUserId: id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return false;
+  }
+}
+
 export async function upsertUserSelectedCity(
   clerkUserId: string,
   selectedCity: string,
@@ -57,9 +79,10 @@ export async function upsertUserSelectedCity(
     create: {
       clerkUserId: id,
       selectedCity: city,
+      cityChosen: true,
       notificationsEnabled: true,
     },
-    update: { selectedCity: city },
+    update: { selectedCity: city, cityChosen: true },
   });
 
   invalidateActiveMonitoredCitiesCache();
@@ -124,6 +147,7 @@ export async function claimUserSessionToken(clerkUserId: string): Promise<string
     create: {
       clerkUserId: id,
       selectedCity: DEFAULT_CITY,
+      cityChosen: false,
       notificationsEnabled: true,
       currentSessionToken: token,
     },

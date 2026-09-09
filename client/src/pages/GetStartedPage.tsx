@@ -6,6 +6,7 @@ import { SiteFooter } from "../components/SiteFooter";
 import { type ZoneUser } from "../hooks/useSelectedZone";
 import { useSubscriptionStatus } from "../hooks/useSubscriptionStatus";
 import { isClerkConfigured } from "../lib/clerkKey";
+import { apiFetch } from "../lib/apiFetch";
 import { destinationCta, resolveAppDestination } from "../lib/onboarding";
 import { startStripeCheckout, type BillingInterval } from "../lib/stripeCheckout";
 
@@ -66,6 +67,7 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
     clerkUser?.emailAddresses?.[0]?.emailAddress ??
     null;
   const { active: subscribed, trialUsed, loading: subscriptionLoading, refresh } = useSubscriptionStatus();
+  const [cityChosen, setCityChosen] = useState<boolean | null>(null);
 
   const checkoutSuccess = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
@@ -78,6 +80,26 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
     const timer = window.setInterval(() => void refresh({ background: true }), 3000);
     return () => window.clearInterval(timer);
   }, [checkoutSuccess, refresh]);
+
+  useEffect(() => {
+    if (!isSignedIn || !subscribed) {
+      setCityChosen(null);
+      return;
+    }
+    let cancelled = false;
+    void apiFetch("/api/user/city")
+      .then(async (res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        setCityChosen(data?.cityChosen === true);
+      })
+      .catch(() => {
+        if (!cancelled) setCityChosen(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isSignedIn, subscribed]);
 
   const accountDone = Boolean(isSignedIn);
   const subscribeDone = subscribed;
@@ -93,6 +115,7 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
   const nextDestination = resolveAppDestination({
     isSignedIn: Boolean(isSignedIn),
     subscribed: subscribeDone,
+    hasChosenCity: cityChosen === true,
   });
   const nextCta = destinationCta(nextDestination);
 

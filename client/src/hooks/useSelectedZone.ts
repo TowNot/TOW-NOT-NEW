@@ -76,7 +76,8 @@ export function useSelectedZone(user?: ZoneUser | null) {
       .then((data) => {
         if (cancelled) return;
         const city = data?.selectedCity;
-        if (isZoneId(city) && isZoneEnabledForDesk(city)) {
+        // Only apply server city once the user has explicitly chosen one.
+        if (data?.cityChosen === true && isZoneId(city) && isZoneEnabledForDesk(city)) {
           setSavedCityId(city);
           writeLocalZoneId(city);
           setLocalZoneId(city);

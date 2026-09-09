@@ -17,9 +17,12 @@ export function signInUrl(returnPath?: string): string {
 export function resolveAppDestination(options: {
   isSignedIn: boolean;
   subscribed?: boolean;
+  /** False until the user explicitly picks a city on /welcome. */
+  hasChosenCity?: boolean;
 }): AppDestination {
   if (!options.isSignedIn) return "/get-started";
   if (options.subscribed !== true) return "/get-started";
+  if (options.hasChosenCity !== true) return "/welcome";
   return "/dashboard";
 }
 

@@ -10,6 +10,7 @@ import {
   getUserSelectedCity,
   updateSubscriptionSelectedCity,
   upsertUserSelectedCity,
+  userHasChosenCity,
   userSessionTokenMatches,
 } from "../store/userPreferenceStore";
 import { updateSmsSubscriberCityForClerkUser } from "../sms/subscribers";
@@ -66,7 +67,8 @@ export function createUserRouter(): Router {
       }
 
       const selectedCity = await getUserSelectedCity(auth.userId);
-      res.json({ selectedCity });
+      const cityChosen = await userHasChosenCity(auth.userId);
+      res.json({ selectedCity, cityChosen });
     } catch (error) {
       next(error);
     }

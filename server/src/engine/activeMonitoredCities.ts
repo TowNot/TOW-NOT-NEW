@@ -28,6 +28,7 @@ export function invalidateActiveMonitoredCitiesCache(): void {
 export async function getActiveMonitoredCities(): Promise<string[]> {
   try {
     const rows = await prisma.userPreference.findMany({
+      where: { cityChosen: true },
       select: { selectedCity: true },
       distinct: ["selectedCity"],
     });
@@ -53,7 +54,7 @@ export async function countUsersSelectingCity(cityId: string): Promise<number> {
   if (!id) return 0;
   try {
     return await prisma.userPreference.count({
-      where: { selectedCity: id },
+      where: { selectedCity: id, cityChosen: true },
     });
   } catch (error) {
     logger.warn("Failed to count users for city", {
