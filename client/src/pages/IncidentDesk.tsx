@@ -92,7 +92,6 @@ export function IncidentDesk({ user }: { user?: ZoneUser | null }) {
             onToggleSource={toggleSource}
             policeAlertsEnabled={policeAlertsEnabled}
             onTogglePoliceAlerts={togglePoliceAlerts}
-            zoneName={activeZone.name}
             hasFireFeed={activeZone.hasFireFeed}
             hasEmsFeed={activeZone.hasEmsFeed}
           />

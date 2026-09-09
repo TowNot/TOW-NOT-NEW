@@ -1,4 +1,4 @@
-import { getZone, selectableCoverageZones, type ZoneId } from "../lib/zones";
+import { selectableCoverageZones, type ZoneId } from "../lib/zones";
 
 export function ZoneSwitcher({
   value,
@@ -9,8 +9,6 @@ export function ZoneSwitcher({
   onChange: (id: ZoneId) => void;
   dark?: boolean;
 }) {
-  const active = getZone(value);
-  const firePending = active ? !active.hasFireFeed : false;
   const zones = selectableCoverageZones();
 
   return (
@@ -43,21 +41,11 @@ export function ZoneSwitcher({
         >
           {zones.map((zone) => (
             <option key={zone.id} value={zone.id}>
-              {zone.hasFireFeed ? zone.name : `${zone.name} · Fire soon`}
+              {zone.name}
             </option>
           ))}
         </select>
       </label>
-      {firePending && active ? (
-        <span
-          className="inline-flex max-w-[10rem] cursor-default items-center truncate rounded-md border border-dashed border-line bg-ink px-2 py-1.5 font-mono text-[10px] font-medium text-gray-500 sm:max-w-none"
-          title={`${active.name} fire audio is not configured yet`}
-          role="status"
-          aria-live="polite"
-        >
-          {active.name} Fire coming soon
-        </span>
-      ) : null}
     </div>
   );
 }

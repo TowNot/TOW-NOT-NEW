@@ -50,7 +50,7 @@ export function IncidentFeed({
               className={`rounded-lg border border-line bg-panel px-4 py-3 ${locked ? "opacity-50" : ""}`}
               title={
                 fireLocked
-                  ? `${zoneName} Fire coming soon`
+                  ? "Fire soon"
                   : emsLocked
                     ? "EMS Encrypted in this Region"
                     : undefined
@@ -64,7 +64,7 @@ export function IncidentFeed({
               </p>
               <p className="text-xs text-gray-500">
                 {fireLocked
-                  ? `${zoneName} Fire coming soon`
+                  ? "Fire soon"
                   : emsLocked
                     ? "encrypted in this region"
                     : "active in 3-hour window"}

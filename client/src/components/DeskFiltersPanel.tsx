@@ -19,7 +19,6 @@ interface DeskFiltersPanelProps {
   onToggleSource: (source: IncidentSource) => void;
   policeAlertsEnabled: boolean;
   onTogglePoliceAlerts: () => void;
-  zoneName: string;
   hasFireFeed: boolean;
   hasEmsFeed: boolean;
 }
@@ -33,7 +32,6 @@ export function DeskFiltersPanel({
   onToggleSource,
   policeAlertsEnabled,
   onTogglePoliceAlerts,
-  zoneName,
   hasFireFeed,
   hasEmsFeed,
 }: DeskFiltersPanelProps) {
@@ -65,7 +63,7 @@ export function DeskFiltersPanel({
             const locked = emsLocked || fireLocked;
             const on = !locked && activeSources.has(source);
             const lockTitle = fireLocked
-              ? `${zoneName} Fire coming soon`
+              ? "Fire soon"
               : emsLocked
                 ? "EMS Encrypted in this Region"
                 : undefined;
@@ -89,7 +87,7 @@ export function DeskFiltersPanel({
                 {SOURCE_SHORT[source]}
                 {fireLocked ? (
                   <span className="mt-1 block normal-case tracking-normal text-[10px] font-medium text-gray-400">
-                    {zoneName} Fire coming soon
+                    Fire soon
                   </span>
                 ) : emsLocked ? (
                   <span className="mt-1 block normal-case tracking-normal text-[10px] font-medium text-gray-400">
