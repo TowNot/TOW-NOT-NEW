@@ -9,6 +9,7 @@ import { isClerkConfigured } from "../lib/clerkKey";
 import { apiFetch } from "../lib/apiFetch";
 import { destinationCta, resolveAppDestination } from "../lib/onboarding";
 import { startStripeCheckout, type BillingInterval } from "../lib/stripeCheckout";
+import { readLocalCityChosen } from "../lib/zones";
 
 const ONBOARDING_STEPS = [
   {
@@ -91,10 +92,10 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
       .then(async (res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (cancelled) return;
-        setCityChosen(data?.cityChosen === true);
+        setCityChosen(data?.cityChosen === true || readLocalCityChosen());
       })
       .catch(() => {
-        if (!cancelled) setCityChosen(false);
+        if (!cancelled) setCityChosen(readLocalCityChosen());
       });
     return () => {
       cancelled = true;

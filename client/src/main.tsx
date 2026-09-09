@@ -24,7 +24,7 @@ createRoot(root).render(
       <ClerkProvider
       publishableKey={publishableKey}
       afterSignOutUrl="/"
-      signInFallbackRedirectUrl="/welcome"
+      signInFallbackRedirectUrl="/dashboard"
       signUpFallbackRedirectUrl="/get-started"
     >
         <App />

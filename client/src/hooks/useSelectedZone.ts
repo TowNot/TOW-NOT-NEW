@@ -7,6 +7,7 @@ import {
   isZoneId,
   readLocalZoneId,
   replaceProgressierPushTags,
+  writeLocalCityChosen,
   writeLocalZoneId,
   type CoverageZone,
   type ZoneId,
@@ -84,6 +85,7 @@ export function useSelectedZone(user?: ZoneUser | null) {
         if (data?.cityChosen === true && isZoneId(city) && isZoneEnabledForDesk(city)) {
           setSavedCityId(city);
           writeLocalZoneId(city);
+          writeLocalCityChosen(true);
           setLocalZoneId(city);
           void replaceProgressierPushTags(city);
         }
@@ -118,6 +120,7 @@ export function useSelectedZone(user?: ZoneUser | null) {
       // Persist to the server first — desk access depends on cityChosen in Postgres.
       if (user?.id) {
         await persistZoneToServer(zoneId);
+        writeLocalCityChosen(true);
         try {
           if (user.update) {
             await user.update({

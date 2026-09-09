@@ -388,6 +388,8 @@ export function isZoneEnabledForDesk(id: string): boolean {
 
 export const DEFAULT_ZONE_ID: ZoneId = "london";
 export const ZONE_STORAGE_KEY = "alertnav-selected-zone-id";
+/** Set only after an explicit city pick (or confirmed server cityChosen). */
+export const CITY_CHOSEN_STORAGE_KEY = "alertnav-city-chosen";
 
 export function zonePushTag(zoneId: ZoneId): string {
   return `zone-${zoneId}`;
@@ -573,6 +575,23 @@ export function readLocalZoneId(): ZoneId | null {
 export function writeLocalZoneId(id: ZoneId): void {
   try {
     window.localStorage.setItem(ZONE_STORAGE_KEY, id);
+  } catch {
+    // Private browsing / quota.
+  }
+}
+
+export function readLocalCityChosen(): boolean {
+  try {
+    return window.localStorage.getItem(CITY_CHOSEN_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function writeLocalCityChosen(chosen: boolean): void {
+  try {
+    if (chosen) window.localStorage.setItem(CITY_CHOSEN_STORAGE_KEY, "1");
+    else window.localStorage.removeItem(CITY_CHOSEN_STORAGE_KEY);
   } catch {
     // Private browsing / quota.
   }

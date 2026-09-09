@@ -5,9 +5,9 @@ function originUrl(): string {
   return window.location.origin;
 }
 
-/** After sign-in — pick or confirm coverage zone. */
+/** After sign-in — desk (gates to city picker only if needed). */
 export function welcomeRedirectUrl(): string {
-  return `${originUrl()}/welcome`;
+  return `${originUrl()}/dashboard`;
 }
 
 /** After sign-up — subscribe and install the app. */

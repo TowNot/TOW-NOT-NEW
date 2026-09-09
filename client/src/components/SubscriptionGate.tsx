@@ -6,9 +6,18 @@ import { SelectZonePage } from "../pages/SelectZonePage";
 import { RouteLoadingShell } from "./RouteLoadingShell";
 import { SessionTakenOverModal } from "./SessionTakenOverModal";
 import { isClerkConfigured } from "../lib/clerkKey";
-import { apiFetch } from "../lib/apiFetch";
+import { apiFetch, SessionReplacedError } from "../lib/apiFetch";
 import { loginRedirectUrl } from "../lib/onboarding";
 import { useSessionTakeover } from "../lib/sessionTakeover";
+import {
+  isZoneEnabledForDesk,
+  isZoneId,
+  readLocalCityChosen,
+  readLocalZoneId,
+  writeLocalCityChosen,
+  writeLocalZoneId,
+} from "../lib/zones";
+import type { ZoneUser } from "../hooks/useSelectedZone";
 
 function redirect(to: string): null {
   window.location.replace(to);
@@ -20,7 +29,27 @@ function currentReturnPath(): string {
   return path === "/login" ? "/dashboard" : path;
 }
 
-function useCityChosen(enabled: boolean): { cityChosen: boolean | null; loading: boolean } {
+function metadataHasChosenCity(user: ZoneUser | null | undefined): boolean {
+  if (!user) return false;
+  const fromPublic = user.publicMetadata?.selectedZoneId;
+  if (isZoneId(fromPublic) && isZoneEnabledForDesk(fromPublic)) return true;
+  const fromUnsafe = user.unsafeMetadata?.selectedZoneId;
+  return isZoneId(fromUnsafe) && isZoneEnabledForDesk(fromUnsafe);
+}
+
+/** Client-side evidence the user already picked a city (survives flaky city API). */
+function clientHasChosenCity(user: ZoneUser | null | undefined): boolean {
+  if (readLocalCityChosen()) {
+    const local = readLocalZoneId();
+    if (local && isZoneEnabledForDesk(local)) return true;
+  }
+  return metadataHasChosenCity(user);
+}
+
+function useCityChosen(
+  enabled: boolean,
+  user: ZoneUser | null | undefined,
+): { cityChosen: boolean | null; loading: boolean } {
   const [cityChosen, setCityChosen] = useState<boolean | null>(null);
   /** idle/loading/done — must not treat "not yet fetched" as cityChosen=false. */
   const [fetchState, setFetchState] = useState<"idle" | "loading" | "done">("idle");
@@ -37,10 +66,26 @@ function useCityChosen(enabled: boolean): { cityChosen: boolean | null; loading:
       .then(async (res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (cancelled) return;
-        setCityChosen(data?.cityChosen === true);
+        if (data?.cityChosen === true) {
+          const city = data?.selectedCity;
+          if (isZoneId(city) && isZoneEnabledForDesk(city)) {
+            writeLocalZoneId(city);
+          }
+          writeLocalCityChosen(true);
+          setCityChosen(true);
+          return;
+        }
+        // API said unchosen or returned nothing — keep desk open if we already picked locally.
+        setCityChosen(clientHasChosenCity(user));
       })
-      .catch(() => {
-        if (!cancelled) setCityChosen(false);
+      .catch((error) => {
+        if (cancelled) return;
+        if (error instanceof SessionReplacedError) {
+          // Session takeover UI handles this — do not bounce to city picker.
+          setCityChosen(clientHasChosenCity(user));
+          return;
+        }
+        setCityChosen(clientHasChosenCity(user));
       })
       .finally(() => {
         if (!cancelled) setFetchState("done");
@@ -48,7 +93,7 @@ function useCityChosen(enabled: boolean): { cityChosen: boolean | null; loading:
     return () => {
       cancelled = true;
     };
-  }, [enabled]);
+  }, [enabled, user?.id]);
 
   // When enabled flips true, fetchState is still "idle" until this effect runs —
   // keep loading so we never redirect on a null cityChosen from the prior disabled state.
@@ -61,7 +106,10 @@ export function ProtectedDeskRoute({ user }: { user: Parameters<typeof IncidentD
   const { isLoaded, isSignedIn } = useUser();
   const { active: subscribed, loading: subscriptionLoading, refresh } = useSubscriptionStatus();
   const sessionTakenOver = useSessionTakeover();
-  const { cityChosen, loading: cityLoading } = useCityChosen(Boolean(isSignedIn && subscribed));
+  const { cityChosen, loading: cityLoading } = useCityChosen(
+    Boolean(isSignedIn && subscribed),
+    user,
+  );
 
   useEffect(() => {
     if (!isSignedIn) return;
@@ -103,12 +151,16 @@ export function ProtectedDeskRoute({ user }: { user: Parameters<typeof IncidentD
 export function ProtectedWelcomeRoute({ user }: { user: Parameters<typeof SelectZonePage>[0]["user"] }) {
   const { isLoaded, isSignedIn } = useUser();
   const { active: subscribed, loading: subscriptionLoading } = useSubscriptionStatus();
+  const { cityChosen, loading: cityLoading } = useCityChosen(
+    Boolean(isSignedIn && subscribed),
+    user,
+  );
 
   if (!isClerkConfigured()) {
     return redirect("/get-started");
   }
 
-  if (!isLoaded || subscriptionLoading) {
+  if (!isLoaded || subscriptionLoading || (subscribed && cityLoading)) {
     return <RouteLoadingShell label="Checking your access…" />;
   }
 
@@ -118,6 +170,11 @@ export function ProtectedWelcomeRoute({ user }: { user: Parameters<typeof Select
 
   if (!subscribed) {
     return redirect("/get-started");
+  }
+
+  // Already picked — don't show the chooser again on every app open.
+  if (cityChosen === true) {
+    return redirect("/dashboard");
   }
 
   return <SelectZonePage user={user} />;
