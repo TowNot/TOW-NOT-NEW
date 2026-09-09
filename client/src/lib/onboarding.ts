@@ -29,7 +29,7 @@ export function resolveAppDestination(options: {
 export function destinationCta(destination: AppDestination): { href: string; label: string } {
   switch (destination) {
     case "/dashboard":
-      return { href: "/dashboard", label: "Enter Dashboard" };
+      return { href: "/dashboard", label: "Open Live Desk" };
     case "/welcome":
       return { href: "/welcome", label: "Choose your city" };
     default:

@@ -11,6 +11,7 @@ import {
 } from "../design/copy";
 import { useSubscriptionStatus } from "../hooks/useSubscriptionStatus";
 import { accountPortalUrl } from "../lib/clerkPortal";
+import { clientHasChosenCity } from "../lib/cityChoice";
 import { isClerkConfigured } from "../lib/clerkKey";
 import {
   clearSessionReplacedFromUrl,
@@ -81,7 +82,13 @@ function LandingHeroCta({ isSignedIn, subscribed, accountReady }: LandingPageVie
   }
 
   if (isSignedIn) {
-    const heroCta = destinationCta(resolveAppDestination({ isSignedIn: true, subscribed }));
+    const heroCta = destinationCta(
+      resolveAppDestination({
+        isSignedIn: true,
+        subscribed,
+        hasChosenCity: clientHasChosenCity(),
+      }),
+    );
     return (
       <>
         <div className="landing-hero-cta mt-6 sm:mt-8">

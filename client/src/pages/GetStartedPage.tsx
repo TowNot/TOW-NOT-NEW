@@ -9,7 +9,8 @@ import { isClerkConfigured } from "../lib/clerkKey";
 import { apiFetch } from "../lib/apiFetch";
 import { destinationCta, resolveAppDestination } from "../lib/onboarding";
 import { startStripeCheckout, type BillingInterval } from "../lib/stripeCheckout";
-import { readLocalCityChosen } from "../lib/zones";
+import { clientHasChosenCity } from "../lib/cityChoice";
+import { writeLocalCityChosen } from "../lib/zones";
 
 const ONBOARDING_STEPS = [
   {
@@ -68,7 +69,9 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
     clerkUser?.emailAddresses?.[0]?.emailAddress ??
     null;
   const { active: subscribed, trialUsed, loading: subscriptionLoading, refresh } = useSubscriptionStatus();
-  const [cityChosen, setCityChosen] = useState<boolean | null>(null);
+  const [cityChosen, setCityChosen] = useState<boolean | null>(() =>
+    clientHasChosenCity(user) ? true : null,
+  );
 
   const checkoutSuccess = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
@@ -92,15 +95,20 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
       .then(async (res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (cancelled) return;
-        setCityChosen(data?.cityChosen === true || readLocalCityChosen());
+        if (data?.cityChosen === true) {
+          writeLocalCityChosen(true);
+          setCityChosen(true);
+          return;
+        }
+        setCityChosen(clientHasChosenCity(user));
       })
       .catch(() => {
-        if (!cancelled) setCityChosen(readLocalCityChosen());
+        if (!cancelled) setCityChosen(clientHasChosenCity(user));
       });
     return () => {
       cancelled = true;
     };
-  }, [isSignedIn, subscribed]);
+  }, [isSignedIn, subscribed, user?.id]);
 
   const accountDone = Boolean(isSignedIn);
   const subscribeDone = subscribed;
@@ -116,7 +124,7 @@ function GetStartedPageWithAuth({ user }: { user?: ZoneUser | null }) {
   const nextDestination = resolveAppDestination({
     isSignedIn: Boolean(isSignedIn),
     subscribed: subscribeDone,
-    hasChosenCity: cityChosen === true,
+    hasChosenCity: cityChosen === true || clientHasChosenCity(user),
   });
   const nextCta = destinationCta(nextDestination);
 

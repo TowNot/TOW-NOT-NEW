@@ -7,13 +7,12 @@ import { RouteLoadingShell } from "./RouteLoadingShell";
 import { SessionTakenOverModal } from "./SessionTakenOverModal";
 import { isClerkConfigured } from "../lib/clerkKey";
 import { apiFetch, SessionReplacedError } from "../lib/apiFetch";
+import { clientHasChosenCity } from "../lib/cityChoice";
 import { loginRedirectUrl } from "../lib/onboarding";
 import { useSessionTakeover } from "../lib/sessionTakeover";
 import {
   isZoneEnabledForDesk,
   isZoneId,
-  readLocalCityChosen,
-  readLocalZoneId,
   writeLocalCityChosen,
   writeLocalZoneId,
 } from "../lib/zones";
@@ -27,23 +26,6 @@ function redirect(to: string): null {
 function currentReturnPath(): string {
   const path = window.location.pathname.replace(/\/+$/, "") || "/";
   return path === "/login" ? "/dashboard" : path;
-}
-
-function metadataHasChosenCity(user: ZoneUser | null | undefined): boolean {
-  if (!user) return false;
-  const fromPublic = user.publicMetadata?.selectedZoneId;
-  if (isZoneId(fromPublic) && isZoneEnabledForDesk(fromPublic)) return true;
-  const fromUnsafe = user.unsafeMetadata?.selectedZoneId;
-  return isZoneId(fromUnsafe) && isZoneEnabledForDesk(fromUnsafe);
-}
-
-/** Client-side evidence the user already picked a city (survives flaky city API). */
-function clientHasChosenCity(user: ZoneUser | null | undefined): boolean {
-  if (readLocalCityChosen()) {
-    const local = readLocalZoneId();
-    if (local && isZoneEnabledForDesk(local)) return true;
-  }
-  return metadataHasChosenCity(user);
 }
 
 function useCityChosen(
@@ -81,7 +63,6 @@ function useCityChosen(
       .catch((error) => {
         if (cancelled) return;
         if (error instanceof SessionReplacedError) {
-          // Session takeover UI handles this — do not bounce to city picker.
           setCityChosen(clientHasChosenCity(user));
           return;
         }
@@ -147,20 +128,20 @@ export function ProtectedDeskRoute({ user }: { user: Parameters<typeof IncidentD
   );
 }
 
-/** Zone picker — subscribed accounts only (canceled → billing). */
+/**
+ * Zone picker — subscribed accounts only.
+ * Do not pre-fetch cityChosen here: that caused Choose city → check → dashboard → check again.
+ * If they already picked, CTAs should send them to /dashboard; local sync redirect is instant.
+ */
 export function ProtectedWelcomeRoute({ user }: { user: Parameters<typeof SelectZonePage>[0]["user"] }) {
   const { isLoaded, isSignedIn } = useUser();
   const { active: subscribed, loading: subscriptionLoading } = useSubscriptionStatus();
-  const { cityChosen, loading: cityLoading } = useCityChosen(
-    Boolean(isSignedIn && subscribed),
-    user,
-  );
 
   if (!isClerkConfigured()) {
     return redirect("/get-started");
   }
 
-  if (!isLoaded || subscriptionLoading || (subscribed && cityLoading)) {
+  if (!isLoaded || subscriptionLoading) {
     return <RouteLoadingShell label="Checking your access…" />;
   }
 
@@ -172,8 +153,8 @@ export function ProtectedWelcomeRoute({ user }: { user: Parameters<typeof Select
     return redirect("/get-started");
   }
 
-  // Already picked — don't show the chooser again on every app open.
-  if (cityChosen === true) {
+  // Instant — no network round-trip, so no second "Checking your access…".
+  if (clientHasChosenCity(user)) {
     return redirect("/dashboard");
   }
 
