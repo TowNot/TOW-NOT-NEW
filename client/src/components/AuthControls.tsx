@@ -11,22 +11,13 @@ import { openStripeBillingPortal } from "../lib/stripeBillingPortal";
 export function AuthControls({
   variant = "light",
   signUpLabel = "Sign up",
-  /** Desk only — small icon beside Clerk; billing stays in the Clerk menu everywhere. */
-  showBillingButton = false,
 }: {
   variant?: "light" | "dark";
   signUpLabel?: string;
-  showBillingButton?: boolean;
 }) {
   if (!isClerkConfigured()) return null;
 
-  return (
-    <AuthControlsInner
-      variant={variant}
-      signUpLabel={signUpLabel}
-      showBillingButton={showBillingButton}
-    />
-  );
+  return <AuthControlsInner variant={variant} signUpLabel={signUpLabel} />;
 }
 
 function BillingCardIcon({ className }: { className?: string }) {
@@ -51,11 +42,9 @@ function BillingCardIcon({ className }: { className?: string }) {
 function AuthControlsInner({
   variant,
   signUpLabel,
-  showBillingButton,
 }: {
   variant: "light" | "dark";
   signUpLabel: string;
-  showBillingButton: boolean;
 }) {
   const { isLoaded, isSignedIn } = useAuth();
   const dark = variant === "dark";
@@ -63,6 +52,7 @@ function AuthControlsInner({
   const [billingBusy, setBillingBusy] = useState(false);
 
   const onManageBilling = () => {
+    if (billingBusy) return;
     setBillingError(null);
     setBillingBusy(true);
     void openStripeBillingPortal()
@@ -100,33 +90,15 @@ function AuthControlsInner({
 
   return (
     <div className="auth-controls flex min-w-0 flex-col items-end gap-1">
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
-        {showBillingButton ? (
-          <button
-            type="button"
-            disabled={billingBusy}
+      <UserButton afterSignOutUrl="/">
+        <UserButton.MenuItems>
+          <UserButton.Action
+            label="Manage billing"
+            labelIcon={<BillingCardIcon className="h-4 w-4" />}
             onClick={onManageBilling}
-            title="Manage billing"
-            aria-label={billingBusy ? "Opening billing" : "Manage billing"}
-            className={
-              dark
-                ? "inline-flex h-9 w-9 shrink-0 touch-manipulation items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition hover:bg-white/15 disabled:opacity-60"
-                : "inline-flex h-9 w-9 shrink-0 touch-manipulation items-center justify-center rounded-full border border-line bg-surface text-brand transition hover:bg-brand-soft disabled:opacity-60"
-            }
-          >
-            <BillingCardIcon className="h-4 w-4" />
-          </button>
-        ) : null}
-        <UserButton afterSignOutUrl="/">
-          <UserButton.MenuItems>
-            <UserButton.Action
-              label="Manage billing"
-              labelIcon={<BillingCardIcon className="h-4 w-4" />}
-              onClick={onManageBilling}
-            />
-          </UserButton.MenuItems>
-        </UserButton>
-      </div>
+          />
+        </UserButton.MenuItems>
+      </UserButton>
       {billingError ? (
         <p className="max-w-[14rem] text-right text-[11px] leading-snug text-rose-600" role="alert">
           {billingError}
