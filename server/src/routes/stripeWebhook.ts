@@ -15,8 +15,10 @@ import {
   isEntitledSubscriptionStatus,
   revokeSubscription,
   updateSubscriptionStatus,
+  type SubscriptionRecord,
   type SubscriptionStatus,
 } from "../store/subscriptionStore";
+import { deactivateSmsSubscribersForClerkUser } from "../sms/subscribers";
 
 function sessionEmail(session: Stripe.Checkout.Session): string | null {
   const fromDetails = session.customer_details?.email?.trim();
@@ -140,6 +142,18 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session): Promis
   });
 }
 
+async function revokeSmsForCanceledSubscription(record: SubscriptionRecord): Promise<void> {
+  const clerkUserId = record.clientReferenceId?.trim();
+  if (!clerkUserId) {
+    logger.warn("Subscription canceled but no Clerk id on record — SMS not auto-deactivated", {
+      email: record.email,
+      stripeSubscriptionId: record.stripeSubscriptionId,
+    });
+    return;
+  }
+  await deactivateSmsSubscribersForClerkUser(clerkUserId);
+}
+
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription): Promise<void> {
   const stripeCustomerId = customerIdOf(subscription.customer);
   const email = await stripeCustomerEmail(stripeCustomerId);
@@ -168,6 +182,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription): Pro
   });
 
   if (record) {
+    await revokeSmsForCanceledSubscription(record);
     logger.info("Stripe subscription updated — access downgraded", {
       email: record.email,
       stripeStatus: subscription.status,
@@ -200,6 +215,8 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription): Pro
     return;
   }
 
+  await revokeSmsForCanceledSubscription(record);
+
   logger.info("Stripe subscription deleted — access revoked", {
     email: record.email,
     stripeCustomerId: record.stripeCustomerId,
@@ -221,6 +238,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice): Promise<void
   });
 
   if (record) {
+    await revokeSmsForCanceledSubscription(record);
     logger.info("Stripe invoice payment failed — access revoked (canceled)", {
       email: record.email,
       invoiceId: invoice.id,

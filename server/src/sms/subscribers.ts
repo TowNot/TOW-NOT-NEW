@@ -2,6 +2,7 @@ import { prisma } from "../db/prisma";
 import { logger } from "../logger";
 import { toE164 } from "./e164";
 import { invalidateActiveMonitoredCitiesCache } from "../engine/activeMonitoredCities";
+import { isClerkUserEntitled } from "../store/subscriptionStore";
 import type { PushCategory } from "../engine/pushCategories";
 
 const MAX_SUBSCRIBERS = 50;
@@ -28,6 +29,7 @@ export const DEFAULT_SMS_ALERT_PREFERENCES: SmsAlertPreferences = {
 export interface SmsSubscriberRow extends SmsAlertPreferences {
   phone: string;
   selectedCity: string;
+  clerkUserId: string | null;
 }
 
 /** Active subscribers — refreshed from Postgres on miss / after writes. */
@@ -36,6 +38,7 @@ let activeSubscribersCache: SmsSubscriberRow[] | null = null;
 function rowFromDb(row: {
   phone: string;
   selectedCity: string;
+  clerkUserId: string | null;
   alertAccidents: boolean;
   alertIncidents: boolean;
   alertPolice: boolean;
@@ -46,6 +49,7 @@ function rowFromDb(row: {
   return {
     phone: row.phone,
     selectedCity: row.selectedCity,
+    clerkUserId: row.clerkUserId,
     alertAccidents: row.alertAccidents,
     alertIncidents: row.alertIncidents,
     alertPolice: row.alertPolice,
@@ -61,6 +65,7 @@ async function refreshActiveSubscribersCache(): Promise<SmsSubscriberRow[]> {
     select: {
       phone: true,
       selectedCity: true,
+      clerkUserId: true,
       alertAccidents: true,
       alertIncidents: true,
       alertPolice: true,
@@ -149,13 +154,26 @@ export async function listSmsRecipientsForCategory(
   if (!city) return [];
 
   const rows = await listSmsSubscriberRows();
-  return rows
-    .filter(
-      (row) =>
-        row.selectedCity.trim().toLowerCase() === city &&
-        subscriberWantsSmsCategory(row, category),
-    )
-    .map((row) => row.phone);
+  const candidates = rows.filter(
+    (row) =>
+      row.selectedCity.trim().toLowerCase() === city &&
+      subscriberWantsSmsCategory(row, category),
+  );
+
+  // Drop numbers whose Clerk owner no longer has an active/trialing subscription.
+  const entitlementByUser = new Map<string, boolean>();
+  const phones: string[] = [];
+  for (const row of candidates) {
+    const ownerId = row.clerkUserId?.trim() || "";
+    if (!ownerId) continue;
+    let entitled = entitlementByUser.get(ownerId);
+    if (entitled === undefined) {
+      entitled = await isClerkUserEntitled(ownerId);
+      entitlementByUser.set(ownerId, entitled);
+    }
+    if (entitled) phones.push(row.phone);
+  }
+  return phones;
 }
 
 /** Keep SMS city in sync when the signed-in user switches desk city. */
@@ -175,6 +193,28 @@ export async function updateSmsSubscriberCityForClerkUser(
     invalidateSmsCache();
     invalidateActiveMonitoredCitiesCache();
   }
+}
+
+/** Turn off SMS for a Clerk user when their Stripe access ends. */
+export async function deactivateSmsSubscribersForClerkUser(
+  clerkUserIdRaw: string,
+): Promise<number> {
+  const clerkUserId = clerkUserIdRaw.trim();
+  if (!clerkUserId) return 0;
+
+  const result = await prisma.smsSubscriber.updateMany({
+    where: { clerkUserId, active: true },
+    data: { active: false },
+  });
+  if (result.count > 0) {
+    invalidateSmsCache();
+    invalidateActiveMonitoredCitiesCache();
+    logger.info("Deactivated SMS subscribers after subscription revoke", {
+      clerkUserId,
+      count: result.count,
+    });
+  }
+  return result.count;
 }
 
 export async function smsSubscriberCount(): Promise<number> {
