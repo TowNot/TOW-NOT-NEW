@@ -31,7 +31,7 @@ export function Header({ connected, health, zoneId, onZoneChange }: HeaderProps)
             live={connected && health?.status === "ok"}
             label={connected ? "feed live" : "feed offline"}
           />
-          <AuthControls variant="dark" />
+          <AuthControls variant="dark" showBillingButton />
         </nav>
       </div>
     </header>
