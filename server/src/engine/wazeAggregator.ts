@@ -1,5 +1,9 @@
 import { fetch as undiciFetch } from "undici";
 import { config } from "../config";
+import {
+  acquireBlocksInsidePermit,
+  isBlocksInsideRateLimitError,
+} from "./blocksInsideRateLimit";
 import { boundingBox, distanceKm, splitBoundingBoxGrid, type BoundingBox } from "./geo";
 import { enabledCoverageZones, getCoverageZone, zoneToBoundingBox } from "./coverageZones";
 import { getProxyAgent, keepAliveFetch } from "./httpFetch";
@@ -881,10 +885,8 @@ export function getProviderRuntimeStats(): Record<
 const PROVIDER_TIMEOUT_MS = 25_000;
 /** BlocksInside 10s poll: abort before the next tick so calls cannot overlap. */
 const BLOCKSINSIDE_TIMEOUT_MS = 8_000;
-/** Plan cap is 10 req/s — never fire more than this many tile fetches at once. */
-const BLOCKSINSIDE_TILE_CONCURRENCY = 10;
-/** Pause between tile batches so the next wave starts in a new rate-limit window. */
-const BLOCKSINSIDE_TILE_BATCH_GAP_MS = 1_100;
+/** After a 429, wait then retry once through the global rate gate. */
+const BLOCKSINSIDE_429_RETRY_MS = 1_100;
 
 /** Launch offset between providers so they never fire on the same millisecond. */
 const PROVIDER_STAGGER_MS = 250;
@@ -1151,7 +1153,8 @@ function parseCoordPair(raw: string): { lat: number; lng: number } {
   return { lat, lng };
 }
 
-async function fetchBlocksInsideTile(tile: BoundingBox): Promise<WazeAlert[]> {
+async function fetchBlocksInsideTileOnce(tile: BoundingBox): Promise<WazeAlert[]> {
+  await acquireBlocksInsidePermit();
   const params = new URLSearchParams({
     "bottom-left": blocksInsideCoordPair(tile.bottomLeft.lat, tile.bottomLeft.lng),
     "top-right": blocksInsideCoordPair(tile.topRight.lat, tile.topRight.lng),
@@ -1188,6 +1191,23 @@ async function fetchBlocksInsideTile(tile: BoundingBox): Promise<WazeAlert[]> {
   return parseRawAlerts(rawAlerts, "blocksinside");
 }
 
+/** One tile fetch, gated globally; single retry after 429. */
+async function fetchBlocksInsideTile(tile: BoundingBox): Promise<WazeAlert[]> {
+  try {
+    return await fetchBlocksInsideTileOnce(tile);
+  } catch (error) {
+    if (!isBlocksInsideRateLimitError(error)) throw error;
+    logger.warn(
+      {
+        tile: `${blocksInsideCoordPair(tile.bottomLeft.lat, tile.bottomLeft.lng)}..${blocksInsideCoordPair(tile.topRight.lat, tile.topRight.lng)}`,
+      },
+      "BlocksInside rate limited — retrying tile once",
+    );
+    await sleep(BLOCKSINSIDE_429_RETRY_MS);
+    return fetchBlocksInsideTileOnce(tile);
+  }
+}
+
 function londonBlocksInsideBox(): BoundingBox {
   const bottomLeft = parseCoordPair(config.wazeBottomLeft);
   const topRight = parseCoordPair(config.wazeTopRight);
@@ -1196,18 +1216,9 @@ function londonBlocksInsideBox(): BoundingBox {
 
 async function fetchBlocksInsideBox(box: BoundingBox): Promise<WazeAlert[]> {
   const tiles = splitBoundingBoxGrid(box, BLOCKSINSIDE_TILE_ROWS, BLOCKSINSIDE_TILE_COLS);
-  const settled: PromiseSettledResult<WazeAlert[]>[] = [];
 
-  // 12 (or more) tiles in one Promise.allSettled burst exceeds the 10 req/s
-  // plan cap → 429 on ~2 tiles every poll (holes that can miss downtown).
-  for (let i = 0; i < tiles.length; i += BLOCKSINSIDE_TILE_CONCURRENCY) {
-    if (i > 0) await sleep(BLOCKSINSIDE_TILE_BATCH_GAP_MS);
-    const batch = tiles.slice(i, i + BLOCKSINSIDE_TILE_CONCURRENCY);
-    const batchSettled = await Promise.allSettled(
-      batch.map((tile) => fetchBlocksInsideTile(tile)),
-    );
-    settled.push(...batchSettled);
-  }
+  // All tiles compete for the global ≤8 req/s gate (shared across cities).
+  const settled = await Promise.allSettled(tiles.map((tile) => fetchBlocksInsideTile(tile)));
 
   const merged: WazeAlert[] = [];
   const seenIds = new Set<string>();
@@ -1240,7 +1251,7 @@ async function fetchBlocksInsideBox(box: BoundingBox): Promise<WazeAlert[]> {
 
 /**
  * Fetch BlocksInside accidents for a single coverage zone.
- * Tile scraper (fetchBlocksInsideTile / fetchBlocksInsideBox) is unchanged.
+ * Tile fetches share the global ≤8 req/s BlocksInside gate.
  */
 export async function fetchBlocksInsideForZone(zone: {
   id: string;
