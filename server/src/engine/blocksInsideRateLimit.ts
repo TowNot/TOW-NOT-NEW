@@ -1,12 +1,12 @@
 /**
  * Global BlocksInside (api.wazeapi.com) gate shared by every city tile fetch.
- * Plan cap is 10 req/s — stay under it so multi-city polls do not 429.
+ * Plan cap is 10 req/s — space starts evenly under that so multi-city polls do not 429.
  */
 
-const MAX_REQUESTS_PER_WINDOW = 8;
-const WINDOW_MS = 1_000;
+/** ~7.5 starts/sec with hard spacing (no same-ms burst of 8). */
+const MIN_INTERVAL_MS = 135;
 
-const startTimes: number[] = [];
+let lastStartMs = 0;
 let gate: Promise<void> = Promise.resolve();
 
 function sleep(ms: number): Promise<void> {
@@ -15,7 +15,7 @@ function sleep(ms: number): Promise<void> {
 
 /**
  * Wait until this process may start one more BlocksInside HTTP call.
- * Serialized acquire + sliding 1s window keeps the whole app ≤ 8 starts/sec.
+ * One global mutex + minimum gap between starts keeps the whole app under the plan cap.
  */
 export async function acquireBlocksInsidePermit(): Promise<void> {
   const previous = gate;
@@ -25,18 +25,10 @@ export async function acquireBlocksInsidePermit(): Promise<void> {
   });
   await previous;
   try {
-    for (;;) {
-      const now = Date.now();
-      while (startTimes.length > 0 && startTimes[0]! <= now - WINDOW_MS) {
-        startTimes.shift();
-      }
-      if (startTimes.length < MAX_REQUESTS_PER_WINDOW) {
-        startTimes.push(now);
-        return;
-      }
-      const waitMs = Math.max(5, startTimes[0]! + WINDOW_MS - now + 5);
-      await sleep(waitMs);
-    }
+    const now = Date.now();
+    const waitMs = Math.max(0, lastStartMs + MIN_INTERVAL_MS - now);
+    if (waitMs > 0) await sleep(waitMs);
+    lastStartMs = Date.now();
   } finally {
     release();
   }
