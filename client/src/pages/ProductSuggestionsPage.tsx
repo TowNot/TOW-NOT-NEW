@@ -1,8 +1,6 @@
-import { UserButton } from "@clerk/clerk-react";
+import { AuthControls } from "../components/AuthControls";
 import { SiteFooter } from "../components/SiteFooter";
-import { accountPortalUrl } from "../lib/clerkPortal";
 import { mailtoSupport, SUPPORT_EMAIL } from "../lib/contactEmail";
-import { isClerkConfigured } from "../lib/clerkKey";
 
 const SUGGESTION_MAILTO = mailtoSupport(
   "AlertNav product suggestion",
@@ -14,7 +12,7 @@ const QUESTION_MAILTO = mailtoSupport(
   "Hi AlertNav team,\n\nI have a question about AlertNav:\n\n",
 );
 
-function PageHeader({ isSignedIn }: { isSignedIn?: boolean }) {
+function PageHeader(_props: { isSignedIn?: boolean }) {
   return (
     <header className="landing-header">
       <div className="landing-header-inner mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-5 sm:py-5">
@@ -24,16 +22,7 @@ function PageHeader({ isSignedIn }: { isSignedIn?: boolean }) {
         >
           AlertNav
         </a>
-        {isSignedIn && isClerkConfigured() ? (
-          <UserButton afterSignOutUrl="/" />
-        ) : (
-          <a
-            href={accountPortalUrl("sign-in")}
-            className="btn-auth-light inline-flex min-h-[2.25rem] items-center justify-center px-4 py-2 text-xs no-underline"
-          >
-            Sign in
-          </a>
-        )}
+        <AuthControls variant="dark" />
       </div>
     </header>
   );

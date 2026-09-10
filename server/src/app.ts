@@ -20,6 +20,7 @@ import { createSmsRouter } from "./routes/sms";
 import { createSourcesRouter, createSourcesStatusRouter } from "./routes/sources";
 import { createSubscriptionsRouter } from "./routes/subscriptions";
 import { createCheckoutSessionRouter } from "./routes/createCheckoutSession";
+import { createBillingPortalSessionRouter } from "./routes/createBillingPortalSession";
 import { createMeRouter } from "./routes/me";
 import { createUserRouter } from "./routes/user";
 import { stripeWebhookHandler } from "./routes/stripeWebhook";
@@ -141,6 +142,14 @@ export function createApp(store: IncidentStore, dispatcher: PushDispatcher): exp
     requireClerkAuth,
     requireMatchingSession,
     createCheckoutSessionRouter(),
+  );
+
+  // Stripe Customer Portal — cancel trial/subscription, update card, invoices.
+  app.use(
+    "/api/create-billing-portal-session",
+    requireClerkAuth,
+    requireMatchingSession,
+    createBillingPortalSessionRouter(),
   );
 
   return app;

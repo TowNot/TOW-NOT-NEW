@@ -1,5 +1,6 @@
-import { UserButton, useUser } from "@clerk/clerk-react";
+import { useUser } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
+import { AuthControls } from "../components/AuthControls";
 import { GetStartedButton } from "../components/GetStartedButton";
 import { InstallAlertNavButton, INSTALL_APP_HINT } from "../components/InstallAlertNavButton";
 import { SiteFooter } from "../components/SiteFooter";
@@ -27,7 +28,7 @@ function LandingHeaderNav({ isSignedIn, accountReady }: { isSignedIn: boolean; a
   if (isSignedIn && isClerkConfigured() && accountReady) {
     return (
       <nav className="landing-header-nav shrink-0" aria-label="Primary">
-        <UserButton afterSignOutUrl="/" />
+        <AuthControls variant="dark" />
       </nav>
     );
   }
