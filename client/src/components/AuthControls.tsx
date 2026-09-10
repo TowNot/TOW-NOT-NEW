@@ -119,7 +119,11 @@ function AuthControlsInner({
         ) : null}
         <UserButton afterSignOutUrl="/">
           <UserButton.MenuItems>
-            <UserButton.Action label="Manage billing" onClick={onManageBilling} />
+            <UserButton.Action
+              label="Manage billing"
+              labelIcon={<BillingCardIcon className="h-4 w-4" />}
+              onClick={onManageBilling}
+            />
           </UserButton.MenuItems>
         </UserButton>
       </div>
