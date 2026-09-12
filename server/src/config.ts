@@ -125,6 +125,13 @@ export const config = {
   torontoFireCadEnabled:
     process.env.TORONTO_FIRE_CAD_ENABLED === "1" ||
     process.env.TORONTO_FIRE_CAD_ENABLED === "true",
+  /**
+   * Fire / EMS radio + Deepgram STT. Default OFF — set FIRE_DISPATCH_ENABLED=1
+   * when you want London (or other) scanners running again.
+   */
+  fireDispatchEnabled:
+    process.env.FIRE_DISPATCH_ENABLED === "1" ||
+    process.env.FIRE_DISPATCH_ENABLED === "true",
   residentialProxyUrl: process.env.RESIDENTIAL_PROXY_URL ?? "",
   // Downtown London, ON (same pin the fire-dispatch geocoder uses). A 15 km
   // radius covers Western campus, the 401, and Hyde Park without overflowing
@@ -147,7 +154,7 @@ export const config = {
   stripePriceMonthly: process.env.STRIPE_PRICE_MONTHLY?.trim() || "",
   stripePriceYearly: process.env.STRIPE_PRICE_YEARLY?.trim() || "",
   /** Trial length when the subscriber has never used a trial (Checkout Sessions only). */
-  stripeTrialDays: Math.max(0, Number(process.env.STRIPE_TRIAL_DAYS ?? 7) || 7),
+  stripeTrialDays: Math.max(0, Number(process.env.STRIPE_TRIAL_DAYS ?? 4) || 4),
   clerkPublishableKey:
     process.env.CLERK_PUBLISHABLE_KEY?.trim() ||
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim() ||

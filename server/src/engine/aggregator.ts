@@ -39,14 +39,24 @@ export class DataAggregatorEngine {
       logger.warn("Twilio credentials unset — SMS alerts will not send until configured");
     }
     this.waze.start();
-    logger.info("[FIRE SCANNER] starting zone audio orchestrator (HLS + continuous streams)");
-    this.radio.start();
+    if (config.fireDispatchEnabled) {
+      logger.info("[FIRE SCANNER] starting zone audio orchestrator (HLS + continuous streams)");
+      this.radio.start();
+    } else {
+      logger.info(
+        "[FIRE SCANNER] paused — set FIRE_DISPATCH_ENABLED=1 to resume Deepgram / radio listeners",
+      );
+    }
     this.googleMaps.start();
     // CAD no-ops under London-only / when TORONTO_FIRE_CAD_ENABLED is off.
     this.torontoFireCad.start();
     logger.info(
       "Data aggregator engine running (Waze/GMaps follow Prisma selectedCity demand)",
-      { radioZones: enabled.map((z) => z.id), londonOnly: LONDON_ONLY_INGEST },
+      {
+        radioZones: enabled.map((z) => z.id),
+        londonOnly: LONDON_ONLY_INGEST,
+        fireDispatchEnabled: config.fireDispatchEnabled,
+      },
     );
   }
 

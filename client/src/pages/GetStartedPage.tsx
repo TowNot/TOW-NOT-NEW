@@ -294,7 +294,7 @@ function PricingPlansGrid({ monthlyHasUsedTrial }: { monthlyHasUsedTrial: boolea
       <div className="pricing-plans-grid">
         <article className="pricing-plan-card">
           <h3 className="pricing-plan-title">Monthly</h3>
-          <p className="pricing-plan-price">$59.99 CAD / month</p>
+          <p className="pricing-plan-price">$39.99 CAD / month</p>
           <ul className="pricing-plan-features">
             {PLAN_FEATURES.map((feature) => (
               <li key={feature}>{feature}</li>
@@ -310,7 +310,7 @@ function PricingPlansGrid({ monthlyHasUsedTrial }: { monthlyHasUsedTrial: boolea
               ? "Redirecting…"
               : monthlyHasUsedTrial
                 ? "Subscribe"
-                : "Start 7-Day Free Trial"}
+                : "Start 4-Day Free Trial"}
           </button>
         </article>
 
@@ -320,7 +320,7 @@ function PricingPlansGrid({ monthlyHasUsedTrial }: { monthlyHasUsedTrial: boolea
             <span className="pricing-plan-badge-popular">Popular</span>
           </div>
           <h3 className="pricing-plan-title">Yearly</h3>
-          <p className="pricing-plan-price">$599.00 CAD / year</p>
+          <p className="pricing-plan-price">$399.00 CAD / year</p>
           <ul className="pricing-plan-features">
             {PLAN_FEATURES.map((feature) => (
               <li key={feature}>{feature}</li>
@@ -336,7 +336,7 @@ function PricingPlansGrid({ monthlyHasUsedTrial }: { monthlyHasUsedTrial: boolea
               ? "Redirecting…"
               : monthlyHasUsedTrial
                 ? "Subscribe"
-                : "Start 7-Day Free Trial"}
+                : "Start 4-Day Free Trial"}
           </button>
         </article>
       </div>
