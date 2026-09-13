@@ -80,6 +80,9 @@ function transcriptFromResponse(response: unknown): string {
  * fetch set length; we never add Content-Length ourselves.
  */
 async function transcribeOnce(wav: Buffer): Promise<string> {
+  if (!config.fireDispatchEnabled) {
+    return "";
+  }
   if (!config.deepgramApiKey) {
     throw new Error("DEEPGRAM_API_KEY is not configured");
   }
@@ -117,5 +120,8 @@ export async function speechToText(
   wav: Buffer,
   transcribe: Transcriber = transcribeOnce,
 ): Promise<string> {
+  if (!config.fireDispatchEnabled) {
+    return "";
+  }
   return withTransientRetry(STT_RETRY_POLICY, () => transcribe(wav));
 }

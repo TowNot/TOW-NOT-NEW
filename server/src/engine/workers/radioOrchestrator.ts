@@ -1,3 +1,4 @@
+import { config } from "../../config";
 import { logger } from "../../logger";
 import { IncidentStore } from "../../store/incidentStore";
 import { getActiveMonitoredCities } from "../activeMonitoredCities";
@@ -24,6 +25,10 @@ export function startRadioOrchestrator(
   store: IncidentStore,
   allowedZoneIds?: ReadonlySet<string>,
 ): void {
+  if (!config.fireDispatchEnabled) {
+    logger.info("[FIRE SCANNER] orchestrator not started — FIRE_DISPATCH_ENABLED is off");
+    return;
+  }
   attachFireDispatchStore(store);
 
   const startedStreams = new Set<string>();
@@ -149,6 +154,10 @@ export function stopRadioOrchestrator(): void {
 export async function reconcileRadioOrchestrator(
   store: IncidentStore,
 ): Promise<void> {
+  if (!config.fireDispatchEnabled) {
+    stopRadioOrchestrator();
+    return;
+  }
   const cities = await getActiveMonitoredCities();
   stopRadioOrchestrator();
   startRadioOrchestrator(store, new Set(cities));

@@ -1,3 +1,4 @@
+import { config } from "../../config";
 import { logger } from "../../logger";
 import { IncidentStore } from "../../store/incidentStore";
 import { reconcileRadioOrchestrator, stopRadioOrchestrator } from "./radioOrchestrator";
@@ -10,6 +11,12 @@ export class RadioIngestionWorker {
   constructor(private readonly store: IncidentStore) {}
 
   start(): void {
+    if (!config.fireDispatchEnabled) {
+      logger.info(
+        "[FIRE SCANNER] RadioIngestionWorker.start skipped — FIRE_DISPATCH_ENABLED is off",
+      );
+      return;
+    }
     logger.info("Fire dispatch radio orchestrator starting (user-monitored cities)");
     void reconcileRadioOrchestrator(this.store).catch((error) => {
       logger.warn("Fire dispatch initial reconcile failed", {
