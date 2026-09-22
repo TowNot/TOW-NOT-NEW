@@ -3,6 +3,7 @@ import { config } from "../config";
 import {
   acquireBlocksInsidePermit,
   isBlocksInsideRateLimitError,
+  isBlocksInsideTransientError,
 } from "./blocksInsideRateLimit";
 import { boundingBox, distanceKm, splitBoundingBoxGrid, type BoundingBox } from "./geo";
 import { enabledCoverageZones, getCoverageZone, zoneToBoundingBox } from "./coverageZones";
@@ -887,6 +888,8 @@ const PROVIDER_TIMEOUT_MS = 25_000;
 const BLOCKSINSIDE_TIMEOUT_MS = 8_000;
 /** After a 429, wait then retry once through the global rate gate. */
 const BLOCKSINSIDE_429_RETRY_MS = 1_100;
+/** Short pause before retrying a 502/503/504 gateway blip. */
+const BLOCKSINSIDE_GATEWAY_RETRY_MS = 450;
 
 /** Launch offset between providers so they never fire on the same millisecond. */
 const PROVIDER_STAGGER_MS = 250;
@@ -1171,10 +1174,21 @@ async function fetchBlocksInsideTileOnce(tile: BoundingBox): Promise<WazeAlert[]
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    logger.error(
-      `Provider request failed provider=blocksinside status=${res.status} latencyMs=${Date.now() - started} body=${body.slice(0, 300)} tile=${blocksInsideCoordPair(tile.bottomLeft.lat, tile.bottomLeft.lng)}..${blocksInsideCoordPair(tile.topRight.lat, tile.topRight.lng)}`,
-    );
-    throw new Error(`blocksinside responded with status ${res.status}`);
+    const tileLabel = `${blocksInsideCoordPair(tile.bottomLeft.lat, tile.bottomLeft.lng)}..${blocksInsideCoordPair(tile.topRight.lat, tile.topRight.lng)}`;
+    const transient = res.status === 429 || res.status === 502 || res.status === 503 || res.status === 504;
+    // Transient gateway / rate-limit noise — retry layer logs only if still failing.
+    if (transient) {
+      logger.debug(
+        `Provider request failed provider=blocksinside status=${res.status} latencyMs=${Date.now() - started} tile=${tileLabel}`,
+      );
+    } else {
+      logger.error(
+        `Provider request failed provider=blocksinside status=${res.status} latencyMs=${Date.now() - started} body=${body.slice(0, 300)} tile=${tileLabel}`,
+      );
+    }
+    throw Object.assign(new Error(`blocksinside responded with status ${res.status}`), {
+      status: res.status,
+    });
   }
   const rawBody = await res.text();
   let parsed: unknown;
@@ -1191,19 +1205,31 @@ async function fetchBlocksInsideTileOnce(tile: BoundingBox): Promise<WazeAlert[]
   return parseRawAlerts(rawAlerts, "blocksinside");
 }
 
-/** One tile fetch, gated globally; single retry after 429. */
+/** One tile fetch, gated globally; single retry after 429 / 502 / 503 / 504. */
 async function fetchBlocksInsideTile(tile: BoundingBox): Promise<WazeAlert[]> {
   try {
     return await fetchBlocksInsideTileOnce(tile);
   } catch (error) {
-    if (!isBlocksInsideRateLimitError(error)) throw error;
-    logger.warn(
+    if (!isBlocksInsideTransientError(error)) throw error;
+    const status =
+      typeof error === "object" &&
+      error !== null &&
+      "status" in error &&
+      typeof (error as { status: unknown }).status === "number"
+        ? (error as { status: number }).status
+        : null;
+    const delayMs = isBlocksInsideRateLimitError(error)
+      ? BLOCKSINSIDE_429_RETRY_MS
+      : BLOCKSINSIDE_GATEWAY_RETRY_MS;
+    logger.debug(
       {
         tile: `${blocksInsideCoordPair(tile.bottomLeft.lat, tile.bottomLeft.lng)}..${blocksInsideCoordPair(tile.topRight.lat, tile.topRight.lng)}`,
+        status,
+        delayMs,
       },
-      "BlocksInside rate limited — retrying tile once",
+      "BlocksInside transient error — retrying tile once",
     );
-    await sleep(BLOCKSINSIDE_429_RETRY_MS);
+    await sleep(delayMs);
     return fetchBlocksInsideTileOnce(tile);
   }
 }
@@ -1223,14 +1249,19 @@ async function fetchBlocksInsideBox(box: BoundingBox): Promise<WazeAlert[]> {
   const merged: WazeAlert[] = [];
   const seenIds = new Set<string>();
   let failedTiles = 0;
+  const failStatuses = new Map<number, number>();
 
   for (const result of settled) {
     if (result.status === "rejected") {
       failedTiles += 1;
-      logger.warn(
-        { error: result.reason instanceof Error ? result.reason.message : String(result.reason) },
-        "BlocksInside tile fetch failed",
-      );
+      const status =
+        typeof result.reason === "object" &&
+        result.reason !== null &&
+        "status" in result.reason &&
+        typeof (result.reason as { status: unknown }).status === "number"
+          ? (result.reason as { status: number }).status
+          : 0;
+      failStatuses.set(status, (failStatuses.get(status) ?? 0) + 1);
       continue;
     }
     for (const alert of result.value) {
@@ -1238,6 +1269,22 @@ async function fetchBlocksInsideBox(box: BoundingBox): Promise<WazeAlert[]> {
       seenIds.add(alert.alertId);
       merged.push(alert);
     }
+  }
+
+  if (failedTiles > 0) {
+    const statusSummary = [...failStatuses.entries()]
+      .map(([status, count]) => `${count}×${status || "unknown"}`)
+      .join(", ");
+    // One yellow line per city box — not N red lines per tile.
+    logger.warn(
+      {
+        failedTiles,
+        totalTiles: tiles.length,
+        statuses: statusSummary,
+        box: `${blocksInsideCoordPair(box.bottomLeft.lat, box.bottomLeft.lng)}..${blocksInsideCoordPair(box.topRight.lat, box.topRight.lng)}`,
+      },
+      "BlocksInside partial tile failures (upstream)",
+    );
   }
 
   if (failedTiles === tiles.length) {
