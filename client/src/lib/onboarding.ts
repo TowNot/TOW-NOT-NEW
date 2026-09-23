@@ -2,15 +2,15 @@ import { accountPortalUrl } from "./clerkPortal";
 
 export type AppDestination = "/get-started" | "/welcome" | "/dashboard";
 
-export function loginRedirectUrl(returnPath = "/dashboard"): string {
-  const safeReturn = returnPath.startsWith("/") ? returnPath : "/dashboard";
+export function loginRedirectUrl(returnPath = "/"): string {
+  const safeReturn = returnPath.startsWith("/") ? returnPath : "/";
   return `/login?return=${encodeURIComponent(safeReturn)}`;
 }
 
 export function signInUrl(returnPath?: string): string {
   const origin =
     typeof window !== "undefined" ? window.location.origin : "https://alertnav.com";
-  const destination = returnPath ?? `${origin}/dashboard`;
+  const destination = returnPath ?? `${origin}/`;
   return accountPortalUrl("sign-in", destination.startsWith("http") ? destination : `${origin}${destination}`);
 }
 

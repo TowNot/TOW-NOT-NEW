@@ -5,9 +5,9 @@ function originUrl(): string {
   return window.location.origin;
 }
 
-/** After sign-in — desk (gates to city picker only if needed). */
+/** After sign-in from the marketing site — homepage so they can install the app. */
 export function welcomeRedirectUrl(): string {
-  return `${originUrl()}/dashboard`;
+  return `${originUrl()}/`;
 }
 
 /** After sign-up — subscribe and install the app. */

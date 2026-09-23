@@ -116,7 +116,7 @@ function AppShell({
 
   if (path === "/login") {
     const params = new URLSearchParams(window.location.search);
-    const returnPath = params.get("return") || "/dashboard";
+    const returnPath = params.get("return") || "/";
     window.location.replace(signInUrl(returnPath));
     return null;
   }
