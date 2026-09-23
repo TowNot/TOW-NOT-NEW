@@ -95,7 +95,7 @@ function labelForIncident(incident: Incident): string {
 
 export function resolvePushDestination(payload: PushPayload): string {
   if (payload.url?.trim()) return absoluteUrl(payload.url.trim());
-  return absoluteUrl("/desk");
+  return absoluteUrl("/dashboard");
 }
 
 function resolvePushCategory(payload: PushPayload): PushCategory {
@@ -161,7 +161,7 @@ export function incidentToPushPayload(incident: Incident): PushPayload {
   const base = {
     severity: incident.severity,
     incidentId: incident.id,
-    url: `/desk?incident=${encodeURIComponent(incident.id)}`,
+    url: `/dashboard?incident=${encodeURIComponent(incident.id)}`,
     zoneId: zoneId ?? undefined,
     pushCategory: pushCategoryForIncident(incident),
     ...(incident.reporterName ? { reporterName: incident.reporterName } : {}),

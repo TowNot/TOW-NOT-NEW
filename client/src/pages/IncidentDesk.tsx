@@ -63,6 +63,11 @@ export function IncidentDesk({ user }: { user?: ZoneUser | null }) {
   useAlertOnNewIncidents(zoneIncidents, deskFilters);
   usePushAlertBridge();
 
+  const focusIncidentId =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("incident")
+      : null;
+
   return (
     <div className="page-shell min-h-screen overflow-x-clip">
       <Header
@@ -108,6 +113,7 @@ export function IncidentDesk({ user }: { user?: ZoneUser | null }) {
         zoneName={activeZone.name}
         hasFireFeed={activeZone.hasFireFeed}
         hasEmsFeed={activeZone.hasEmsFeed}
+        focusIncidentId={focusIncidentId}
       />
     </div>
   );

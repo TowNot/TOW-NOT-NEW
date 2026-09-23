@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import type { Incident, IncidentSource } from "../types";
 import { fireDispatchDisplayLabel } from "../lib/fireDispatchLabel";
 import type { DeskFilterPreferences } from "../lib/deskFilterPreferences";
@@ -15,6 +16,8 @@ interface IncidentFeedProps {
   hasFireFeed: boolean;
   /** When false, EMS pillar is grayed out (encrypted / unavailable in zone). */
   hasEmsFeed: boolean;
+  /** Optional incident id from a push deep-link (`?incident=`). */
+  focusIncidentId?: string | null;
 }
 
 export function IncidentFeed({
@@ -23,6 +26,7 @@ export function IncidentFeed({
   zoneName,
   hasFireFeed,
   hasEmsFeed,
+  focusIncidentId = null,
 }: IncidentFeedProps) {
   const { showAccidents, showIncidents } = preferences;
 
@@ -36,6 +40,18 @@ export function IncidentFeed({
     if (incident.source === "fire_dispatch" && !hasFireFeed) return false;
     return passesDeskFilters(incident, preferences);
   });
+
+  useEffect(() => {
+    if (!focusIncidentId) return;
+    const el = document.getElementById(`incident-${focusIncidentId}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.add("ring-2", "ring-indigo-400");
+    const timer = window.setTimeout(() => {
+      el.classList.remove("ring-2", "ring-indigo-400");
+    }, 4_000);
+    return () => window.clearTimeout(timer);
+  }, [focusIncidentId, filtered.length]);
 
   return (
     <section className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-5 px-4 py-6 sm:px-5">

@@ -20,6 +20,7 @@ import {
   SESSION_REPLACED_MESSAGE,
 } from "../lib/deviceSession";
 import { destinationCta, resolveAppDestination } from "../lib/onboarding";
+import { consumeRecentPushDeepLink } from "../lib/pushDeepLink";
 
 const headerAuthTouch =
   "inline-flex min-h-[2.25rem] cursor-pointer items-center justify-center touch-manipulation";
@@ -221,6 +222,35 @@ function LandingPageWithAuth() {
   const { isLoaded, isSignedIn } = useUser();
   const { active: subscribed, loading: subscriptionLoading } = useSubscriptionStatus();
   const accountReady = isLoaded && (!isSignedIn || !subscriptionLoading);
+  const sessionReplaced = readSessionReplacedFromUrl();
+
+  // Notification taps (esp. iOS PWA) often land on `/` via Progressier start_url.
+  // Send entitled users straight to the dashboard (or a recent push deep-link).
+  useEffect(() => {
+    if (!accountReady || !isSignedIn || sessionReplaced) return;
+    const destination = resolveAppDestination({
+      isSignedIn: true,
+      subscribed,
+      hasChosenCity: clientHasChosenCity(),
+    });
+    if (destination !== "/dashboard") return;
+
+    let cancelled = false;
+    void (async () => {
+      const deepLink = await consumeRecentPushDeepLink();
+      if (cancelled) return;
+      if (deepLink && (deepLink.startsWith("/dashboard") || deepLink.startsWith("/desk") || deepLink.startsWith("/feed"))) {
+        window.location.replace(deepLink);
+        return;
+      }
+      const search = window.location.search;
+      window.location.replace(`/dashboard${search && search !== "?" ? search : ""}`);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [accountReady, isSignedIn, subscribed, sessionReplaced]);
 
   return (
     <LandingPageView

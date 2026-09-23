@@ -18,7 +18,10 @@ export function IncidentCard({ incident }: { incident: Incident }) {
   const showMap = detections.some((detection) => showTrafficMapThumbnail(detection.source));
 
   return (
-    <article className="grid gap-3 rounded-lg border border-line bg-panel p-4 md:grid-cols-[9rem_1fr_auto]">
+    <article
+      id={`incident-${incident.id}`}
+      className="grid gap-3 rounded-lg border border-line bg-panel p-4 md:grid-cols-[9rem_1fr_auto]"
+    >
       <div className="flex items-start justify-between gap-3 md:block">
         <SourceBadges detections={detections} incident={incident} />
       </div>
