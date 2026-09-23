@@ -40,7 +40,9 @@ export class DataAggregatorEngine {
     }
     this.waze.start();
     if (config.fireDispatchEnabled) {
-      logger.info("[FIRE SCANNER] starting zone audio orchestrator (HLS + continuous streams)");
+      logger.info("[FIRE SCANNER] starting zone audio orchestrator (HLS + continuous streams)", {
+        zones: config.fireDispatchZoneIds,
+      });
       this.radio.start();
     } else {
       logger.info(

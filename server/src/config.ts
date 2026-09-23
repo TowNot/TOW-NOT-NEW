@@ -132,6 +132,15 @@ export const config = {
   fireDispatchEnabled:
     process.env.FIRE_DISPATCH_ENABLED === "1" ||
     process.env.FIRE_DISPATCH_ENABLED === "true",
+  /**
+   * Zone ids that may start radio/Deepgram when fire dispatch is on.
+   * Default london only (Fire + Public Works share feed 34296).
+   * Comma-separated, e.g. FIRE_DISPATCH_ZONES=london or london,milton
+   */
+  fireDispatchZoneIds: (process.env.FIRE_DISPATCH_ZONES ?? "london")
+    .split(",")
+    .map((z) => z.trim())
+    .filter(Boolean),
   residentialProxyUrl: process.env.RESIDENTIAL_PROXY_URL ?? "",
   // Downtown London, ON (same pin the fire-dispatch geocoder uses). A 15 km
   // radius covers Western campus, the 401, and Hyde Park without overflowing

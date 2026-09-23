@@ -1,7 +1,6 @@
 import { config } from "../../config";
 import { logger } from "../../logger";
 import { IncidentStore } from "../../store/incidentStore";
-import { getActiveMonitoredCities } from "../activeMonitoredCities";
 import { isIngestZoneAllowed } from "../londonOnly";
 import { WATERLOO_REGION_RADIO_FEEDS } from "../waterlooRegionRadio";
 import { COVERAGE_ZONES } from "../zones.config";
@@ -21,6 +20,19 @@ function streamKey(audio: { type: string; feedId?: number | null; url?: string }
   return `${audio.type}:unknown`;
 }
 
+/** Zones allowed for Deepgram / radio (config allowlist ∩ optional caller filter). */
+function resolveFireZoneAllowlist(
+  allowedZoneIds?: ReadonlySet<string>,
+): ReadonlySet<string> {
+  const configured = new Set(config.fireDispatchZoneIds);
+  if (!allowedZoneIds) return configured;
+  const intersection = new Set<string>();
+  for (const id of allowedZoneIds) {
+    if (configured.has(id)) intersection.add(id);
+  }
+  return intersection;
+}
+
 export function startRadioOrchestrator(
   store: IncidentStore,
   allowedZoneIds?: ReadonlySet<string>,
@@ -31,13 +43,14 @@ export function startRadioOrchestrator(
   }
   attachFireDispatchStore(store);
 
+  const fireZones = resolveFireZoneAllowlist(allowedZoneIds);
   const startedStreams = new Set<string>();
   const active: string[] = [];
   const skippedInactive: string[] = [];
 
   for (const zone of COVERAGE_ZONES) {
-    if (allowedZoneIds && !allowedZoneIds.has(zone.id)) {
-      skippedInactive.push(`${zone.id}(not-monitored)`);
+    if (!fireZones.has(zone.id)) {
+      skippedInactive.push(`${zone.id}(not-in-FIRE_DISPATCH_ZONES)`);
       continue;
     }
     if (!zone.enabled || !zone.audio?.enabled) {
@@ -96,8 +109,8 @@ export function startRadioOrchestrator(
   }
 
   for (const feed of WATERLOO_REGION_RADIO_FEEDS) {
-    if (allowedZoneIds && !allowedZoneIds.has(feed.zoneId)) {
-      skippedInactive.push(`${feed.id}(not-monitored)`);
+    if (!fireZones.has(feed.zoneId)) {
+      skippedInactive.push(`${feed.id}(not-in-FIRE_DISPATCH_ZONES)`);
       continue;
     }
     if (!feed.enabled) {
@@ -137,9 +150,8 @@ export function startRadioOrchestrator(
   const skippedInactiveCount = skippedInactive.length;
   logger.info("[fire-dispatch] radio orchestrator started", {
     sources: active,
+    fireDispatchZones: [...fireZones].sort(),
     skippedInactive: `skipped ${skippedInactiveCount} inactive region${skippedInactiveCount === 1 ? "" : "s"}`,
-    monitoredOnly: Boolean(allowedZoneIds),
-    monitoredCities: allowedZoneIds ? [...allowedZoneIds].sort() : undefined,
   });
   if (skippedInactiveCount > 0) {
     logger.debug("[fire-dispatch] inactive regions detail", { skippedInactive });
@@ -158,7 +170,8 @@ export async function reconcileRadioOrchestrator(
     stopRadioOrchestrator();
     return;
   }
-  const cities = await getActiveMonitoredCities();
+  // Deepgram spend is gated by FIRE_DISPATCH_ZONES (default: london only),
+  // not by which cities users selected for Waze/GMaps.
   stopRadioOrchestrator();
-  startRadioOrchestrator(store, new Set(cities));
+  startRadioOrchestrator(store, new Set(config.fireDispatchZoneIds));
 }

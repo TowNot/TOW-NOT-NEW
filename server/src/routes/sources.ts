@@ -86,6 +86,7 @@ async function buildSourcesStatusPayload(store: IncidentStore) {
     fireDispatch: {
       ...getFireDispatchRuntime(),
       enabled: config.fireDispatchEnabled,
+      zones: config.fireDispatchZoneIds,
       streamOverride: Boolean(config.radioHlsUrl),
     },
     torontoFireCad: {
