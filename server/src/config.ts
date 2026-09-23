@@ -126,16 +126,17 @@ export const config = {
     process.env.TORONTO_FIRE_CAD_ENABLED === "1" ||
     process.env.TORONTO_FIRE_CAD_ENABLED === "true",
   /**
-   * Fire / EMS radio + Deepgram STT. Default OFF — set FIRE_DISPATCH_ENABLED=1
-   * when you want London (or other) scanners running again.
+   * Fire / EMS radio + Deepgram STT. Default ON when a key is present.
+   * Set FIRE_DISPATCH_ENABLED=0 to pause and stop Deepgram spend.
    */
-  fireDispatchEnabled:
-    process.env.FIRE_DISPATCH_ENABLED === "1" ||
-    process.env.FIRE_DISPATCH_ENABLED === "true",
+  fireDispatchEnabled: !(
+    process.env.FIRE_DISPATCH_ENABLED === "0" ||
+    process.env.FIRE_DISPATCH_ENABLED === "false"
+  ),
   /**
    * Zone ids that may start radio/Deepgram when fire dispatch is on.
    * Default london only (Fire + Public Works share feed 34296).
-   * Comma-separated, e.g. FIRE_DISPATCH_ZONES=london or london,milton
+   * No Railway var needed — override with FIRE_DISPATCH_ZONES if you expand later.
    */
   fireDispatchZoneIds: (process.env.FIRE_DISPATCH_ZONES ?? "london")
     .split(",")
