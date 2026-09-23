@@ -38,18 +38,3 @@ export function isBlocksInsideRateLimitError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return message.includes("429") || /rate[_\s-]?limit/i.test(message);
 }
-
-/** 429 + gateway blips — safe to retry once. */
-export function isBlocksInsideTransientError(error: unknown): boolean {
-  if (isBlocksInsideRateLimitError(error)) return true;
-  const status =
-    typeof error === "object" &&
-    error !== null &&
-    "status" in error &&
-    typeof (error as { status: unknown }).status === "number"
-      ? (error as { status: number }).status
-      : null;
-  if (status === 502 || status === 503 || status === 504) return true;
-  const message = error instanceof Error ? error.message : String(error);
-  return /\bstatus\s+50[234]\b/.test(message) || /\b50[234]\b/.test(message);
-}
