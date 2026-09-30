@@ -13,6 +13,7 @@ import {
   fetchOpenWebNinjaGoogleMapsForCity,
   getMonitoredGoogleMapsCities,
   GOOGLE_MAPS_ZOOM_LEVELS,
+  probeOpenWebNinjaGoogleMaps,
   type GoogleMapsCity,
 } from "../googleMaps/openWebNinjaGoogleMapsScraper";
 import {
@@ -64,6 +65,7 @@ export class GoogleMapsTrafficPoller {
       fetchConcurrency: 8,
       endpoint: "https://api.openwebninja.com/google-maps-traffic-alerts/traffic-alerts",
     });
+    void probeOpenWebNinjaGoogleMaps();
     this.scheduler = startMonitoredZoneScheduler({
       label: "OpenWebNinja Google Maps",
       intervalMs: GOOGLE_MAPS_POLL_INTERVAL_MS,

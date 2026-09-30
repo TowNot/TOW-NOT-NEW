@@ -825,6 +825,36 @@ export async function fetchOpenWebNinjaGoogleMapsForCity(
   };
 }
 
+/**
+ * One-shot startup probe: raw OpenWebNinja replies for central London under
+ * a few parameter variants, so an all-empty poll can be traced to params vs provider.
+ */
+export async function probeOpenWebNinjaGoogleMaps(): Promise<void> {
+  const apiKey = config.openWebNinjaApiKey;
+  if (!apiKey) return;
+  const variants: Record<string, string> = {
+    current: "bottom_left=42.93,-81.33&top_right=43.03,-81.16&zoom=13",
+    noZoom: "bottom_left=42.93,-81.33&top_right=43.03,-81.16",
+    lngLatOrder: "bottom_left=-81.33,42.93&top_right=-81.16,43.03&zoom=13",
+  };
+  for (const [name, query] of Object.entries(variants)) {
+    try {
+      const res = await keepAliveFetch(`${ENDPOINT}?${query}`, {
+        headers: { "X-API-Key": apiKey, Accept: "application/json" },
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+      const body = await res.text().catch(() => "");
+      logger.warn(
+        `[GoogleMaps Probe] variant=${name} status=${res.status} body=${body.slice(0, 400)}`,
+      );
+    } catch (error) {
+      logger.error(`[GoogleMaps Probe] variant=${name} failed`, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+}
+
 export async function fetchAllOpenWebNinjaGoogleMapsCities(): Promise<Incident[]> {
   const cities = await getMonitoredGoogleMapsCities();
   const batches = await Promise.allSettled(
