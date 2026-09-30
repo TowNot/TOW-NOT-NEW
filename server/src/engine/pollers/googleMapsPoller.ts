@@ -86,18 +86,25 @@ export class GoogleMapsTrafficPoller {
       const fetchResult = await fetchOpenWebNinjaGoogleMapsForCity(city);
       const { incidents, stats } = await this.ingestIncidents(fetchResult.incidents);
       noteDemandPollResult("google_maps", city.id, true);
+      const types =
+        Object.entries(fetchResult.typeCounts)
+          .map(([type, count]) => `${type}:${count}`)
+          .join(",") || "none";
       const line =
-        `[GoogleMaps Poll] city=${city.id} | tiles=${fetchResult.tiles} | fetched=${fetchResult.fetched} | retained=${fetchResult.retained} | pushed=${stats.pushed} | merged=${stats.merged} | noCoords=${fetchResult.missingCoords} | badShape=${fetchResult.unexpectedShape} | duration=${fetchResult.latencyMs || Date.now() - started}ms`;
+        `[GoogleMaps Poll] city=${city.id} | tiles=${fetchResult.tiles} | fetched=${fetchResult.fetched} | types=${types} | retained=${fetchResult.retained} | pushed=${stats.pushed} | merged=${stats.merged} | noCoords=${fetchResult.missingCoords} | badShape=${fetchResult.unexpectedShape} | duration=${fetchResult.latencyMs || Date.now() - started}ms`;
       const now = Date.now();
       const dueForSummary =
         now - (this.lastCitySummaryAt.get(city.id) ?? 0) >= CITY_SUMMARY_INTERVAL_MS;
-      const suspicious =
-        fetchResult.unexpectedShape > 0 ||
-        (fetchResult.fetched > 0 && fetchResult.missingCoords === fetchResult.fetched);
+      const problem =
+        fetchResult.unexpectedShape > 0 || fetchResult.missingCoords === fetchResult.fetched
+          ? fetchResult.fetched === 0 && fetchResult.unexpectedShape === 0
+            ? "OpenWebNinja returned zero alerts (not even construction) for the whole city"
+            : "OpenWebNinja response not parsed"
+          : null;
       if (dueForSummary) {
         this.lastCitySummaryAt.set(city.id, now);
-        if (suspicious) {
-          logger.warn(`${line} | OpenWebNinja response not parsed`, {
+        if (problem) {
+          logger.warn(`${line} | ${problem}`, {
             sample: fetchResult.unexpectedShapeSample,
           });
         } else {

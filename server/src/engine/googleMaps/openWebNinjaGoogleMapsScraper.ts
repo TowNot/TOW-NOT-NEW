@@ -643,10 +643,9 @@ async function fetchZoom(
     ...boxParams(box),
     zoom: String(zoom),
   });
-  // Rollback (unfiltered): `${ENDPOINT}?${params.toString()}`
-  // Rollback (accident only): `${ENDPOINT}?${params.toString()}&alert_types=accident`
-  // Rollback (incident only): `${ENDPOINT}?${params.toString()}&alert_types=incident`
-  const url = `${ENDPOINT}?${params.toString()}&alert_types=accident,incident`;
+  // Unfiltered: construction / closures are dropped locally via HARD_DROP_TYPES.
+  // Rollback (API-side filter): `${ENDPOINT}?${params.toString()}&alert_types=accident,incident`
+  const url = `${ENDPOINT}?${params.toString()}`;
   const res = await keepAliveFetch(url, {
     headers: {
       "X-API-Key": apiKey,
@@ -708,6 +707,8 @@ export interface GoogleMapsCityFetchResult {
   /** 200 responses whose body had no `data.alerts` array. */
   unexpectedShape: number;
   unexpectedShapeSample: string | null;
+  /** Raw OpenWebNinja `type` counts before filtering (e.g. accident, construction). */
+  typeCounts: Record<string, number>;
 }
 
 /**
@@ -779,6 +780,10 @@ export async function fetchOpenWebNinjaGoogleMapsForCity(
     if (lat == null || lng == null) missingCoords += 1;
     const rawType = (asString(tagged.raw.type) ?? "unknown").toLowerCase();
     typeCounts[rawType] = (typeCounts[rawType] ?? 0) + 1;
+    if (HARD_DROP_TYPES.has(rawType.trim())) {
+      dropped += 1;
+      continue;
+    }
     const incident = toIncident(tagged, city, now);
     if (incident) mapped.push(incident);
     else dropped += 1;
@@ -816,6 +821,7 @@ export async function fetchOpenWebNinjaGoogleMapsForCity(
     missingCoords,
     unexpectedShape: shape.unexpected,
     unexpectedShapeSample: shape.sample,
+    typeCounts,
   };
 }
 
