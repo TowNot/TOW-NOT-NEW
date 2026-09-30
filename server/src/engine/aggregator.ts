@@ -32,7 +32,7 @@ export class DataAggregatorEngine {
         box: `${zone.bounds.southWest.lat}, ${zone.bounds.southWest.lng} .. ${zone.bounds.northEast.lat}, ${zone.bounds.northEast.lng}`,
       })),
     });
-    if (!config.wazeApiKey) {
+    if (config.wazePollingEnabled && !config.wazeApiKey) {
       logger.warn("WAZEAPI_KEY is unset — BlocksInside poll will be skipped");
     }
     if (!config.twilioAccountSid || !config.twilioAuthToken) {

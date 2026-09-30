@@ -109,6 +109,13 @@ export const config = {
     "https://oouxkyuexvzylckxeeks.supabase.co/storage/v1/object/public/pgsstoragebucket/Box8ybh6oF1k8MfNQjxX/YUEjbFcDfJDaWOI.png",
   rapidApiKey: process.env.RAPIDAPI_KEY ?? "",
   wazeApiKey: process.env.WAZEAPI_KEY?.trim() || "",
+  /**
+   * BlocksInside (WazeAPI) polling. Default OFF (paused while billing is unpaid).
+   * Set WAZE_POLLING_ENABLED=1 to resume. Google Maps is unaffected.
+   */
+  wazePollingEnabled:
+    process.env.WAZE_POLLING_ENABLED === "1" ||
+    process.env.WAZE_POLLING_ENABLED === "true",
   wazeApiCountry: process.env.WAZEAPI_COUNTRY?.trim() || "eur",
   wazeBottomLeft: process.env.WAZE_BOTTOM_LEFT?.trim() || "42.8949, -81.3683",
   wazeTopRight: process.env.WAZE_TOP_RIGHT?.trim() || "43.0749, -81.1223",

@@ -98,6 +98,12 @@ export class WazeTrafficPoller {
 
   start(): void {
     if (this.scheduler) return;
+    if (!config.wazePollingEnabled) {
+      logger.info(
+        "[WAZE API] BlocksInside paused — set WAZE_POLLING_ENABLED=1 to resume (Google Maps still running)",
+      );
+      return;
+    }
     logger.info("Live traffic aggregator started", {
       intervalMs: config.pollIntervalMs,
       staggerMs: ZONE_SCHEDULER_STAGGER_MS,
@@ -129,7 +135,7 @@ export class WazeTrafficPoller {
 
   private liveProviders(): LiveWazeProvider[] {
     const providers: LiveWazeProvider[] = [];
-    if (config.wazeApiKey) providers.push("blocksinside");
+    if (config.wazePollingEnabled && config.wazeApiKey) providers.push("blocksinside");
     return providers;
   }
 

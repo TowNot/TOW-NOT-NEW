@@ -54,6 +54,7 @@ async function buildSourcesStatusPayload(store: IncidentStore) {
     lastRetained: blocksinside.lastRetained,
     credentials: {
       wazeApi: Boolean(config.wazeApiKey),
+      wazePollingEnabled: config.wazePollingEnabled,
       apify: Boolean(config.apifyApiToken),
       deepgram: Boolean(config.deepgramApiKey),
       redis: Boolean(config.redisUrl) || Boolean(process.env.REDIS_HOST),
