@@ -627,10 +627,17 @@ export function dedupeGoogleMapsIncidents(incidents: Incident[]): Incident[] {
   return unique;
 }
 
+/** Per-city tally of 200 responses whose body has no `data.alerts` array. */
+interface ResponseShapeStats {
+  unexpected: number;
+  sample: string | null;
+}
+
 async function fetchZoom(
   box: BoundingBox,
   zoom: number,
   apiKey: string,
+  shape: ResponseShapeStats,
 ): Promise<TaggedRawAlert[]> {
   const params = new URLSearchParams({
     ...boxParams(box),
@@ -652,20 +659,38 @@ async function fetchZoom(
     const body = await res.text().catch(() => "");
     throw new Error(`openwebninja google_maps zoom=${zoom} status=${res.status} body=${body.slice(0, 200)}`);
   }
-  const json = (await res.json().catch(() => ({}))) as unknown;
+  const text = await res.text().catch(() => "");
+  let json: unknown = {};
+  try {
+    json = JSON.parse(text) as unknown;
+  } catch {
+    json = {};
+  }
+  if (!hasAlertsArray(json)) {
+    shape.unexpected += 1;
+    shape.sample ??= text.slice(0, 300);
+  }
   return extractAlerts(json).map((raw) => ({ raw, zoom }));
+}
+
+function hasAlertsArray(payload: unknown): boolean {
+  if (!payload || typeof payload !== "object") return false;
+  const root = payload as Record<string, unknown>;
+  const data = (root["data"] ?? root) as Record<string, unknown> | null;
+  return Boolean(data && typeof data === "object" && Array.isArray(data["alerts"]));
 }
 
 /** Run tile/zoom fetches in small parallel batches to avoid API timeouts. */
 async function fetchJobsWithConcurrency(
   jobs: Array<{ tile: BoundingBox; zoom: number }>,
   apiKey: string,
+  shape: ResponseShapeStats,
 ): Promise<PromiseSettledResult<TaggedRawAlert[]>[]> {
   const settled: PromiseSettledResult<TaggedRawAlert[]>[] = [];
   for (let i = 0; i < jobs.length; i += FETCH_CONCURRENCY) {
     const batch = jobs.slice(i, i + FETCH_CONCURRENCY);
     const batchResults = await Promise.allSettled(
-      batch.map(({ tile, zoom }) => fetchZoom(tile, zoom, apiKey)),
+      batch.map(({ tile, zoom }) => fetchZoom(tile, zoom, apiKey, shape)),
     );
     settled.push(...batchResults);
   }
@@ -678,6 +703,11 @@ export interface GoogleMapsCityFetchResult {
   fetched: number;
   retained: number;
   latencyMs: number;
+  /** Raw rows with no usable latitude/longitude (dropped silently otherwise). */
+  missingCoords: number;
+  /** 200 responses whose body had no `data.alerts` array. */
+  unexpectedShape: number;
+  unexpectedShapeSample: string | null;
 }
 
 /**
@@ -701,7 +731,8 @@ export async function fetchOpenWebNinjaGoogleMapsForCity(
   runtime.lastError = null;
   runtime.lastTypeCounts = null;
 
-  const settled = await fetchJobsWithConcurrency(fetchJobs, apiKey);
+  const shape: ResponseShapeStats = { unexpected: 0, sample: null };
+  const settled = await fetchJobsWithConcurrency(fetchJobs, apiKey, shape);
 
   const rawMerged: TaggedRawAlert[] = [];
   let zoomsOk = 0;
@@ -740,8 +771,12 @@ export async function fetchOpenWebNinjaGoogleMapsForCity(
   const now = new Date();
   const mapped: Incident[] = [];
   let dropped = 0;
+  let missingCoords = 0;
   const typeCounts: Record<string, number> = {};
   for (const tagged of rawMerged) {
+    const lat = asNumber(tagged.raw.latitude) ?? asNumber(tagged.raw.lat);
+    const lng = asNumber(tagged.raw.longitude) ?? asNumber(tagged.raw.lng);
+    if (lat == null || lng == null) missingCoords += 1;
     const rawType = (asString(tagged.raw.type) ?? "unknown").toLowerCase();
     typeCounts[rawType] = (typeCounts[rawType] ?? 0) + 1;
     const incident = toIncident(tagged, city, now);
@@ -778,6 +813,9 @@ export async function fetchOpenWebNinjaGoogleMapsForCity(
     fetched: rawMerged.length,
     retained: deduped.length,
     latencyMs: runtime.lastLatencyMs ?? Date.now() - started,
+    missingCoords,
+    unexpectedShape: shape.unexpected,
+    unexpectedShapeSample: shape.sample,
   };
 }
 

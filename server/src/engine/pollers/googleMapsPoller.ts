@@ -29,6 +29,8 @@ import { noteDemandPollResult } from "../cityDemandSummary";
 
 /** Extreme field-test cadence (15s). Waze uses config.pollIntervalMs (10s). */
 const GOOGLE_MAPS_POLL_INTERVAL_MS = 15_000;
+/** Per-city info summary cadence — keeps Railway readable at a 15s poll. */
+const CITY_SUMMARY_INTERVAL_MS = 3 * 60_000;
 
 interface IngestStats {
   pushed: number;
@@ -41,6 +43,7 @@ interface IngestStats {
  */
 export class GoogleMapsTrafficPoller {
   private scheduler: ZoneSchedulerHandle | null = null;
+  private readonly lastCitySummaryAt = new Map<string, number>();
 
   constructor(private readonly store: IncidentStore) {}
 
@@ -83,9 +86,26 @@ export class GoogleMapsTrafficPoller {
       const fetchResult = await fetchOpenWebNinjaGoogleMapsForCity(city);
       const { incidents, stats } = await this.ingestIncidents(fetchResult.incidents);
       noteDemandPollResult("google_maps", city.id, true);
-      logger.debug(
-        `[GoogleMaps Poll] city=${city.id} | tiles=${fetchResult.tiles} | fetched=${fetchResult.fetched} | retained=${fetchResult.retained} | pushed=${stats.pushed} | merged=${stats.merged} | duration=${fetchResult.latencyMs || Date.now() - started}ms`,
-      );
+      const line =
+        `[GoogleMaps Poll] city=${city.id} | tiles=${fetchResult.tiles} | fetched=${fetchResult.fetched} | retained=${fetchResult.retained} | pushed=${stats.pushed} | merged=${stats.merged} | noCoords=${fetchResult.missingCoords} | badShape=${fetchResult.unexpectedShape} | duration=${fetchResult.latencyMs || Date.now() - started}ms`;
+      const now = Date.now();
+      const dueForSummary =
+        now - (this.lastCitySummaryAt.get(city.id) ?? 0) >= CITY_SUMMARY_INTERVAL_MS;
+      const suspicious =
+        fetchResult.unexpectedShape > 0 ||
+        (fetchResult.fetched > 0 && fetchResult.missingCoords === fetchResult.fetched);
+      if (dueForSummary) {
+        this.lastCitySummaryAt.set(city.id, now);
+        if (suspicious) {
+          logger.warn(`${line} | OpenWebNinja response not parsed`, {
+            sample: fetchResult.unexpectedShapeSample,
+          });
+        } else {
+          logger.info(line);
+        }
+      } else {
+        logger.debug(line);
+      }
       return incidents;
     } catch (error) {
       noteDemandPollResult("google_maps", city.id, false);
