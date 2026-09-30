@@ -46,7 +46,7 @@ export class DataAggregatorEngine {
       this.radio.start();
     } else {
       logger.info(
-        "[FIRE SCANNER] paused — set FIRE_DISPATCH_ENABLED=0 is active (Deepgram / radio off)",
+        "[FIRE SCANNER] paused — set FIRE_DISPATCH_ENABLED=1 to resume Deepgram / radio listeners",
       );
     }
     this.googleMaps.start();
