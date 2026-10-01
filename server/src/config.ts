@@ -117,10 +117,17 @@ export const config = {
     process.env.WAZE_POLLING_ENABLED !== "0" &&
     process.env.WAZE_POLLING_ENABLED !== "false",
   /**
-   * Waze 2 — OpenWebNinja Waze API key. Waze 2 polls only while this is set
-   * (same 12-tile / 10s / ACCIDENT+POLICE settings as Waze 1).
+   * Waze 2 — OpenWebNinja Waze (same 12-tile / 10s / ACCIDENT+POLICE settings as Waze 1).
+   * Uses the shared OpenWebNinja account key unless OPENWEBNINJA_WAZE_API_KEY overrides it.
+   * Set OPENWEBNINJA_WAZE_ENABLED=0 to pause.
    */
-  openWebNinjaWazeApiKey: process.env.OPENWEBNINJA_WAZE_API_KEY?.trim() || "",
+  openWebNinjaWazeApiKey:
+    process.env.OPENWEBNINJA_WAZE_ENABLED === "0" ||
+    process.env.OPENWEBNINJA_WAZE_ENABLED === "false"
+      ? ""
+      : process.env.OPENWEBNINJA_WAZE_API_KEY?.trim() ||
+        process.env.OPENWEBNINJA_API_KEY?.trim() ||
+        "",
   wazeApiCountry: process.env.WAZEAPI_COUNTRY?.trim() || "eur",
   wazeBottomLeft: process.env.WAZE_BOTTOM_LEFT?.trim() || "42.8949, -81.3683",
   wazeTopRight: process.env.WAZE_TOP_RIGHT?.trim() || "43.0749, -81.1223",

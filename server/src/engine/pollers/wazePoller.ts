@@ -117,7 +117,7 @@ const WAZE_FEEDS: Record<WazeFeed, WazeFeedSettings> = {
     demandKey: "waze_2",
     enabled: () => Boolean(config.openWebNinjaWazeApiKey),
     pausedMessage:
-      "[WAZE 2] OpenWebNinja Waze off — set OPENWEBNINJA_WAZE_API_KEY in Railway to turn it on",
+      "[WAZE 2] OpenWebNinja Waze paused — OPENWEBNINJA_WAZE_ENABLED=0 or no OpenWebNinja key set",
     fetchZone: fetchOpenWebNinjaWazeForZone,
   },
 };
