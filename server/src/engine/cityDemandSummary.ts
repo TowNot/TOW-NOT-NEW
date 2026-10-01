@@ -2,7 +2,8 @@ import { logger } from "../logger";
 
 const SUMMARY_INTERVAL_MS = 3 * 60_000;
 
-type ProviderKey = "waze" | "google_maps";
+/** `waze` = Waze 1 (BlocksInside), `waze_2` = Waze 2 (OpenWebNinja Waze). */
+export type ProviderKey = "waze" | "waze_2" | "google_maps";
 
 interface ProviderCycleStats {
   ok: number;
@@ -12,6 +13,7 @@ interface ProviderCycleStats {
 
 const lastCycle: Record<ProviderKey, ProviderCycleStats> = {
   waze: { ok: 0, fail: 0, cities: [] },
+  waze_2: { ok: 0, fail: 0, cities: [] },
   google_maps: { ok: 0, fail: 0, cities: [] },
 };
 
@@ -56,12 +58,14 @@ export function maybeLogDemandSummary(force = false): void {
   lastSummaryAt = now;
 
   const waze = lastCycle.waze;
+  const waze2 = lastCycle.waze_2;
   const gmaps = lastCycle.google_maps;
-  const demand = [...new Set([...waze.cities, ...gmaps.cities])].sort();
+  const demand = [...new Set([...waze.cities, ...waze2.cities, ...gmaps.cities])].sort();
 
   logger.info(
     `[city-demand] demand=[${demand.join(",") || "none"}] ` +
-      `waze_ok=${waze.ok} waze_fail=${waze.fail} ` +
+      `waze1_ok=${waze.ok} waze1_fail=${waze.fail} ` +
+      `waze2_ok=${waze2.ok} waze2_fail=${waze2.fail} ` +
       `gmaps_ok=${gmaps.ok} gmaps_fail=${gmaps.fail}`,
   );
 }

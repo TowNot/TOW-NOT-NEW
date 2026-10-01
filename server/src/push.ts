@@ -53,17 +53,24 @@ function absoluteUrl(pathOrUrl: string): string {
 }
 
 const PROVIDER_LABELS: Record<string, string> = {
-  blocksinside: "Waze",
+  blocksinside: "Waze 1",
+  openwebninja: "Waze 2",
   waze_direct: "Waze",
-  openwebninja: "OpenWebNinja",
   openwebninja_google_maps: "Google Maps",
   google_maps: "Google Maps",
   [TORONTO_FIRE_CAD_PROVIDER]: "Toronto Fire",
 };
 
+/** Waze 1 = BlocksInside, Waze 2 = OpenWebNinja Waze. */
+function wazeLabel(provider: string | undefined): string {
+  if (provider === "blocksinside") return "Waze 1";
+  if (provider === "openwebninja") return "Waze 2";
+  return "Waze";
+}
+
 function labelForIncident(incident: Incident): string {
   if (isPoliceType(incident.type, incident.subtype ?? null)) {
-    return "Waze (Police)";
+    return `${wazeLabel(incident.provider)} (Police)`;
   }
   if (incident.provider === TORONTO_FIRE_CAD_PROVIDER || isTorontoFireCadProvider(incident.provider)) {
     return "Toronto Fire";
@@ -178,7 +185,7 @@ export function incidentToPushPayload(incident: Incident): PushPayload {
 
   return {
     title: police
-      ? "AlertNav · Waze (Police)"
+      ? `AlertNav · ${providerLabel}`
       : `AlertNav · ${providerLabel} · ${incident.title}`,
     body: police
       ? truncate(

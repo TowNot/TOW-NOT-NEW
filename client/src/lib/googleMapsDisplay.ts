@@ -17,7 +17,8 @@ export function formatGoogleMapsProviderAttribution(
   if (provider === "openwebninja_google_maps") {
     return formatOpenWebNinjaGoogleMapsLabel(googleMapsZoom, rawType);
   }
-  if (provider === "blocksinside") return "BlocksInside";
+  if (provider === "blocksinside") return "Waze 1";
+  if (provider === "openwebninja") return "Waze 2";
   if (/^[a-zA-Z]+_fire_dispatch/.test(provider)) {
     return fireDispatchDisplayLabel(provider);
   }

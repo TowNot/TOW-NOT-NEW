@@ -110,12 +110,17 @@ export const config = {
   rapidApiKey: process.env.RAPIDAPI_KEY ?? "",
   wazeApiKey: process.env.WAZEAPI_KEY?.trim() || "",
   /**
-   * BlocksInside (WazeAPI) polling. Default OFF (paused while billing is unpaid).
-   * Set WAZE_POLLING_ENABLED=1 to resume. Google Maps is unaffected.
+   * Waze 1 — BlocksInside (WazeAPI) polling. Default ON.
+   * Set WAZE_POLLING_ENABLED=0 to pause. Google Maps is unaffected.
    */
   wazePollingEnabled:
-    process.env.WAZE_POLLING_ENABLED === "1" ||
-    process.env.WAZE_POLLING_ENABLED === "true",
+    process.env.WAZE_POLLING_ENABLED !== "0" &&
+    process.env.WAZE_POLLING_ENABLED !== "false",
+  /**
+   * Waze 2 — OpenWebNinja Waze API key. Waze 2 polls only while this is set
+   * (same 12-tile / 10s / ACCIDENT+POLICE settings as Waze 1).
+   */
+  openWebNinjaWazeApiKey: process.env.OPENWEBNINJA_WAZE_API_KEY?.trim() || "",
   wazeApiCountry: process.env.WAZEAPI_COUNTRY?.trim() || "eur",
   wazeBottomLeft: process.env.WAZE_BOTTOM_LEFT?.trim() || "42.8949, -81.3683",
   wazeTopRight: process.env.WAZE_TOP_RIGHT?.trim() || "43.0749, -81.1223",

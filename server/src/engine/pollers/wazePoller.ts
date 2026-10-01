@@ -12,10 +12,9 @@ import {
 } from "../incidentMerge";
 import {
   fetchBlocksInsideForZone,
+  fetchOpenWebNinjaWazeForZone,
   isBreakdown,
   isPoliceType,
-  LIVE_WAZE_PROVIDERS,
-  type LiveWazeProvider,
   type ProviderSource,
   type WazeAlert,
 } from "../wazeAggregator";
@@ -91,35 +90,65 @@ export function mapWazeAlert(alert: WazeAlert): Incident {
   };
 }
 
+/** Waze 1 = BlocksInside, Waze 2 = OpenWebNinja Waze. Identical settings, independent feeds. */
+export type WazeFeed = "waze1" | "waze2";
+
+interface WazeFeedSettings {
+  /** Scheduler label — also routes `[city-demand]` counters. */
+  label: string;
+  demandKey: "waze" | "waze_2";
+  enabled: () => boolean;
+  pausedMessage: string;
+  fetchZone: (zone: { id: string; name: string }) => Promise<WazeAlert[]>;
+}
+
+const WAZE_FEEDS: Record<WazeFeed, WazeFeedSettings> = {
+  waze1: {
+    label: "Waze 1 (BlocksInside)",
+    demandKey: "waze",
+    enabled: () => config.wazePollingEnabled && Boolean(config.wazeApiKey),
+    pausedMessage: !config.wazePollingEnabled
+      ? "[WAZE 1] BlocksInside paused — WAZE_POLLING_ENABLED=0 (Google Maps still running)"
+      : "[WAZE 1] BlocksInside skipped — WAZEAPI_KEY is unset",
+    fetchZone: fetchBlocksInsideForZone,
+  },
+  waze2: {
+    label: "Waze 2 (OpenWebNinja)",
+    demandKey: "waze_2",
+    enabled: () => Boolean(config.openWebNinjaWazeApiKey),
+    pausedMessage:
+      "[WAZE 2] OpenWebNinja Waze off — set OPENWEBNINJA_WAZE_API_KEY in Railway to turn it on",
+    fetchZone: fetchOpenWebNinjaWazeForZone,
+  },
+};
+
 export class WazeTrafficPoller {
   private scheduler: ZoneSchedulerHandle | null = null;
+  private readonly feed: WazeFeedSettings;
 
-  constructor(private readonly store: IncidentStore) {}
+  constructor(
+    private readonly store: IncidentStore,
+    feed: WazeFeed = "waze1",
+  ) {
+    this.feed = WAZE_FEEDS[feed];
+  }
 
   start(): void {
     if (this.scheduler) return;
-    if (!config.wazePollingEnabled) {
-      logger.info(
-        "[WAZE API] BlocksInside paused — set WAZE_POLLING_ENABLED=1 to resume (Google Maps still running)",
-      );
+    if (!this.feed.enabled()) {
+      logger.info(this.feed.pausedMessage);
       return;
     }
-    logger.info("Live traffic aggregator started", {
+    logger.info(`[${this.feed.label}] live traffic poller started`, {
       intervalMs: config.pollIntervalMs,
       staggerMs: ZONE_SCHEDULER_STAGGER_MS,
       prismaDemandedCities: true,
-      providers: LIVE_WAZE_PROVIDERS.filter((p) => p === "blocksinside" && config.wazeApiKey),
-      wazeApiConfigured: Boolean(config.wazeApiKey),
       filter: '["ACCIDENT","POLICE"]',
-      country: config.wazeApiCountry,
       tiles: 12,
+      ...(this.feed.demandKey === "waze" ? { country: config.wazeApiCountry } : {}),
     });
-    if (!config.wazeApiKey) {
-      logger.warn("Skipping live traffic poll; WAZEAPI_KEY is unset");
-      return;
-    }
     this.scheduler = startMonitoredZoneScheduler({
-      label: "Waze",
+      label: this.feed.label,
       intervalMs: config.pollIntervalMs,
       resolveZones: getMonitoredCoverageZones,
       run: async (zone) => {
@@ -133,22 +162,16 @@ export class WazeTrafficPoller {
     this.scheduler = null;
   }
 
-  private liveProviders(): LiveWazeProvider[] {
-    const providers: LiveWazeProvider[] = [];
-    if (config.wazePollingEnabled && config.wazeApiKey) providers.push("blocksinside");
-    return providers;
-  }
-
   async pollZone(zone: { id: string; name: string }): Promise<Incident[]> {
-    if (this.liveProviders().length === 0) return [];
+    if (!this.feed.enabled()) return [];
     try {
-      const alerts = await fetchBlocksInsideForZone(zone);
+      const alerts = await this.feed.fetchZone(zone);
       const ingested = await this.ingestAlerts(alerts);
-      noteDemandPollResult("waze", zone.id, true);
+      noteDemandPollResult(this.feed.demandKey, zone.id, true);
       return ingested;
     } catch (error) {
-      noteDemandPollResult("waze", zone.id, false);
-      logger.error("Live traffic poll failed", {
+      noteDemandPollResult(this.feed.demandKey, zone.id, false);
+      logger.error(`${this.feed.label} poll failed`, {
         zone: zone.id,
         error: error instanceof Error ? error.message : String(error),
       });
@@ -195,7 +218,7 @@ export class WazeTrafficPoller {
     }
     if (alerts.length > 0 || ingested.length > 0) {
       logger.info(
-        `Live traffic poll complete fetched=${alerts.length} ingested=${ingested.length}`,
+        `${this.feed.label} poll complete fetched=${alerts.length} ingested=${ingested.length}`,
       );
     }
     return ingested;

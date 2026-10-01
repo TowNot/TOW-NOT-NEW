@@ -102,14 +102,15 @@ function resolveProgressierFile(): string | undefined {
 
 const store = new IncidentStore();
 const dispatcher = new PushDispatcher();
-const waze = new WazeTrafficPoller(store);
+const waze = new WazeTrafficPoller(store, "waze1");
+const waze2 = new WazeTrafficPoller(store, "waze2");
 const googleMaps = new GoogleMapsTrafficPoller(store);
 const radio = new RadioIngestionWorker(store);
 const torontoFireCad = new TorontoFireCadPoller(store);
-const engine = new DataAggregatorEngine(waze, googleMaps, radio, torontoFireCad);
+const engine = new DataAggregatorEngine(waze, waze2, googleMaps, radio, torontoFireCad);
 
 registerCityDemandScrapers({
-  pollWazeZone: (zone) => waze.pollZone(zone),
+  pollWazeZone: (zone) => Promise.allSettled([waze.pollZone(zone), waze2.pollZone(zone)]),
   pollGoogleMapsCity: (city) => googleMaps.pollCity(city),
   reconcileRadio: () => reconcileRadioOrchestrator(store),
 });

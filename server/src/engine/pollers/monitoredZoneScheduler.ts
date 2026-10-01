@@ -3,6 +3,7 @@ import {
   maybeLogDemandSummary,
   noteDemandCycleCities,
   noteDemandPollResult,
+  type ProviderKey,
 } from "../cityDemandSummary";
 
 export interface ZoneSchedulerHandle {
@@ -12,10 +13,9 @@ export interface ZoneSchedulerHandle {
 /** Delay between cities within one poll cycle so APIs are not burst together. */
 export const ZONE_SCHEDULER_STAGGER_MS = 175;
 
-type DemandProvider = "waze" | "google_maps";
-
-function providerForLabel(label: string): DemandProvider | null {
+function providerForLabel(label: string): ProviderKey | null {
   const lower = label.toLowerCase();
+  if (lower.includes("waze 2")) return "waze_2";
   if (lower.includes("waze")) return "waze";
   if (lower.includes("google")) return "google_maps";
   return null;

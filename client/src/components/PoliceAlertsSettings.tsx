@@ -13,7 +13,7 @@ export function PoliceAlertsSettings({ enabled, onToggle }: PoliceAlertsSettings
         <div>
           <h2 className="text-sm font-semibold text-gray-900">Police Alerts</h2>
           <p className="mt-0.5 text-xs text-gray-500">
-            Waze police presence — pins and pushes labeled AlertNav · Waze (Police)
+            Waze police presence — pins and pushes labeled AlertNav · Waze 1 (Police) or Waze 2 (Police)
           </p>
         </div>
         <button

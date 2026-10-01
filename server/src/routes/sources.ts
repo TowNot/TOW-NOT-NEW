@@ -55,6 +55,7 @@ async function buildSourcesStatusPayload(store: IncidentStore) {
     credentials: {
       wazeApi: Boolean(config.wazeApiKey),
       wazePollingEnabled: config.wazePollingEnabled,
+      openWebNinjaWaze: Boolean(config.openWebNinjaWazeApiKey),
       apify: Boolean(config.apifyApiToken),
       deepgram: Boolean(config.deepgramApiKey),
       redis: Boolean(config.redisUrl) || Boolean(process.env.REDIS_HOST),
@@ -76,8 +77,19 @@ async function buildSourcesStatusPayload(store: IncidentStore) {
       fetchConcurrency: 8,
       endpoint: "https://api.openwebninja.com/google-maps-traffic-alerts/traffic-alerts",
     },
+    waze2OpenWebNinja: {
+      enabled: Boolean(config.openWebNinjaWazeApiKey),
+      endpoint: "https://api.openwebninja.com/waze/alerts-and-jams",
+      alertTypes: "ACCIDENT,POLICE",
+      tiles: 12,
+      intervalMs: config.pollIntervalMs,
+      ...providers.openwebninja,
+    },
     subscriptions: await subscriptionStoreStats(),
-    liveWazeProvider: "blocksinside",
+    liveWazeProviders: {
+      waze1: config.wazePollingEnabled && Boolean(config.wazeApiKey) ? "blocksinside" : null,
+      waze2: config.openWebNinjaWazeApiKey ? "openwebninja" : null,
+    },
     push: {
       endpoint: config.progressierPushUrl,
       appId: config.progressierAppId,

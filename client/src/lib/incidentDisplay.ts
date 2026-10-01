@@ -10,6 +10,13 @@ const SOURCE_LABELS: Record<IncidentSource, string> = {
   ems: "EMS",
 };
 
+/** Waze 1 = BlocksInside, Waze 2 = OpenWebNinja Waze. */
+export function wazeProviderLabel(provider?: string | null): string {
+  if (provider === "blocksinside") return "Waze 1";
+  if (provider === "openwebninja") return "Waze 2";
+  return "Waze";
+}
+
 export function incidentSourceDetections(incident: Incident): SourceDetection[] {
   if (incident.sourceDetections?.length) return incident.sourceDetections;
   return [
@@ -27,12 +34,11 @@ export function formatSourceDetectionLabel(
   detection: SourceDetection,
   incident?: Pick<Incident, "type" | "subtype" | "provider">,
 ): string {
-  if (
-    incident &&
-    detection.source === "waze" &&
-    isPoliceIncident(incident.type, incident.subtype)
-  ) {
-    return "Waze (Police)";
+  if (detection.source === "waze") {
+    const label = wazeProviderLabel(detection.provider ?? incident?.provider);
+    return incident && isPoliceIncident(incident.type, incident.subtype)
+      ? `${label} (Police)`
+      : label;
   }
   if (detection.source === "google_maps") {
     return formatOpenWebNinjaGoogleMapsLabel(detection.googleMapsZoom, detection.rawType);
@@ -58,7 +64,10 @@ export function sourceLabel(
   subtype?: string | null,
   provider?: string | null,
 ): string {
-  if (source === "waze" && isPoliceIncident(type, subtype)) return "Waze (Police)";
+  if (source === "waze") {
+    const label = wazeProviderLabel(provider);
+    return isPoliceIncident(type, subtype) ? `${label} (Police)` : label;
+  }
   if (source === "fire_dispatch") return fireDispatchDisplayLabel(provider);
   return SOURCE_LABELS[source];
 }

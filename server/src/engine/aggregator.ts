@@ -10,6 +10,7 @@ import { RadioIngestionWorker } from "./workers/radioIngestionWorker";
 export class DataAggregatorEngine {
   constructor(
     private readonly waze: WazeTrafficPoller,
+    private readonly waze2: WazeTrafficPoller,
     private readonly googleMaps: GoogleMapsTrafficPoller,
     private readonly radio: RadioIngestionWorker,
     private readonly torontoFireCad: TorontoFireCadPoller,
@@ -17,15 +18,16 @@ export class DataAggregatorEngine {
 
   start(): void {
     const enabled = enabledCoverageZones();
-    logger.info("[WAZE API] starting BlocksInside 12-tile Waze scraper", {
+    logger.info("[WAZE API] starting Waze 1 (BlocksInside) + Waze 2 (OpenWebNinja) 12-tile scrapers", {
       londonOnly: LONDON_ONLY_INGEST,
       prismaDemandedCities: true,
       wazeApi: Boolean(config.wazeApiKey),
+      openWebNinjaWazeApi: Boolean(config.openWebNinjaWazeApiKey),
       twilio: Boolean(config.twilioAccountSid && config.twilioAuthToken),
       publicUrl: config.publicUrl,
       filter: '["ACCIDENT","POLICE"]',
       country: config.wazeApiCountry,
-      tilesPerCity: 4,
+      tilesPerCity: 12,
       radioZones: enabled.map((zone) => zone.id),
       zones: enabled.map((zone) => ({
         id: zone.id,
@@ -39,6 +41,7 @@ export class DataAggregatorEngine {
       logger.warn("Twilio credentials unset — SMS alerts will not send until configured");
     }
     this.waze.start();
+    this.waze2.start();
     if (config.fireDispatchEnabled) {
       logger.info("[FIRE SCANNER] starting zone audio orchestrator (HLS + continuous streams)", {
         zones: config.fireDispatchZoneIds,
@@ -64,6 +67,7 @@ export class DataAggregatorEngine {
 
   stop(): void {
     this.waze.stop();
+    this.waze2.stop();
     this.googleMaps.stop();
     this.radio.stop();
     this.torontoFireCad.stop();

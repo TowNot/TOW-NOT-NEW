@@ -176,7 +176,8 @@ export function mergeSourceDetections(
     bySource.set(detection.source, {
       source: detection.source,
       detectedAt: keepEarliest ? detection.detectedAt : prev.detectedAt,
-      provider: detection.provider ?? prev.provider,
+      // First provider to report wins (Waze 1 vs Waze 2 attribution).
+      provider: prev.provider ?? detection.provider,
       googleMapsZoom: mergeGoogleMapsZoom(prev.googleMapsZoom, detection.googleMapsZoom),
       rawType: mergeGoogleMapsRawType(prev.rawType, detection.rawType),
     });

@@ -2,6 +2,7 @@ import { fetch as undiciFetch } from "undici";
 import { config } from "../config";
 import {
   acquireBlocksInsidePermit,
+  acquireOpenWebNinjaWazePermit,
   isBlocksInsideRateLimitError,
 } from "./blocksInsideRateLimit";
 import { boundingBox, distanceKm, splitBoundingBoxGrid, type BoundingBox } from "./geo";
@@ -1192,20 +1193,81 @@ async function fetchBlocksInsideTileOnce(tile: BoundingBox): Promise<WazeAlert[]
 }
 
 /** One tile fetch, gated globally; single retry after 429. */
-async function fetchBlocksInsideTile(tile: BoundingBox): Promise<WazeAlert[]> {
+async function withRateLimitRetry(
+  label: string,
+  tile: BoundingBox,
+  fetchOnce: (tile: BoundingBox) => Promise<WazeAlert[]>,
+): Promise<WazeAlert[]> {
   try {
-    return await fetchBlocksInsideTileOnce(tile);
+    return await fetchOnce(tile);
   } catch (error) {
     if (!isBlocksInsideRateLimitError(error)) throw error;
     logger.warn(
       {
         tile: `${blocksInsideCoordPair(tile.bottomLeft.lat, tile.bottomLeft.lng)}..${blocksInsideCoordPair(tile.topRight.lat, tile.topRight.lng)}`,
       },
-      "BlocksInside rate limited — retrying tile once",
+      `${label} rate limited — retrying tile once`,
     );
     await sleep(BLOCKSINSIDE_429_RETRY_MS);
-    return fetchBlocksInsideTileOnce(tile);
+    return fetchOnce(tile);
   }
+}
+
+function fetchBlocksInsideTile(tile: BoundingBox): Promise<WazeAlert[]> {
+  return withRateLimitRetry("BlocksInside", tile, fetchBlocksInsideTileOnce);
+}
+
+const OPENWEBNINJA_WAZE_ENDPOINT = "https://api.openwebninja.com/waze/alerts-and-jams";
+
+/**
+ * Waze 2 — OpenWebNinja direct API. Same tile, filter, timeout and pacing as
+ * BlocksInside (Waze 1) so both feeds race on equal terms.
+ */
+async function fetchOpenWebNinjaWazeTileOnce(tile: BoundingBox): Promise<WazeAlert[]> {
+  await acquireOpenWebNinjaWazePermit();
+  const params = new URLSearchParams({
+    bottom_left: `${tile.bottomLeft.lat},${tile.bottomLeft.lng}`,
+    top_right: `${tile.topRight.lat},${tile.topRight.lng}`,
+    alert_types: "ACCIDENT,POLICE",
+    max_alerts: "200",
+    max_jams: "0",
+  });
+  const url = `${OPENWEBNINJA_WAZE_ENDPOINT}?${params.toString()}`;
+  const started = Date.now();
+  const res = await timedProviderFetch("openwebninja", url, {
+    headers: {
+      "X-API-Key": config.openWebNinjaWazeApiKey,
+      Accept: "application/json",
+    },
+    signal: AbortSignal.timeout(BLOCKSINSIDE_TIMEOUT_MS),
+  });
+  const rawBody = await res.text().catch(() => "");
+  if (!res.ok) {
+    logger.error(
+      `Provider request failed provider=openwebninja_waze status=${res.status} latencyMs=${Date.now() - started} body=${rawBody.slice(0, 300)}`,
+    );
+    throw new Error(`openwebninja_waze responded with status ${res.status}`);
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawBody) as unknown;
+  } catch (err) {
+    logger.error(`Provider returned malformed JSON provider=openwebninja_waze sample=${rawBody.slice(0, 300)}`);
+    throw err;
+  }
+  if (isPlainRecord(parsed) && parsed["status"] === "ERROR") {
+    logger.error(`Provider returned error provider=openwebninja_waze body=${rawBody.slice(0, 300)}`);
+    throw new Error("openwebninja_waze returned status ERROR");
+  }
+  const rawAlerts = extractAlertRows(parsed);
+  logger.debug(
+    `[WAZE 2] OpenWebNinja tile fetched=${rawAlerts.length} bytes=${rawBody.length} latencyMs=${Date.now() - started}`,
+  );
+  return parseRawAlerts(rawAlerts, "openwebninja");
+}
+
+function fetchOpenWebNinjaWazeTile(tile: BoundingBox): Promise<WazeAlert[]> {
+  return withRateLimitRetry("OpenWebNinja Waze", tile, fetchOpenWebNinjaWazeTileOnce);
 }
 
 function londonBlocksInsideBox(): BoundingBox {
@@ -1214,11 +1276,15 @@ function londonBlocksInsideBox(): BoundingBox {
   return { bottomLeft, topRight };
 }
 
-async function fetchBlocksInsideBox(box: BoundingBox): Promise<WazeAlert[]> {
+async function fetchTileGrid(
+  box: BoundingBox,
+  label: string,
+  fetchTile: (tile: BoundingBox) => Promise<WazeAlert[]>,
+): Promise<WazeAlert[]> {
   const tiles = splitBoundingBoxGrid(box, BLOCKSINSIDE_TILE_ROWS, BLOCKSINSIDE_TILE_COLS);
 
-  // All tiles compete for the global ≤8 req/s gate (shared across cities).
-  const settled = await Promise.allSettled(tiles.map((tile) => fetchBlocksInsideTile(tile)));
+  // All tiles compete for the provider's global ≤8 req/s gate (shared across cities).
+  const settled = await Promise.allSettled(tiles.map((tile) => fetchTile(tile)));
 
   const merged: WazeAlert[] = [];
   const seenIds = new Set<string>();
@@ -1229,7 +1295,7 @@ async function fetchBlocksInsideBox(box: BoundingBox): Promise<WazeAlert[]> {
       failedTiles += 1;
       logger.warn(
         { error: result.reason instanceof Error ? result.reason.message : String(result.reason) },
-        "BlocksInside tile fetch failed",
+        `${label} tile fetch failed`,
       );
       continue;
     }
@@ -1242,29 +1308,31 @@ async function fetchBlocksInsideBox(box: BoundingBox): Promise<WazeAlert[]> {
 
   if (failedTiles === tiles.length) {
     throw new Error(
-      `blocksinside all tile fetches failed for box ${blocksInsideCoordPair(box.bottomLeft.lat, box.bottomLeft.lng)}`,
+      `${label.toLowerCase()} all tile fetches failed for box ${blocksInsideCoordPair(box.bottomLeft.lat, box.bottomLeft.lng)}`,
     );
   }
 
   return merged;
 }
 
-/**
- * Fetch BlocksInside accidents for a single coverage zone.
- * Tile fetches share the global ≤8 req/s BlocksInside gate.
- */
-export async function fetchBlocksInsideForZone(zone: {
-  id: string;
-  name: string;
-}): Promise<WazeAlert[]> {
+function fetchBlocksInsideBox(box: BoundingBox): Promise<WazeAlert[]> {
+  return fetchTileGrid(box, "BlocksInside", fetchBlocksInsideTile);
+}
+
+async function fetchZoneTileGrid(
+  zone: { id: string; name: string },
+  label: string,
+  logTag: string,
+  fetchTile: (tile: BoundingBox) => Promise<WazeAlert[]>,
+): Promise<WazeAlert[]> {
   const match = getCoverageZone(zone.id);
   const box = match ? zoneToBoundingBox(match) : londonBlocksInsideBox();
   try {
-    const alerts = await fetchBlocksInsideBox(box);
+    const alerts = await fetchTileGrid(box, label, fetchTile);
     const accidents = alerts.filter((a) => a.type.toUpperCase().startsWith("ACCIDENT")).length;
     const police = alerts.filter((a) => a.type.toUpperCase() === "POLICE" || (a.subtype ?? "").toUpperCase().includes("POLICE")).length;
     logger.info(
-      `[waze-poller] Polled zone: ${zone.name} | Tiles: ${BLOCKSINSIDE_TILES_PER_ZONE} | Alerts found: ${alerts.length} (accidents=${accidents} police=${police})`,
+      `[${logTag}] Polled zone: ${zone.name} | Tiles: ${BLOCKSINSIDE_TILES_PER_ZONE} | Alerts found: ${alerts.length} (accidents=${accidents} police=${police})`,
     );
     return alerts;
   } catch (err) {
@@ -1273,13 +1341,35 @@ export async function fetchBlocksInsideForZone(zone: {
         zone: zone.name,
         error: err instanceof Error ? err.message : String(err),
       },
-      "BlocksInside city fetch failed",
+      `${label} city fetch failed`,
     );
     logger.info(
-      `[waze-poller] Polled zone: ${zone.name} | Tiles: ${BLOCKSINSIDE_TILES_PER_ZONE} | Alerts found: 0`,
+      `[${logTag}] Polled zone: ${zone.name} | Tiles: ${BLOCKSINSIDE_TILES_PER_ZONE} | Alerts found: 0`,
     );
     throw err;
   }
+}
+
+/**
+ * Waze 1: BlocksInside accidents + police for a single coverage zone.
+ * Tile fetches share the global ≤8 req/s BlocksInside gate.
+ */
+export function fetchBlocksInsideForZone(zone: {
+  id: string;
+  name: string;
+}): Promise<WazeAlert[]> {
+  return fetchZoneTileGrid(zone, "BlocksInside", "waze-poller", fetchBlocksInsideTile);
+}
+
+/**
+ * Waze 2: OpenWebNinja Waze accidents + police for a single coverage zone.
+ * Same 12-tile grid as Waze 1, on its own ≤8 req/s gate.
+ */
+export function fetchOpenWebNinjaWazeForZone(zone: {
+  id: string;
+  name: string;
+}): Promise<WazeAlert[]> {
+  return fetchZoneTileGrid(zone, "OpenWebNinja Waze", "waze2-poller", fetchOpenWebNinjaWazeTile);
 }
 
 async function fetchBlocksInside(
