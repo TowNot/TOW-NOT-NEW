@@ -108,7 +108,7 @@ const WAZE_FEEDS: Record<WazeFeed, WazeFeedSettings> = {
     demandKey: "waze",
     enabled: () => config.wazePollingEnabled && Boolean(config.wazeApiKey),
     pausedMessage: !config.wazePollingEnabled
-      ? "[WAZE 1] BlocksInside paused — WAZE_POLLING_ENABLED=0 (Google Maps still running)"
+      ? "[WAZE 1] BlocksInside paused — set WAZE_POLLING_ENABLED=1 to resume (Waze 2 + Google Maps still running)"
       : "[WAZE 1] BlocksInside skipped — WAZEAPI_KEY is unset",
     fetchZone: fetchBlocksInsideForZone,
   },

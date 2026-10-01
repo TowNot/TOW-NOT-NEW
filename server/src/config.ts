@@ -110,12 +110,12 @@ export const config = {
   rapidApiKey: process.env.RAPIDAPI_KEY ?? "",
   wazeApiKey: process.env.WAZEAPI_KEY?.trim() || "",
   /**
-   * Waze 1 — BlocksInside (WazeAPI) polling. Default ON.
-   * Set WAZE_POLLING_ENABLED=0 to pause. Google Maps is unaffected.
+   * Waze 1 — BlocksInside (WazeAPI) polling. Default OFF (paused).
+   * Set WAZE_POLLING_ENABLED=1 to resume. Waze 2 / Google Maps are unaffected.
    */
   wazePollingEnabled:
-    process.env.WAZE_POLLING_ENABLED !== "0" &&
-    process.env.WAZE_POLLING_ENABLED !== "false",
+    process.env.WAZE_POLLING_ENABLED === "1" ||
+    process.env.WAZE_POLLING_ENABLED === "true",
   /**
    * Waze 2 — OpenWebNinja Waze (same 12-tile / 10s / ACCIDENT+POLICE settings as Waze 1).
    * Uses the shared OpenWebNinja account key unless OPENWEBNINJA_WAZE_API_KEY overrides it.
