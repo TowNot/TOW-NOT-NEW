@@ -1,7 +1,7 @@
 import type { Subscription, SubscriptionStatus as PrismaSubscriptionStatus } from "@prisma/client";
 import { prisma } from "../db/prisma";
 import { invalidateActiveMonitoredCitiesCache } from "../engine/activeMonitoredCities";
-import { clerkPrimaryEmail } from "../lib/clerkUserEmail";
+import { clerkPrimaryEmail, clerkPrimaryEmailInfo } from "../lib/clerkUserEmail";
 import { logger } from "../logger";
 
 export type SubscriptionStatus = "active" | "trialing" | "canceled" | "inactive";
@@ -87,6 +87,9 @@ export async function findSubscriptionByClientReferenceId(
   return row ? toRecord(row) : null;
 }
 
+/** Owner accounts with full access without a Stripe subscription. Requires a Clerk-verified primary email. */
+const COMPLIMENTARY_ACCESS_EMAILS = new Set(["salehsoccer6@gmail.com"]);
+
 export function isEntitledSubscriptionStatus(status: SubscriptionStatus | undefined): boolean {
   return status === "active" || status === "trialing";
 }
@@ -104,9 +107,10 @@ export async function isClerkUserEntitled(clerkUserId: string): Promise<boolean>
   const byReference = await findSubscriptionByClientReferenceId(id);
   if (isEntitledSubscriptionStatus(byReference?.status)) return true;
 
-  const email = await clerkPrimaryEmail(id);
-  if (!email) return false;
-  return isSubscriptionEntitled(email);
+  const primary = await clerkPrimaryEmailInfo(id);
+  if (!primary) return false;
+  if (primary.verified && COMPLIMENTARY_ACCESS_EMAILS.has(primary.email)) return true;
+  return isSubscriptionEntitled(primary.email);
 }
 
 /** True if this Clerk account already used a trial (by Clerk id or email). Sticky across cancel. */
