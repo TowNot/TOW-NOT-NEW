@@ -223,7 +223,10 @@ export async function mintBroadcastifyHlsUrl(feedId: number): Promise<string | n
 
     const minted = new URL(session.url);
     logger.info(
-      `[broadcastify] minted HLS stream URL ${minted.host}${minted.pathname} (query params: ${
+      `[broadcastify] minted HLS stream URL ${minted.host}${minted.pathname.replace(
+        /\/t\/[^/]+\//,
+        "/t/<token>/",
+      )} (query params: ${
         [...minted.searchParams.keys()].join(",") || "none"
       }; response fields: ${session.keys.join(",")})`,
       { feedId },

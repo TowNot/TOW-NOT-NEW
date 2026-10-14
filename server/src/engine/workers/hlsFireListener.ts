@@ -74,6 +74,12 @@ const REMINT_AFTER_FAILURES = 2;
 /** Minimum spacing between mint attempts when minting keeps failing. */
 const MINT_RETRY_MS = 60_000;
 const MINT_MIN_GAP_MS = 20_000;
+/** Broadcastify refuses non-licensed programmatic access; stop hitting it for a while. */
+const LICENSE_REFUSAL_PAUSE_MS = 6 * 60 * 60 * 1000;
+
+function isLicenseRefusal(err: unknown): boolean {
+  return err instanceof Error && /requires a developer license/i.test(err.message);
+}
 
 interface StreamState extends AudioBufferState {
   /** Signed playlist URL; empty until minted. */
@@ -86,6 +92,8 @@ interface StreamState extends AudioBufferState {
   firstAudioLogged: boolean;
   /** Index into HEADER_PROFILES that the HLS host currently accepts. */
   headerProfile: number;
+  /** Epoch ms until which polling is suspended after a license refusal. */
+  pausedUntil: number;
 }
 
 function curlFetch(url: string, headerArgs: string[] = HEADER_PROFILES[0].args): Promise<Buffer> {
@@ -325,6 +333,7 @@ export function startHlsFireListener(opts: HlsFireListenerOptions): () => void {
     mintFailures: 0,
     firstAudioLogged: false,
     headerProfile: 0,
+    pausedUntil: 0,
   };
 
   /** Replace the playlist URL with a freshly minted signed one. */
@@ -352,6 +361,7 @@ export function startHlsFireListener(opts: HlsFireListenerOptions): () => void {
   logger.info(`[fire-dispatch] HLS listener started: ${label} → zone ${zoneId}`);
 
   const pollOnce = async (): Promise<void> => {
+    if (Date.now() < state.pausedUntil) return;
     if (!state.hlsUrl && !(await remint())) return;
 
     let playlistText: string;
@@ -359,6 +369,16 @@ export function startHlsFireListener(opts: HlsFireListenerOptions): () => void {
       playlistText = await fetchPlaylist(state, label);
       state.consecutiveFailures = 0;
     } catch (err) {
+      if (isLicenseRefusal(err)) {
+        state.pausedUntil = Date.now() + LICENSE_REFUSAL_PAUSE_MS;
+        state.hlsUrl = "";
+        state.lastAudioAt = state.pausedUntil;
+        logger.error(
+          `[fire-dispatch] Broadcastify refused ${label}: programmatic access requires a Broadcastify developer license (bcfy.io). Pausing this feed for 6h.`,
+          { feedId },
+        );
+        return;
+      }
       state.consecutiveFailures += 1;
       if (state.consecutiveFailures === 1 || state.consecutiveFailures % 10 === 0) {
         const message = err instanceof Error ? err.message : String(err);
