@@ -133,6 +133,9 @@ export const config = {
   wazeTopRight: process.env.WAZE_TOP_RIGHT?.trim() || "43.0749, -81.1223",
   apifyApiToken: process.env.APIFY_API_TOKEN ?? "",
   deepgramApiKey: process.env.DEEPGRAM_API_KEY ?? "",
+  /** Broadcastify account (free tier works) — required to mint HLS stream URLs for fire radio. */
+  broadcastifyUsername: process.env.BROADCASTIFY_USERNAME?.trim() || "",
+  broadcastifyPassword: process.env.BROADCASTIFY_PASSWORD ?? "",
   /** BullMQ / Redis — notification queue. Empty → local 127.0.0.1:6379. */
   redisUrl: process.env.REDIS_URL?.trim() || "",
   /** PostgreSQL — subscriptions + SMS opt-ins (Prisma). */

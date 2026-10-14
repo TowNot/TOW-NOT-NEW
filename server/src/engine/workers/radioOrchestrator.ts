@@ -9,6 +9,8 @@ import { startHlsFireListener } from "./hlsFireListener";
 import { startIcecastFireListener } from "./icecastFireListener";
 
 const stopFns: Array<() => void> = [];
+/** Sorted fire-zone allowlist the running listeners were started with; null when stopped. */
+let runningZonesKey: string | null = null;
 
 function streamKey(audio: { type: string; feedId?: number | null; url?: string }): string {
   if (audio.type === "hls" && typeof audio.feedId === "number") {
@@ -33,6 +35,10 @@ function resolveFireZoneAllowlist(
   return intersection;
 }
 
+function resolveFireZoneKey(allowedZoneIds: ReadonlySet<string>): string {
+  return [...resolveFireZoneAllowlist(allowedZoneIds)].sort().join(",");
+}
+
 export function startRadioOrchestrator(
   store: IncidentStore,
   allowedZoneIds?: ReadonlySet<string>,
@@ -44,6 +50,7 @@ export function startRadioOrchestrator(
   attachFireDispatchStore(store);
 
   const fireZones = resolveFireZoneAllowlist(allowedZoneIds);
+  runningZonesKey = [...fireZones].sort().join(",");
   const startedStreams = new Set<string>();
   const active: string[] = [];
   const skippedInactive: string[] = [];
@@ -161,6 +168,7 @@ export function startRadioOrchestrator(
 export function stopRadioOrchestrator(): void {
   for (const stop of stopFns) stop();
   stopFns.length = 0;
+  runningZonesKey = null;
 }
 
 export async function reconcileRadioOrchestrator(
@@ -172,6 +180,8 @@ export async function reconcileRadioOrchestrator(
   }
   // Deepgram spend is gated by FIRE_DISPATCH_ZONES (default: london only),
   // not by which cities users selected for Waze/GMaps.
+  const desired = new Set(config.fireDispatchZoneIds);
+  if (runningZonesKey === resolveFireZoneKey(desired)) return;
   stopRadioOrchestrator();
-  startRadioOrchestrator(store, new Set(config.fireDispatchZoneIds));
+  startRadioOrchestrator(store, desired);
 }

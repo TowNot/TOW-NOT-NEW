@@ -1,12 +1,12 @@
 /**
  * Reusable Broadcastify HLS fire-dispatch listener.
  *
- * Polls `https://hls-o1.broadcastify.com/s0/feed/{FEED_ID}/playlist.m3u8`,
+ * Polls a signed playlist URL minted per session (see broadcastifySession),
  * buffers ~10s of MPEG-TS segments with rolling overlap, converts to WAV,
  * and hands audio to the shared STT → incident pipeline.
  *
  * Broadcastify's HLS origin 403s Node's fetch fingerprint, so all HTTP goes
- * through the system `curl` binary (verified working for London feed 34296).
+ * through the system `curl` binary.
  */
 import { spawn } from "node:child_process";
 import fs from "node:fs";
@@ -22,6 +22,7 @@ import {
   takeFlushChunk,
   type AudioBufferState,
 } from "./audioBuffer";
+import { mintBroadcastifyHlsUrl } from "./broadcastifySession";
 import { createFireDispatchProcessor } from "./fireDispatchPipeline";
 import {
   noteAudioSegment,
@@ -45,20 +46,21 @@ const MAX_HTTP_RESPONSE_BYTES = 4 * 1024 * 1024;
 const SUBPROCESS_TIMEOUT_MS = 40_000;
 const FFMPEG_TIMEOUT_MS = 60_000;
 const WATCHDOG_SILENCE_MS = 2 * 60 * 1000;
-
-function hlsPlaylistUrl(feedId: number): string {
-  return `https://hls-o1.broadcastify.com/s0/feed/${feedId}/playlist.m3u8`;
-}
-
-function popoutUrl(feedId: number): string {
-  return `https://www.broadcastify.com/listen/feed/popout.php?feedId=${feedId}`;
-}
+/** Playlist failures in a row before minting a fresh signed URL. */
+const REMINT_AFTER_FAILURES = 2;
+/** Minimum spacing between mint attempts when minting keeps failing. */
+const MINT_RETRY_MS = 60_000;
+const MINT_MIN_GAP_MS = 20_000;
 
 interface StreamState extends AudioBufferState {
+  /** Signed playlist URL; empty until minted. */
   hlsUrl: string;
   lastSequence: number;
   consecutiveFailures: number;
   lastAudioAt: number;
+  lastMintAttemptAt: number;
+  mintFailures: number;
+  firstAudioLogged: boolean;
 }
 
 function curlFetch(url: string): Promise<Buffer> {
@@ -129,19 +131,13 @@ async function fetchText(url: string): Promise<string> {
   return (await curlFetch(url)).toString("utf8");
 }
 
-async function rediscoverHlsUrl(feedId: number): Promise<string | null> {
-  try {
-    const html = await fetchText(popoutUrl(feedId));
-    const m = html.match(/hlsUrl:\s*"([^"]+)"/);
-    if (m?.[1]) {
-      const url = m[1].replace(/\\\//g, "/");
-      logger.debug(`[fire-dispatch] rediscovered HLS url for feed ${feedId}: ${url}`);
-      return url;
-    }
-  } catch (err) {
-    logger.warn("[fire-dispatch] popout re-scrape failed", { err, feedId });
-  }
-  return null;
+/** First variant of a master playlist, or null if this is already a media playlist. */
+function firstVariantUrl(text: string, baseUrl: string): string | null {
+  if (!text.includes("#EXT-X-STREAM-INF")) return null;
+  const lines = text.split("\n").map((l) => l.trim());
+  const idx = lines.findIndex((l) => l.startsWith("#EXT-X-STREAM-INF"));
+  const uri = lines.slice(idx + 1).find((l) => l.length > 0 && !l.startsWith("#"));
+  return uri ? new URL(uri, baseUrl).toString() : null;
 }
 
 interface PlaylistSegment {
@@ -268,10 +264,30 @@ export function startHlsFireListener(opts: HlsFireListenerOptions): () => void {
 
   const state: StreamState = {
     ...createAudioBufferState(),
-    hlsUrl: hlsPlaylistUrl(feedId),
+    hlsUrl: "",
     lastSequence: -1,
     consecutiveFailures: 0,
     lastAudioAt: Date.now(),
+    lastMintAttemptAt: 0,
+    mintFailures: 0,
+    firstAudioLogged: false,
+  };
+
+  /** Replace the playlist URL with a freshly minted signed one. */
+  const remint = async (): Promise<boolean> => {
+    const minGap = state.mintFailures > 0 ? MINT_RETRY_MS : MINT_MIN_GAP_MS;
+    if (Date.now() - state.lastMintAttemptAt < minGap) return false;
+    state.lastMintAttemptAt = Date.now();
+    const fresh = await mintBroadcastifyHlsUrl(feedId);
+    if (!fresh) {
+      state.mintFailures += 1;
+      return false;
+    }
+    state.mintFailures = 0;
+    state.hlsUrl = fresh;
+    state.lastSequence = -1;
+    state.consecutiveFailures = 0;
+    return true;
   };
 
   let stopped = false;
@@ -282,6 +298,8 @@ export function startHlsFireListener(opts: HlsFireListenerOptions): () => void {
   logger.info(`[fire-dispatch] HLS listener started: ${label} → zone ${zoneId}`);
 
   const pollOnce = async (): Promise<void> => {
+    if (!state.hlsUrl && !(await remint())) return;
+
     let playlistText: string;
     try {
       playlistText = await fetchText(state.hlsUrl);
@@ -295,13 +313,15 @@ export function startHlsFireListener(opts: HlsFireListenerOptions): () => void {
           failures: state.consecutiveFailures,
         });
       }
-      if (state.consecutiveFailures >= 3) {
-        const fresh = await rediscoverHlsUrl(feedId);
-        if (fresh) {
-          state.hlsUrl = fresh;
-          state.consecutiveFailures = 0;
-        }
+      if (state.consecutiveFailures >= REMINT_AFTER_FAILURES) {
+        await remint();
       }
+      return;
+    }
+
+    const variant = firstVariantUrl(playlistText, state.hlsUrl);
+    if (variant) {
+      state.hlsUrl = variant;
       return;
     }
 
@@ -326,6 +346,10 @@ export function startHlsFireListener(opts: HlsFireListenerOptions): () => void {
         state.lastSequence = seg.sequence;
         state.lastAudioAt = Date.now();
         noteAudioSegment();
+        if (!state.firstAudioLogged) {
+          state.firstAudioLogged = true;
+          logger.info(`[fire-dispatch] receiving audio from ${label}`);
+        }
       } catch (err) {
         logger.warn("[fire-dispatch] segment fetch failed", {
           err,
@@ -384,9 +408,8 @@ export function startHlsFireListener(opts: HlsFireListenerOptions): () => void {
     resetAudioBuffer(state);
     state.lastSequence = -1;
     state.consecutiveFailures = 0;
-    void rediscoverHlsUrl(feedId).then((fresh) => {
-      if (fresh) state.hlsUrl = fresh;
-    });
+    state.firstAudioLogged = false;
+    void remint();
   }, 30_000);
   watchdogTimer.unref();
 

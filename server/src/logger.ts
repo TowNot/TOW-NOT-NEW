@@ -19,11 +19,17 @@ function emit(level: LogLevel, message: string, meta?: Record<string, unknown>):
     ...meta,
   };
 
+  const json = JSON.stringify(line, serializeErrors);
   if (level === "error") {
-    console.error(JSON.stringify(line));
+    console.error(json);
     return;
   }
-  console.log(JSON.stringify(line));
+  console.log(json);
+}
+
+/** Error instances have no enumerable fields, so JSON.stringify would print `{}`. */
+function serializeErrors(_key: string, value: unknown): unknown {
+  return value instanceof Error ? value.message : value;
 }
 
 export const logger = {
