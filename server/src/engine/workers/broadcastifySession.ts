@@ -19,6 +19,7 @@ const ORIGIN = "https://www.broadcastify.com";
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36";
 const COOKIE_JAR = path.join(os.tmpdir(), `broadcastify-cookies-${process.pid}.txt`);
+export const BROADCASTIFY_COOKIE_JAR = COOKIE_JAR;
 const CURL_TIMEOUT_MS = 30_000;
 /** Re-login proactively; Broadcastify sessions outlive this comfortably. */
 const LOGIN_MAX_AGE_MS = 6 * 60 * 60 * 1000;
@@ -167,10 +168,13 @@ async function requestSessionUrl(feedId: number): Promise<CurlResult> {
   ]);
 }
 
-function parseSessionUrl(body: string): string | null {
+function parseSessionUrl(body: string): { url: string; keys: string[] } | null {
   try {
-    const json = JSON.parse(body) as { url?: unknown };
-    return typeof json.url === "string" && json.url.startsWith("https://") ? json.url : null;
+    const json = JSON.parse(body) as Record<string, unknown>;
+    const url = json.url;
+    return typeof url === "string" && url.startsWith("https://")
+      ? { url, keys: Object.keys(json) }
+      : null;
   } catch {
     return null;
   }
@@ -199,8 +203,8 @@ export async function mintBroadcastifyHlsUrl(feedId: number): Promise<string | n
       res = await requestSessionUrl(feedId);
     }
 
-    const url = res.status === 200 ? parseSessionUrl(res.body) : null;
-    if (!url) {
+    const session = res.status === 200 ? parseSessionUrl(res.body) : null;
+    if (!session) {
       if (res.status === 401 || res.status === 403) {
         lastLoginFailureAt = Date.now();
         logger.error(
@@ -217,8 +221,14 @@ export async function mintBroadcastifyHlsUrl(feedId: number): Promise<string | n
       return null;
     }
 
-    logger.info("[broadcastify] minted HLS stream URL", { feedId, host: new URL(url).host });
-    return url;
+    const minted = new URL(session.url);
+    logger.info(
+      `[broadcastify] minted HLS stream URL ${minted.host}${minted.pathname} (query params: ${
+        [...minted.searchParams.keys()].join(",") || "none"
+      }; response fields: ${session.keys.join(",")})`,
+      { feedId },
+    );
+    return session.url;
   } catch (err) {
     logger.warn("[broadcastify] session request failed", { err, feedId });
     return null;

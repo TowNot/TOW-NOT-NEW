@@ -22,7 +22,7 @@ import {
   takeFlushChunk,
   type AudioBufferState,
 } from "./audioBuffer";
-import { mintBroadcastifyHlsUrl } from "./broadcastifySession";
+import { BROADCASTIFY_COOKIE_JAR, mintBroadcastifyHlsUrl } from "./broadcastifySession";
 import { createFireDispatchProcessor } from "./fireDispatchPipeline";
 import {
   noteAudioSegment,
@@ -40,7 +40,30 @@ export {
 
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36";
-const STREAM_REFERER = "https://www.broadcastify.com";
+const BROADCASTIFY_ORIGIN = "https://www.broadcastify.com";
+/**
+ * Request header variants for the signed HLS host. Tried in order when the
+ * playlist is refused with a 4xx; the first one that works is kept.
+ */
+const HEADER_PROFILES: ReadonlyArray<{ name: string; args: string[] }> = [
+  {
+    name: "browser",
+    args: ["-H", `Origin: ${BROADCASTIFY_ORIGIN}`, "-H", `Referer: ${BROADCASTIFY_ORIGIN}/`],
+  },
+  {
+    name: "browser+cookies",
+    args: [
+      "-H",
+      `Origin: ${BROADCASTIFY_ORIGIN}`,
+      "-H",
+      `Referer: ${BROADCASTIFY_ORIGIN}/`,
+      "-b",
+      BROADCASTIFY_COOKIE_JAR,
+    ],
+  },
+  { name: "referer-only", args: ["-H", `Referer: ${BROADCASTIFY_ORIGIN}`] },
+  { name: "bare", args: [] },
+];
 const POLL_INTERVAL_MS = 5_000;
 const MAX_HTTP_RESPONSE_BYTES = 4 * 1024 * 1024;
 const SUBPROCESS_TIMEOUT_MS = 40_000;
@@ -61,12 +84,15 @@ interface StreamState extends AudioBufferState {
   lastMintAttemptAt: number;
   mintFailures: number;
   firstAudioLogged: boolean;
+  /** Index into HEADER_PROFILES that the HLS host currently accepts. */
+  headerProfile: number;
 }
 
-function curlFetch(url: string): Promise<Buffer> {
+function curlFetch(url: string, headerArgs: string[] = HEADER_PROFILES[0].args): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const proc = spawn("curl", [
       "-sS",
+      "-g",
       "--fail-with-body",
       "--max-time",
       "25",
@@ -82,8 +108,7 @@ function curlFetch(url: string): Promise<Buffer> {
       String(MAX_HTTP_RESPONSE_BYTES),
       "-A",
       UA,
-      "-H",
-      `Referer: ${STREAM_REFERER}`,
+      ...headerArgs,
       url,
     ]);
     const out: Buffer[] = [];
@@ -115,20 +140,48 @@ function curlFetch(url: string): Promise<Buffer> {
     proc.on("error", (err) => settle(() => reject(err)));
     proc.on("close", (code) => {
       settle(() => {
-        if (code === 0) resolve(Buffer.concat(out));
-        else
-          reject(
-            new Error(
-              `curl exited ${code}: ${Buffer.concat(errOut).toString().slice(0, 200)}`,
-            ),
-          );
+        if (code === 0) {
+          resolve(Buffer.concat(out));
+          return;
+        }
+        const stderr = Buffer.concat(errOut).toString().trim().slice(0, 160);
+        const body = Buffer.concat(out).toString("utf8").replace(/\s+/g, " ").trim().slice(0, 160);
+        reject(new Error(`curl exited ${code}: ${stderr}${body ? ` | body: ${body}` : ""}`));
       });
     });
   });
 }
 
-async function fetchText(url: string): Promise<string> {
-  return (await curlFetch(url)).toString("utf8");
+function isHttpClientError(err: unknown): boolean {
+  return err instanceof Error && /returned error: 4\d\d/.test(err.message);
+}
+
+/**
+ * Fetch the playlist with the accepted header profile; on a 4xx, try the other
+ * profiles and remember the first that works.
+ */
+async function fetchPlaylist(state: StreamState, label: string): Promise<string> {
+  const order = [
+    state.headerProfile,
+    ...HEADER_PROFILES.map((_, i) => i).filter((i) => i !== state.headerProfile),
+  ];
+  const failures: string[] = [];
+  for (const idx of order) {
+    try {
+      const text = (await curlFetch(state.hlsUrl, HEADER_PROFILES[idx].args)).toString("utf8");
+      if (idx !== state.headerProfile) {
+        state.headerProfile = idx;
+        logger.info(
+          `[fire-dispatch] HLS host accepted header profile "${HEADER_PROFILES[idx].name}" (${label})`,
+        );
+      }
+      return text;
+    } catch (err) {
+      if (!isHttpClientError(err)) throw err;
+      failures.push(`${HEADER_PROFILES[idx].name}: ${(err as Error).message}`);
+    }
+  }
+  throw new Error(`all header profiles refused — ${failures.join(" || ")}`);
 }
 
 /** First variant of a master playlist, or null if this is already a media playlist. */
@@ -271,6 +324,7 @@ export function startHlsFireListener(opts: HlsFireListenerOptions): () => void {
     lastMintAttemptAt: 0,
     mintFailures: 0,
     firstAudioLogged: false,
+    headerProfile: 0,
   };
 
   /** Replace the playlist URL with a freshly minted signed one. */
@@ -302,14 +356,15 @@ export function startHlsFireListener(opts: HlsFireListenerOptions): () => void {
 
     let playlistText: string;
     try {
-      playlistText = await fetchText(state.hlsUrl);
+      playlistText = await fetchPlaylist(state, label);
       state.consecutiveFailures = 0;
     } catch (err) {
       state.consecutiveFailures += 1;
       if (state.consecutiveFailures === 1 || state.consecutiveFailures % 10 === 0) {
-        logger.warn("[fire-dispatch] playlist fetch failed", {
-          err,
+        const message = err instanceof Error ? err.message : String(err);
+        logger.warn(`[fire-dispatch] playlist fetch failed (${label}): ${message}`, {
           feedId,
+          host: new URL(state.hlsUrl).host,
           failures: state.consecutiveFailures,
         });
       }
@@ -341,7 +396,7 @@ export function startHlsFireListener(opts: HlsFireListenerOptions): () => void {
     const fresh = segments.filter((s) => s.sequence > state.lastSequence);
     for (const seg of fresh) {
       try {
-        const data = await curlFetch(seg.url);
+        const data = await curlFetch(seg.url, HEADER_PROFILES[state.headerProfile].args);
         pushSegment(state, data, seg.seconds);
         state.lastSequence = seg.sequence;
         state.lastAudioAt = Date.now();
@@ -351,8 +406,8 @@ export function startHlsFireListener(opts: HlsFireListenerOptions): () => void {
           logger.info(`[fire-dispatch] receiving audio from ${label}`);
         }
       } catch (err) {
-        logger.warn("[fire-dispatch] segment fetch failed", {
-          err,
+        const message = err instanceof Error ? err.message : String(err);
+        logger.warn(`[fire-dispatch] segment fetch failed (${label}): ${message}`, {
           feedId,
           sequence: seg.sequence,
         });
