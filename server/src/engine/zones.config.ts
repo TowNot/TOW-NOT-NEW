@@ -21,6 +21,8 @@ export interface ZoneStreamAudio {
   agency?: "fire" | "ems";
   /** Optional extra STT gate phrases for this stream. */
   keywordTriggers?: string[];
+  /** Broadcastify Premium static URL — sign in with BROADCASTIFY_USERNAME / BROADCASTIFY_PASSWORD. */
+  broadcastifyPremium?: boolean;
 }
 
 export type ZoneAudio = ZoneHlsAudio | ZoneStreamAudio;
@@ -111,9 +113,10 @@ const ZONE_SEEDS: ZoneSeed[] = [
     enabled: true,
     audio: {
       enabled: true,
-      type: "hls",
-      feedId: 34296,
-      description: "London Fire",
+      type: "stream",
+      url: "https://audio.broadcastify.com/34296.mp3",
+      description: "London Fire (feed 34296)",
+      broadcastifyPremium: true,
     },
     scannedAgencies: ["Fire", "Public Works"],
   },

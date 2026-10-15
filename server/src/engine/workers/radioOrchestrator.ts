@@ -6,6 +6,7 @@ import { WATERLOO_REGION_RADIO_FEEDS } from "../waterlooRegionRadio";
 import { COVERAGE_ZONES } from "../zones.config";
 import { attachFireDispatchStore } from "./fireDispatchPipeline";
 import { startHlsFireListener } from "./hlsFireListener";
+import { startBroadcastifyPremiumListener } from "./broadcastifyPremiumListener";
 import { startIcecastFireListener } from "./icecastFireListener";
 
 const stopFns: Array<() => void> = [];
@@ -102,16 +103,19 @@ export function startRadioOrchestrator(
     }
 
     if (zone.audio.type === "stream") {
+      const listenerOpts = {
+        zoneId: zone.id,
+        url: zone.audio.url,
+        description: zone.audio.description,
+        agency: zone.audio.agency,
+        keywordTriggers: zone.audio.keywordTriggers,
+      };
       stopFns.push(
-        startIcecastFireListener({
-          zoneId: zone.id,
-          url: zone.audio.url,
-          description: zone.audio.description,
-          agency: zone.audio.agency,
-          keywordTriggers: zone.audio.keywordTriggers,
-        }),
+        zone.audio.broadcastifyPremium
+          ? startBroadcastifyPremiumListener(listenerOpts)
+          : startIcecastFireListener(listenerOpts),
       );
-      active.push(`${zone.id}:stream`);
+      active.push(`${zone.id}:stream${zone.audio.broadcastifyPremium ? "(premium)" : ""}`);
     }
   }
 

@@ -133,7 +133,7 @@ export const config = {
   wazeTopRight: process.env.WAZE_TOP_RIGHT?.trim() || "43.0749, -81.1223",
   apifyApiToken: process.env.APIFY_API_TOKEN ?? "",
   deepgramApiKey: process.env.DEEPGRAM_API_KEY ?? "",
-  /** Broadcastify account (free tier works) — required to mint HLS stream URLs for fire radio. */
+  /** Broadcastify Premium login (username, not email) — signs in to the static MP3 fire feed. */
   broadcastifyUsername: process.env.BROADCASTIFY_USERNAME?.trim() || "",
   broadcastifyPassword: process.env.BROADCASTIFY_PASSWORD ?? "",
   /** BullMQ / Redis — notification queue. Empty → local 127.0.0.1:6379. */
@@ -148,13 +148,13 @@ export const config = {
     process.env.TORONTO_FIRE_CAD_ENABLED === "1" ||
     process.env.TORONTO_FIRE_CAD_ENABLED === "true",
   /**
-   * Fire / EMS radio + Deepgram STT. Default OFF (paused — Broadcastify now
-   * requires a developer license for programmatic access).
-   * Set FIRE_DISPATCH_ENABLED=1 to resume.
+   * Fire / EMS radio + Deepgram STT. Default ON (London only via fireDispatchZoneIds,
+   * using the Broadcastify Premium static URL). Set FIRE_DISPATCH_ENABLED=0 to pause.
    */
-  fireDispatchEnabled:
-    process.env.FIRE_DISPATCH_ENABLED === "1" ||
-    process.env.FIRE_DISPATCH_ENABLED === "true",
+  fireDispatchEnabled: !(
+    process.env.FIRE_DISPATCH_ENABLED === "0" ||
+    process.env.FIRE_DISPATCH_ENABLED === "false"
+  ),
   /**
    * Zone ids that may start radio/Deepgram when fire dispatch is on.
    * Default london only (Fire + Public Works share feed 34296).
