@@ -159,14 +159,12 @@ export class FireDispatchProcessor {
     const startedAt = Date.now();
     const transcript = (await speechToText(wav)).trim();
     noteFireDispatchTranscript(transcript);
-    logger.debug(
-      {
-        source: this.ctx.sourceType,
-        chars: transcript.length,
-        preview: transcript.slice(0, 160),
-      },
-      "[FIRE SCANNER] Transcription received",
-    );
+    if (transcript.length >= 5) {
+      const preview = transcript.replace(/\s+/g, " ").slice(0, 300);
+      logger.info(
+        `[fire-dispatch] ${this.ctx.label} heard: "${preview}${transcript.length > 300 ? "…" : ""}"`,
+      );
+    }
     logger.debug(
       `[fire-dispatch] ${this.ctx.label} STT complete in ${Date.now() - startedAt}ms`,
     );
