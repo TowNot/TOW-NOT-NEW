@@ -37,7 +37,9 @@ export class DataAggregatorEngine {
     if (config.wazePollingEnabled && !config.wazeApiKey) {
       logger.warn("WAZEAPI_KEY is unset — BlocksInside poll will be skipped");
     }
-    if (!config.twilioAccountSid || !config.twilioAuthToken) {
+    if (!config.smsAlertsEnabled) {
+      logger.info("[SMS] Twilio SMS alerts paused — set SMS_ALERTS_ENABLED=1 to resume");
+    } else if (!config.twilioAccountSid || !config.twilioAuthToken) {
       logger.warn("Twilio credentials unset — SMS alerts will not send until configured");
     }
     this.waze.start();

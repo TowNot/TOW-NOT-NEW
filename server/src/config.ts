@@ -175,6 +175,9 @@ export const config = {
   openWebNinjaApiKey: process.env.OPENWEBNINJA_API_KEY?.trim() || "",
   googleMapsPollIntervalMs: 15_000,
   logLevel: (process.env.LOG_LEVEL ?? "info") as "debug" | "info" | "warn" | "error",
+  /** Twilio SMS alerts. Default OFF (paused) — set SMS_ALERTS_ENABLED=1 to resume. */
+  smsAlertsEnabled:
+    process.env.SMS_ALERTS_ENABLED === "1" || process.env.SMS_ALERTS_ENABLED === "true",
   twilioAccountSid: process.env.TWILIO_ACCOUNT_SID?.trim() || "",
   twilioAuthToken: process.env.TWILIO_AUTH_TOKEN?.trim() || "",
   twilioFromNumber: process.env.TWILIO_FROM_NUMBER?.trim() || "+12494025882",

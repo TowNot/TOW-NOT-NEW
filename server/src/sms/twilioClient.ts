@@ -68,7 +68,7 @@ export async function dispatchSmsBody(
   category?: PushCategory,
   zoneId?: string | null,
 ): Promise<void> {
-  if (!isTwilioConfigured()) return;
+  if (!config.smsAlertsEnabled || !isTwilioConfigured()) return;
   const recipients = category
     ? await listSmsRecipientsForCategory(category, zoneId)
     : [];
